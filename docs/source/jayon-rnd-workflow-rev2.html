@@ -1,0 +1,1102 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Jayon R&amp;D Workflow</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;family=IBM+Plex+Sans+Condensed:wght@500;600;700&amp;display=swap">
+<style>
+/* Layout: a drawing sheet. A title block in the hero, the whole route as one ballooned strip, then six framed
+   stages read top to bottom beside a step sheet. Light reads as a drawing sheet, dark as a blueprint. */
+:root {
+  --bg: #EEF2F6;
+  --sheet: #FBFCFD;
+  --ink: #0F2233;
+  --ink-2: #40566B;
+  --ink-3: #5A6E82;
+  --line: #C9D3DD;
+  --line-2: #94A6B8;
+  --grid: rgba(15, 60, 110, .06);
+  --band: rgba(31, 79, 216, .05);
+  --stamp: #5B2EC9;
+  --stamp-wash: rgba(91, 46, 201, .08);
+  --on-stamp: #FFFFFF;
+  --now: #C2410C;
+  --now-wash: rgba(194, 65, 12, .10);
+  --on-now: #FFFFFF;
+  --on-ink: #FBFCFD;
+  --shadow: 0 -8px 28px rgba(15, 34, 51, .16);
+  --f-text: "IBM Plex Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --f-head: "IBM Plex Sans Condensed", "Arial Narrow", "IBM Plex Sans", system-ui, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0A1E36; --sheet: #102B4C; --ink: #E8F1FF; --ink-2: #B7CAE6; --ink-3: #8FA8CB;
+    --line: #25456E; --line-2: #4F79AE; --grid: rgba(140, 180, 240, .075); --band: rgba(120, 170, 255, .08);
+    --stamp: #C6B6FF; --stamp-wash: rgba(198, 182, 255, .13); --on-stamp: #0A1E36;
+    --now: #FF9A4D; --now-wash: rgba(255, 154, 77, .15); --on-now: #0A1E36; --on-ink: #0A1E36;
+    --shadow: 0 -8px 28px rgba(0, 0, 0, .45);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0A1E36; --sheet: #102B4C; --ink: #E8F1FF; --ink-2: #B7CAE6; --ink-3: #8FA8CB;
+  --line: #25456E; --line-2: #4F79AE; --grid: rgba(140, 180, 240, .075); --band: rgba(120, 170, 255, .08);
+  --stamp: #C6B6FF; --stamp-wash: rgba(198, 182, 255, .13); --on-stamp: #0A1E36;
+  --now: #FF9A4D; --now-wash: rgba(255, 154, 77, .15); --on-now: #0A1E36; --on-ink: #0A1E36;
+  --shadow: 0 -8px 28px rgba(0, 0, 0, .45);
+  color-scheme: dark;
+}
+
+*, *::before, *::after { box-sizing: border-box }
+body {
+  margin: 0;
+  background-color: var(--bg);
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 24px 24px;
+  color: var(--ink);
+  font: 400 14px/1.5 var(--f-text);
+  -webkit-font-smoothing: antialiased;
+}
+button { font: inherit; color: inherit }
+h1, h2, h3, p, dl, dd, figure, ul { margin: 0 }
+h1, h2, h3 { font-family: var(--f-head); font-weight: 600; letter-spacing: -.01em; text-wrap: balance }
+:focus-visible { outline: 2px solid var(--now); outline-offset: 2px }
+.mono { font: 500 10.5px/1.4 var(--f-mono); letter-spacing: .09em; text-transform: uppercase; color: var(--ink-3) }
+.by { font: 500 9.5px/1 var(--f-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3) }
+
+.page {
+  max-width: 1280px; margin-inline: auto;
+  padding-block: 28px calc(190px + env(safe-area-inset-bottom, 0px));
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex; flex-direction: column; gap: 44px;
+}
+
+/* ---------- hero ---------- */
+.hero { display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px; align-items: end }
+.hero h1 { font-size: clamp(34px, 5.4vw, 54px); line-height: 1.02; margin-top: 10px; max-width: 17ch }
+.lede { font-size: 16px; color: var(--ink-2); max-width: 56ch; margin-top: 14px }
+.facts { display: flex; flex-wrap: wrap; gap: 4px 20px; margin-top: 18px; font: 500 12px/1.6 var(--f-mono); color: var(--ink-2) }
+.facts b { font-weight: 600; color: var(--ink) }
+.hero-cta { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 22px }
+.hint { color: var(--ink-3); font-size: 13px }
+.tblock { border: 1px solid var(--ink); background: var(--sheet); display: grid; grid-template-columns: auto minmax(0, 1fr) }
+.tblock > div { display: contents }
+.tblock dt, .tblock dd { padding: 7px 10px; border-bottom: 1px solid var(--line) }
+.tblock dt { font: 500 10px/1.7 var(--f-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); border-right: 1px solid var(--line); white-space: nowrap }
+.tblock dd { font-size: 13px; line-height: 1.4 }
+.tblock > div:last-child dt, .tblock > div:last-child dd { border-bottom: 0 }
+
+/* ---------- shared marks ---------- */
+.btn {
+  appearance: none; border: 1px solid var(--ink); background: var(--ink); color: var(--on-ink);
+  font: 600 14px/1 var(--f-text); padding: 11px 16px; border-radius: 3px; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 9px; white-space: nowrap;
+}
+.btn:hover { background: var(--now); border-color: var(--now); color: var(--on-now) }
+.btn svg, .ic svg { flex: none; display: block }
+.ic {
+  appearance: none; width: 38px; height: 38px; padding: 0; border: 1px solid var(--line-2); background: var(--sheet);
+  color: var(--ink); border-radius: 3px; cursor: pointer; display: inline-grid; place-items: center; flex: none;
+}
+.ic:hover { border-color: var(--ink) }
+.ic:disabled, .ic[aria-disabled="true"] { opacity: .35; cursor: default; border-color: var(--line-2) }
+.lnk {
+  appearance: none; border: 0; background: none; color: var(--ink-2); font: 500 13px/1 var(--f-text);
+  text-decoration: underline; text-underline-offset: 3px; cursor: pointer; padding: 8px 2px;
+}
+.lnk:hover { color: var(--ink) }
+.bal {
+  width: 28px; height: 28px; flex: none; display: inline-grid; place-items: center; padding: 0;
+  border: 1.25px solid var(--ink); border-radius: 50%; background: var(--sheet); color: var(--ink);
+  font: 500 12px/1 var(--f-mono); font-variant-numeric: tabular-nums;
+}
+.bal.dia { width: 25px; height: 25px; border-radius: 2px; transform: rotate(45deg); margin: 5px }
+.bal.dia > span { transform: rotate(-45deg) }
+.bal.start { background: var(--ink) }
+.bal.sm { width: 14px; height: 14px }
+.bal.long { font-size: 10px; letter-spacing: -.03em }
+.stamp {
+  --rot: 0deg;
+  display: inline-block; border: 1.5px solid var(--stamp); color: var(--stamp); background: var(--stamp-wash);
+  font: 700 11px/1 var(--f-head); letter-spacing: .07em; text-transform: uppercase;
+  padding: 4px 6px 3px; border-radius: 2px; white-space: nowrap; transform: rotate(var(--rot));
+}
+.stamp.hit { background: var(--stamp); color: var(--on-stamp) }
+@keyframes press {
+  0% { transform: scale(1.7) rotate(-9deg); opacity: 0 }
+  55% { transform: scale(.94) rotate(var(--rot)); opacity: 1 }
+  100% { transform: scale(1) rotate(var(--rot)); opacity: 1 }
+}
+.stamp.signing { animation: press .5s cubic-bezier(.2, .9, .3, 1.2) both; background: var(--stamp); color: var(--on-stamp) }
+.q {
+  position: absolute; top: 7px; right: 7px; width: 17px; height: 17px; border: 1px dashed var(--ink-2); border-radius: 50%;
+  display: grid; place-items: center; font: 600 10px/1 var(--f-mono); color: var(--ink-2); background: var(--sheet);
+}
+.q.hit { border-style: solid; border-color: var(--ink); background: var(--ink); color: var(--on-ink) }
+.q.st { position: static; flex: none }
+.q.chg { border: 1px solid var(--now); color: var(--now); font-size: 9px }
+.q.chg.hit { background: var(--now); border-color: var(--now); color: var(--on-now) }
+.q + .q.chg { right: 28px }
+
+/* ---------- section heads ---------- */
+.sec-h { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; margin-bottom: 16px }
+.sec-h h2 { font-size: 27px; line-height: 1.1 }
+.sec-h p { color: var(--ink-2); max-width: 78ch }
+
+/* ---------- the whole route ---------- */
+.route-fig { border: 1px solid var(--line-2); background: var(--sheet); padding: 16px 14px 14px }
+.strip { --bh: 40px; display: flex; flex-wrap: wrap; gap: 16px 6px }
+.sg { display: flex; flex-direction: column; gap: 8px; min-width: 0 }
+.sg-l {
+  font: 500 10.5px/1.4 var(--f-mono); letter-spacing: .09em; text-transform: uppercase; color: var(--ink-3);
+  border-bottom: 1px solid var(--line-2); padding-bottom: 5px; white-space: nowrap;
+}
+.sg-l b { color: var(--ink); font-weight: 600; margin-right: 7px }
+.sg-f { display: flex; flex-wrap: wrap; align-items: center; row-gap: 6px; min-height: var(--bh) }
+.og { display: flex; flex-direction: row; gap: 5px; padding: 5px; border: 1px solid var(--line-2); border-radius: 4px; background: var(--band) }
+.oa { flex: none; width: 14px; height: 1px; background: var(--line-2); position: relative; margin: 0 4px }
+.oa::after {
+  content: ""; position: absolute; right: 0; top: 50%; width: 5px; height: 5px;
+  border-top: 1px solid var(--line-2); border-right: 1px solid var(--line-2); transform: translate(0, -50%) rotate(45deg);
+}
+.ob { appearance: none; cursor: pointer; transition: opacity .2s }
+.ob:hover { border-color: var(--now) }
+.ob.cond { border-style: dashed }
+.ob.is-done { background: var(--ink); color: var(--on-ink) }
+.ob.is-next { opacity: .45 }
+.ob.is-on { border-color: var(--now); background: var(--now); color: var(--on-now); opacity: 1 }
+.ob.dim:not(.is-on) { opacity: .2 }
+.oe { flex: none; width: 18px; height: 18px; border: 1.25px solid var(--ink); border-radius: 50%; position: relative; display: inline-block }
+.oe::after { content: ""; position: absolute; inset: 4px; border-radius: 50%; background: var(--ink) }
+.route-fig figcaption { margin-top: 14px; color: var(--ink-2); font-size: 13px; max-width: 96ch }
+.rule { margin-top: 12px; color: var(--ink-2); font-size: 13px; max-width: 96ch }
+.fails { margin-top: 14px; display: flex; flex-direction: column; gap: 6px }
+.fails ul { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 28px; font-size: 13px; color: var(--ink-2) }
+.fails b { color: var(--ink); font-weight: 600 }
+.legend { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 10px 22px; margin-top: 16px; color: var(--ink-2); font-size: 12.5px }
+.legend li { display: flex; align-items: center; gap: 8px }
+.legend .og { flex-direction: row; padding: 3px; gap: 3px }
+.legend em { font-style: italic }
+.lg-dash { width: 24px; height: 17px; border: 1px dashed var(--line-2); border-radius: 3px; flex: none }
+.lg-c { width: 13px; height: 13px; border: 1px solid var(--line-2); border-radius: 1px; flex: none }
+.lg-c.do { background: var(--ink); border-color: var(--ink) }
+.lg-c.sn { background: var(--stamp); border-color: var(--stamp) }
+.lg-c.do.sn { background: linear-gradient(135deg, var(--ink) 50%, var(--stamp) 50%); border-color: var(--ink) }
+
+/* ---------- role lens ---------- */
+.lens { display: flex; flex-direction: column; gap: 8px; margin-bottom: 26px }
+.chips { display: flex; flex-wrap: wrap; gap: 6px }
+.chip {
+  appearance: none; border: 1px solid var(--line-2); background: var(--sheet); color: var(--ink);
+  font: 500 12.5px/1 var(--f-text); padding: 8px 11px; border-radius: 3px; cursor: pointer;
+}
+.chip:hover { border-color: var(--ink) }
+.chip[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--on-ink) }
+.chip.ask { border-style: dashed }
+.lens-sum { min-height: 1.5em; color: var(--ink-2); font-size: 13px }
+.key { display: flex; flex-wrap: wrap; gap: 2px 18px; padding-top: 8px; border-top: 1px solid var(--line); font-size: 12.5px; color: var(--ink-2) }
+.key b { color: var(--ink); font-weight: 600 }
+
+/* ---------- step by step ---------- */
+.split { display: grid; grid-template-columns: minmax(0, 1fr); gap: 28px; align-items: start }
+.flow { container-type: inline-size; container-name: flow; min-width: 0; display: flex; flex-direction: column; padding-top: 12px }
+.stage { position: relative; border: 1px solid var(--line-2); padding: 30px 20px 22px }
+.stage-h {
+  position: absolute; top: 0; left: 12px; transform: translateY(-50%); max-width: calc(100% - 24px);
+  background: var(--bg); padding: 0 8px; display: flex; align-items: baseline; gap: 10px;
+}
+.stage-h .mono { white-space: nowrap }
+.stage-h h3 { font-size: 19px; line-height: 1.15; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+.stage-sum { color: var(--ink-2); margin-bottom: 18px; max-width: 62ch }
+.rows { --gap: 10px; --tw: calc((100% - 4 * var(--gap)) / 5); display: flex; flex-direction: column }
+.row.one { display: flex; justify-content: center }
+.row.one .tile { width: var(--tw) }
+.row.one .tile.gate { width: calc(3 * var(--tw) + 2 * var(--gap)) }
+.row.par { background: var(--band); padding: 12px 0 14px }
+.par-label {
+  position: relative; margin: 0 auto 10px; width: calc(var(--n) * var(--tw) + (var(--n) - 1) * var(--gap));
+  display: flex; align-items: center; gap: 10px; white-space: nowrap;
+  font: 500 10.5px/1 var(--f-mono); letter-spacing: .09em; text-transform: uppercase; color: var(--ink-2);
+}
+.par-label::before, .par-label::after { content: ""; flex: 1; min-width: 8px; height: 1px; background: var(--line-2) }
+.par-label i { position: absolute; top: 50%; width: 1px; height: 11px; background: var(--line-2); transform: translateY(-50%) }
+.par-label i:first-of-type { left: 0 }
+.par-label i:last-of-type { right: 0 }
+.par-grid { display: grid; grid-template-columns: repeat(var(--n), var(--tw)); gap: var(--gap); justify-content: center }
+.tile {
+  appearance: none; position: relative; min-width: 0; text-align: left; cursor: pointer;
+  display: flex; flex-direction: column; gap: 8px; padding: 10px;
+  background-color: var(--sheet); border: 1px solid var(--line-2); border-radius: 3px; color: var(--ink);
+  transition: border-color .15s, box-shadow .15s, opacity .2s;
+}
+.tile:hover { border-color: var(--ink) }
+.t-body { display: flex; flex-direction: column; gap: 3px; min-width: 0 }
+.t-kicker { font: 500 9.5px/1.3 var(--f-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3) }
+.t-name { font: 600 15px/1.2 var(--f-head); overflow-wrap: anywhere }
+.t-who { font-size: 12.5px; line-height: 1.4; color: var(--ink-2) }
+.t-who .by { margin-right: 5px }
+.t-who .ext { font-style: italic }
+.t-who .hit { color: var(--ink); font-weight: 600; text-decoration: underline; text-underline-offset: 2px }
+.t-sign { margin-top: auto; display: flex; align-items: center; gap: 6px; padding-top: 2px }
+.tile.cond { border-style: dashed }
+.tile.gate { flex-direction: row; align-items: center; gap: 14px; padding: 12px 16px; border: 1.5px solid var(--ink) }
+.tile.gate .t-body { flex: 1 }
+.tile.gate .t-sign { margin: 0; padding: 0; flex-direction: column; align-items: flex-end; gap: 6px }
+.tile.gate .stamp { --rot: -4deg; font-size: 15px; padding: 6px 10px 5px; border-width: 2px }
+.tile.gate .q { top: -9px; right: 14px }
+.tile.gate .q + .q.chg { right: 35px }
+.tile.is-done .bal { background: var(--ink); color: var(--on-ink) }
+.tile.is-done .stamp { background: var(--stamp); color: var(--on-stamp) }
+.tile.is-next { opacity: .5 }
+.tile.is-on { opacity: 1; border-color: var(--now); box-shadow: 0 0 0 2px var(--now); background-image: linear-gradient(var(--now-wash), var(--now-wash)) }
+.tile.is-on .bal { border-color: var(--now); background: var(--now); color: var(--on-now) }
+.tile.dim:not(.is-on) { opacity: .22 }
+.link { flex: none; width: 1px; height: 20px; margin-inline: auto; background: var(--line-2); position: relative }
+.link::after {
+  content: ""; position: absolute; left: 50%; bottom: 0; width: 7px; height: 7px;
+  border-right: 1px solid var(--line-2); border-bottom: 1px solid var(--line-2); transform: translate(-50%, -1px) rotate(45deg);
+}
+.link.big { height: 32px }
+.link.is-done { background: var(--ink) }
+.link.is-done::after { border-color: var(--ink) }
+.end { display: flex; align-items: center; justify-content: center; gap: 10px; padding-top: 6px; font: 500 11px/1 var(--f-mono); letter-spacing: .09em; text-transform: uppercase; color: var(--ink-2) }
+
+@container flow (max-width: 620px) {
+  .stage { padding: 28px 12px 14px }
+  .rows { --tw: 100% }
+  .row.one .tile, .row.one .tile.gate { width: 100% }
+  .row.par { background: none; padding: 0 0 0 12px; border-left: 1px solid var(--line-2) }
+  .par-label { width: auto; margin: 0 0 8px; white-space: normal; line-height: 1.4 }
+  .par-label::before, .par-label i { display: none }
+  .par-grid { grid-template-columns: minmax(0, 1fr); gap: 8px }
+  .tile { flex-direction: row; align-items: center; gap: 12px; padding: 10px 12px }
+  .tile .t-body { flex: 1 }
+  .tile .t-sign { margin: 0; padding: 0; flex-direction: column; align-items: flex-end; gap: 5px }
+  .tile.gate .stamp { font-size: 13px; padding: 5px 8px 4px }
+  .q { top: -8px; right: 10px }
+  .q + .q.chg { right: 31px }
+}
+
+/* ---------- step sheet ---------- */
+.panel {
+  background: var(--sheet); border: 1px solid var(--ink); border-width: 1px 0 0;
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; box-shadow: var(--shadow);
+  max-height: 66vh; max-height: 66dvh; overflow: auto; padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.p-in { display: flex; flex-direction: column; max-width: 760px; margin-inline: auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)) }
+.p-head { padding: 10px 0 4px; display: flex; flex-direction: column; gap: 3px; min-width: 0 }
+.p-head:focus-visible { outline: none }
+.p-k { font: 500 10.5px/1.4 var(--f-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3) }
+.p-t { font-size: 19px; line-height: 1.15 }
+.p-l { color: var(--ink-2); font-size: 13px }
+.p-ctl { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 6px 0 10px }
+.p-ctl .lnk { margin-left: auto }
+#b-all:not([hidden]) + #b-more { margin-left: 8px }
+.p-body { border-top: 1px solid var(--line); padding: 12px 0 16px; display: none; flex-direction: column; gap: 12px }
+.panel.open .p-body { display: flex }
+.p-what { font-size: 14.5px; line-height: 1.5 }
+.p-table { font-size: 12.5px; color: var(--ink-3) }
+.tb { border: 1px solid var(--line-2); display: grid; grid-template-columns: 112px minmax(0, 1fr) }
+.tb > div { display: contents }
+.tb dt, .tb dd { padding: 8px 10px; border-bottom: 1px solid var(--line) }
+.tb dt { font: 500 10px/1.5 var(--f-mono); letter-spacing: .07em; text-transform: uppercase; color: var(--ink-3); border-right: 1px solid var(--line) }
+.tb dd { font-size: 13px; min-width: 0 }
+.tb dd p + p { margin-top: 6px }
+.tb > div:last-child dt, .tb > div:last-child dd { border-bottom: 0 }
+.jump {
+  appearance: none; border: 1px solid var(--line-2); background: none; border-radius: 3px; cursor: pointer;
+  font: 500 12.5px/1.2 var(--f-text); padding: 4px 7px; margin: 0 4px 4px 0;
+}
+.jump:hover, .g-item:hover { border-color: var(--ink) }
+.g-list { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 6px }
+.g-item {
+  appearance: none; width: 100%; text-align: left; display: flex; align-items: center; gap: 10px; cursor: pointer;
+  border: 1px solid var(--line-2); background: none; border-radius: 3px; padding: 8px 10px;
+}
+.g-txt { display: flex; flex-direction: column; gap: 1px; min-width: 0 }
+.g-txt b { font: 600 14px/1.2 var(--f-head) }
+.g-txt span { font-size: 12.5px; color: var(--ink-2) }
+
+/* ---------- who does what ---------- */
+.matrix { container-type: inline-size; --cs: clamp(7px, calc((100cqw - 76px) / 28), 15px); --g1: 2px; --g2: 6px; border-bottom: 1px solid var(--line) }
+.mrow { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "l n" "c c"; align-items: center; gap: 6px 14px; padding: 9px 0; border-top: 1px solid var(--line) }
+.mrow.mhead { border-top: 0; padding: 0 0 6px; grid-template-areas: "c c" }
+.mrow.is-lens { background: var(--now-wash) }
+.m-l { grid-area: l; appearance: none; border: 0; background: none; padding: 2px 0; text-align: left; cursor: pointer; min-width: 0 }
+.m-l b { display: block; font: 600 15px/1.2 var(--f-head) }
+.m-l span { display: block; font-size: 12px; line-height: 1.3; color: var(--ink-3) }
+.m-l:hover b { text-decoration: underline; text-underline-offset: 3px }
+.m-n { grid-area: n; font: 500 11.5px/1.3 var(--f-mono); color: var(--ink-2); white-space: nowrap; text-align: right }
+.m-c { grid-area: c; display: flex; gap: var(--g2) }
+.mhead .m-l, .mhead .m-n { display: none }
+.mg { display: flex; gap: var(--g1) }
+.mgh { display: flex; flex-direction: column; gap: 3px }
+.mgh-l { font: 600 10px/1.2 var(--f-mono); color: var(--ink-2); border-bottom: 1px solid var(--line-2); padding-bottom: 3px }
+.cn { width: var(--cs); height: 0; overflow: hidden; text-align: center; font: 500 8.5px/1 var(--f-mono); color: var(--ink-3) }
+.cn.long { font-size: 6.5px; letter-spacing: -.05em; line-height: 1.3 }
+.c { width: var(--cs); height: var(--cs); flex: none; border: 1px solid var(--line-2); border-radius: 1px }
+.c.do { background: var(--ink); border-color: var(--ink) }
+.c.sn { background: var(--stamp); border-color: var(--stamp) }
+.c.do.sn { background: linear-gradient(135deg, var(--ink) 50%, var(--stamp) 50%); border-color: var(--ink) }
+.tally { margin-top: 28px; max-width: 720px }
+.tally figcaption { font: 600 15px/1.2 var(--f-head); margin-bottom: 8px }
+.tally-bar { display: flex; gap: 2px; height: 14px }
+.tally-bar i { display: block; background: var(--stamp) }
+.tally-key { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 20px; margin-top: 8px; font-size: 13px; color: var(--ink-2) }
+.tally-key li { display: flex; align-items: center; gap: 7px }
+.tally-key i { width: 10px; height: 10px; background: var(--stamp); display: inline-block }
+.tally-key b { color: var(--ink); font: 600 13px/1 var(--f-mono) }
+.foot { color: var(--ink-3); font-size: 12.5px; max-width: 86ch }
+
+/* ---------- from the meeting ---------- */
+.duo { display: grid; grid-template-columns: minmax(0, 1fr); gap: 32px }
+.duo > div { min-width: 0 }
+.duo h3 { font-size: 19px; line-height: 1.15; margin-bottom: 4px }
+.duo .d-sub { color: var(--ink-2); font-size: 13px; margin-bottom: 12px; max-width: 60ch }
+.plist { list-style: none; padding: 0; border-top: 1px solid var(--line-2) }
+.plist li { padding: 9px 0; border-bottom: 1px solid var(--line); display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; font-size: 13.5px; line-height: 1.45 }
+.plist b { flex: 0 0 104px; font: 600 14px/1.3 var(--f-head) }
+.plist .n-t { flex: 1 1 240px; min-width: 0 }
+.plist .n-w { font: 500 10.5px/1.4 var(--f-mono); letter-spacing: .07em; text-transform: uppercase; color: var(--ink-3) }
+.plist .jump { margin: 0 }
+
+/* ---------- wider screens ---------- */
+@media (min-width: 860px) {
+  .duo { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 40px }
+  .page { padding-left: max(28px, env(safe-area-inset-left, 0px)); padding-right: max(28px, env(safe-area-inset-right, 0px)) }
+  .hero { grid-template-columns: minmax(0, 1fr) 320px }
+  .route-fig { padding: 18px 18px 16px }
+}
+@media (min-width: 1040px) {
+  .matrix { --cs: 15px; --g1: 3px; --g2: 9px }
+  .mrow { grid-template-columns: 250px auto minmax(0, 1fr); grid-template-areas: "l c n"; gap: 4px 18px; padding: 7px 0 }
+  .mrow.mhead { grid-template-areas: "l c n"; align-items: end; padding: 0 0 6px }
+  .mhead .m-l, .mhead .m-n { display: block }
+  .m-n { text-align: left }
+  .cn { height: auto; overflow: visible }
+}
+@media (min-width: 1200px) {
+  .strip { --bh: 148px; flex-wrap: nowrap; gap: 0 8px }
+  .oa { width: 9px; margin: 0 3px }
+  .sg { flex: 1 1 auto }
+  .sg-f { flex-wrap: nowrap }
+  .og { flex-direction: column; gap: 6px }
+  .oa.tail { flex: 1 1 14px }
+}
+@media (min-width: 1180px) {
+  .page { padding-block: 32px 72px }
+  .split { grid-template-columns: minmax(0, 1fr) 348px }
+  .panel {
+    position: sticky; top: calc(16px + env(safe-area-inset-top, 0px)); left: auto; right: auto; bottom: auto; z-index: 1;
+    border-width: 1px; box-shadow: none; max-height: calc(100vh - 32px); padding-bottom: 0;
+  }
+  .p-in { max-width: none; padding-left: 0; padding-right: 0 }
+  .p-head { padding: 16px 16px 8px; gap: 4px }
+  .p-t { font-size: 25px; line-height: 1.1 }
+  .p-ctl { padding: 6px 16px 14px }
+  .p-ctl #b-more { display: none }
+  .p-body { display: flex; padding: 14px 16px 16px }
+}
+@media (prefers-reduced-motion: reduce) {
+  .stamp.signing { animation: none }
+  .tile, .ob { transition: none }
+}
+</style>
+
+<div class="page">
+
+  <header class="hero">
+    <div>
+      <p class="mono">Jayon · Research and Development</p>
+      <h1>How a product moves through R&amp;D</h1>
+      <p class="lede">From the VP's idea to the product on the market, in <span id="l-steps">27</span> steps. See who does each job, who signs it off, and which jobs start together. This revision applies the points from the COAL meeting.</p>
+      <p class="facts"><span><b id="f-steps">25</b> steps</span><span><b id="f-stages">6</b> stages</span><span><b id="f-gates">4</b> checkpoints</span><span><b id="f-signs">25</b> sign-offs</span></p>
+      <div class="hero-cta">
+        <button class="btn" id="hero-play" type="button"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 1l9 5-9 5z" fill="currentColor"/></svg><span>Play the route</span></button>
+        <span class="hint">or pick any step below</span>
+      </div>
+    </div>
+    <dl class="tblock" aria-label="About this sheet">
+      <div><dt>Title</dt><dd>R&amp;D workflow, idea to launch</dd></div>
+      <div><dt>Drawn from</dt><dd>The company's 25-step R&amp;D process table, a walkthrough of how each step runs in practice, written answers to follow-up questions, the company's sample documents for the steps, and the COAL meeting points</dd></div>
+      <div><dt>Date</dt><dd>16 November 2026</dd></div>
+      <div><dt>Revision</dt><dd>2. COAL meeting points applied, marked Δ</dd></div>
+      <div><dt>Status</dt><dd id="status">Draft</dd></div>
+    </dl>
+  </header>
+
+  <section aria-labelledby="h-route">
+    <div class="sec-h">
+      <h2 id="h-route">The whole route</h2>
+      <p>Six stages, start to finish, in one picture.</p>
+    </div>
+    <figure class="route-fig">
+      <div class="strip" id="strip" aria-hidden="true"></div>
+      <figcaption>Follow the arrows. The numbers are the step numbers used on the tiles below. Steps inside a bracket start together. A diamond is a checkpoint: a go or no-go decision, and nothing after it starts until it is signed. After the Board approves at step 4, the action plan (step 5) comes first. Then steps 6, 7, 8 and 9 run in parallel. Testing (step 13) now comes before market feedback and the pre-clinical study (steps 14 and 15). A number with a letter (2a, 24a, 24b) is a step added or split at the COAL meeting; the other numbers are the company's own.</figcaption>
+    </figure>
+    <p class="rule">At a sign-off the signer can approve the work or send it back to its author for rework, and a project can be dropped. Every document is signed online. The Managing Director and the CEO sign only as the Board, at steps 4 and 23.</p>
+    <div class="fails">
+      <span class="mono">When something fails</span>
+      <ul>
+        <li><b>The FEA fails:</b> The R&amp;D Lead has the design reworked.</li>
+        <li><b>A prototype fails:</b> The R&amp;D Head sends it back to design (step 7 for an implant, step 8 for an instrument).</li>
+        <li><b>A lab test fails:</b> R&amp;D Ops, with the help of DARD, takes the first decision on whether the result is a failure. That decision is then presented to the R&amp;D Lead and the R&amp;D Head. If it is a failure, the work goes back to implant design (step 7).</li>
+        <li><b>The prototype is not approved (step 18):</b> The work can go back as far as step 7, depending on the severity.</li>
+        <li><b>Design changes are required after the clinical trials (steps 20 and 21):</b> The work starts again from the implant prototype (step 10, the start of stage 3).</li>
+      </ul>
+    </div>
+    <ul class="legend" aria-label="How to read the marks">
+      <li><span class="bal start sm"></span>Start</li>
+      <li><span class="bal"><span>7</span></span>A step</li>
+      <li><span class="bal dia"><span>4</span></span>A checkpoint</li>
+      <li><span class="og"><span class="bal sm"></span><span class="bal sm"></span></span>Start together</li>
+      <li><span class="oe"></span>End: in the market</li>
+      <li><span class="by">By</span>Who does the work</li>
+      <li><span class="stamp">Head</span>Who signs it off</li>
+      <li><em>+ vendors</em>People outside R&amp;D</li>
+      <li><span class="lg-dash"></span>Only if needed</li>
+      <li id="lg-ask"><span class="q st">?</span>An open question, not yet confirmed</li>
+      <li><span class="q st chg">Δ</span>Changed at the COAL meeting</li>
+    </ul>
+  </section>
+
+  <section aria-labelledby="h-steps">
+    <div class="sec-h">
+      <h2 id="h-steps">Step by step</h2>
+      <p>Pick a step to see what happens, who does it and who signs it off, or play the route and watch it run. A row marked Planned says what the new R&amp;D software is meant to do at that step. A row marked Open question is not yet confirmed. A row marked Changed at the meeting says what the COAL meeting changed at that step. Everything else is the workflow.</p>
+    </div>
+    <div class="lens" role="group" aria-label="Show one role's part">
+      <span class="mono">Show one role's part</span>
+      <div class="chips" id="chips"></div>
+      <p class="lens-sum" id="lens-sum" aria-live="polite"></p>
+      <p class="key" id="key" aria-label="Short names used on the tiles"></p>
+    </div>
+    <div class="split">
+      <div class="flow" id="flow"></div>
+      <aside class="panel" id="panel" aria-label="Step details">
+        <div class="p-in">
+          <div class="p-head" id="p-head" aria-live="polite" tabindex="-1"></div>
+          <div class="p-ctl">
+            <button class="ic" id="b-prev" type="button" aria-label="Previous"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M8 1.5L3.5 6 8 10.5" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></button>
+            <button class="btn" id="b-play" type="button"></button>
+            <button class="ic" id="b-next" type="button" aria-label="Next"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M4 1.5L8.5 6 4 10.5" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></button>
+            <button class="lnk" id="b-all" type="button" hidden>Show all</button>
+            <button class="lnk" id="b-more" type="button" aria-expanded="false" aria-controls="p-body">Details</button>
+          </div>
+          <div class="p-body" id="p-body"></div>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-roles">
+    <div class="sec-h">
+      <h2 id="h-roles">Who does what</h2>
+      <p>Each row is one role. Each square is one step, in order, grouped by stage 1 to 6. The first square is the start. Pick a role to light up its part of the route.</p>
+    </div>
+    <div class="matrix" id="matrix"></div>
+    <ul class="legend" aria-label="How to read the squares">
+      <li><span class="lg-c do"></span>Does the work</li>
+      <li><span class="lg-c sn"></span>Signs it off</li>
+      <li><span class="lg-c do sn"></span>Both</li>
+      <li><span class="lg-c"></span>Not involved</li>
+    </ul>
+    <figure class="tally">
+      <figcaption id="tally-cap">Who signs off the 25 steps</figcaption>
+      <div id="tally"></div>
+    </figure>
+  </section>
+
+  <section aria-labelledby="h-mtg">
+    <div class="sec-h">
+      <h2 id="h-mtg">From the COAL meeting</h2>
+      <p>What the software is to do at every step, and what Jayon still has to send.</p>
+    </div>
+    <div class="duo">
+      <div>
+        <h3>Planned across every step</h3>
+        <p class="d-sub">These apply to the whole route, not to one step.</p>
+        <ul class="plist">
+          <li><b>Sources</b><span class="n-t">People can add the sources behind their research.</span></li>
+          <li><b>Signatures</b><span class="n-t">Every document is signed online, on three rows: Prepared, Reviewed and Approved.</span></li>
+          <li><b>Work messages</b><span class="n-t">Each person gets work messages written for their own responsibilities.</span></li>
+          <li><b>Pictures</b><span class="n-t">Pictures can be uploaded at any step.</span></li>
+          <li><b>Dates and alerts</b><span class="n-t">Each role gets its own dates. An alert goes out when a date is not met, and every deviation is recorded with its reason and who caused it.</span></li>
+          <li><b>Costing</b><span class="n-t">The machine log feeds the software, which works out each prototype's cost (manpower, raw material, machine cost and overhead) and saves it as a document.</span></li>
+          <li><b>CAD</b><span class="n-t">AI is integrated into the CAD modelling.</span></li>
+          <li><b>Risk file</b><span class="n-t">The software keeps the risk file, which several of the company's documents refer to.</span></li>
+        </ul>
+      </div>
+      <div>
+        <h3>Still needed from Jayon</h3>
+        <p class="d-sub">Pick a step number to see where the item is used.</p>
+        <ul class="plist" id="needs"></ul>
+      </div>
+    </div>
+  </section>
+
+  <p class="foot">This workflow is how R&amp;D will work in future. The page was built between 11 and 15 November 2026 from the company's 25-step R&amp;D process table, a walkthrough of how each step runs in practice, written answers to follow-up questions and the company's sample documents for the steps. It was revised on 16 November 2026 with the points from the COAL meeting. Steps 1 to 25 keep the company's numbers; a step added or split at the meeting carries a letter (2a, 24a, 24b). BP is used as it is in the meeting notes. Where the page follows the walkthrough, the answers or a sample document instead of the table, it says so in the step. The six stages, the short step names and the word "checkpoint" are reading aids, not company terms. The workflow shows roles, not people, so a role appears here even when nobody holds it yet. Only the list of items still needed names the person to ask.</p>
+
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  const ROLES = {
+    board:  { short: 'Board',     name: 'Board',            note: 'The Managing Director and the CEO sign as the Board, at steps 4 and 23' },
+    vp:     { short: 'VP',        name: 'VP',               note: 'Product strategy and global business development' },
+    head:   { short: 'Head',      name: 'R&D Head',         note: 'Head of R&D' },
+    lead:   { short: 'Lead',      name: 'R&D Lead',         note: 'Lead of the product line: Arthroscopy, Spine or Trauma' },
+    design: { short: 'Designers', name: 'Design engineers', note: 'Make the 3D models and drawings in SolidWorks' },
+    aems:   { short: 'AEMS',      name: 'AEMS',             full: 'Advanced Engineering and Materials Science', note: 'The FEA and metallurgy experts. The role of the metallurgy expert covers metallurgy work from identifying the material through to the FEA' },
+    pme:    { short: 'PME',       name: 'PME',              full: 'Prototype Manufacturing and Engineering', note: 'Makes the prototypes, the trial sets and the master set' },
+    ops:    { short: 'Ops',       name: 'R&D Ops',          full: 'R&D Operations', note: '' },
+    dard:   { short: 'DARD',      name: 'DARD',             full: 'Design Assurance and Regulatory Documentation', note: 'Takes part in the raw material test and in the transfer to production' },
+    qc:     { short: 'QC',        name: 'QC inspectors',    note: 'Part of DARD. They check each prototype after it is made' },
+    team:   { short: 'Team',      name: 'Project team',     note: 'The people named in the Project Initiation Document (step 1). The metallurgy expert is there wherever the project team is' },
+    out:    { short: 'Outside',   name: 'Outside R&D',      note: 'Vendors, outside makers, the test lab, marketing, surgeons, production, the Quality Control department and the company QA team' }
+  };
+  const ROLE_ORDER = ['board', 'vp', 'head', 'lead', 'design', 'aems', 'pme', 'ops', 'dard', 'qc', 'team', 'out'];
+  const KEY = [['Head', 'R&D Head'], ['Lead', 'R&D Lead of the product line'], ['Designers', 'design engineers'],
+    ['AEMS', 'Advanced Engineering and Materials Science (the FEA and metallurgy experts)'], ['PME', 'Prototype Manufacturing and Engineering'],
+    ['Ops', 'R&D Operations'], ['DARD', 'Design Assurance and Regulatory Documentation'], ['QC', 'QC inspectors, part of DARD'], ['Team', 'the project team']];
+
+  const NO_DOC = 'The process table names no document for this step';
+  const PLAT_DESIGN = 'AI will be integrated into the CAD modelling. Also being considered: a link between SolidWorks and the software (the tool is not chosen yet), a risk assessment document drawn from the FEA, and drawings made from the model with all the critical measurements.';
+  const PLAT_PROTO = 'The Material Issue Slip and the prototype run card will be kept with every prototype, and OEE will be defined so the efficiency of each machine is known. Every job run on R&D\'s machines will be logged in the software, including work that is not part of a project. The machine log will be connected to the software, so the cost of each prototype is worked out and saved as a document. The prototype costing will be broken down into manpower, raw material, machine cost and overhead.';
+  const FAIL_FEA = 'If the FEA fails, the R&D Lead takes the call to rework the design.';
+  const FAIL_IMPLANT = 'If a prototype fails, the R&D Head takes the call to rework it, and it goes back to implant design (step 7).';
+  const FAIL_INSTRUMENT = 'If a prototype fails, the R&D Head takes the call to rework it, and it goes back to instrument design (step 8).';
+  const DIFF_QC = 'The process table names only PME. In practice the QC inspectors also check each prototype after it is made.';
+  const MTG_DESIGN = ['AI is to be integrated into the CAD modelling.'];
+  const MTG_PROTO = ['The machine log is to be connected to the software, so the costing is saved as a document.', 'The prototype costing is to be broken down into manpower, raw material, machine cost and overhead.', 'Who approves the Material Issue Slip is an open question.'];
+  const ASK_SLIP = 'Who approves the Material Issue Slip?';
+  const FEEDBACK_50 = 'This step takes place after positive feedback on the product has been received (approximately 50 cases).';
+
+  const STEPS = {
+    C: { name: 'The idea', by: ['vp'], docs: 'The product concept',
+      what: 'The VP has the idea for a new product. It can come from the market or from the VP\'s own requirement. The VP puts the concept forward to R&D.',
+      plat: 'The VP will describe the idea in a chat. The software will show each person\'s responsibilities as boxes, the VP will approve them, and software agents will carry the jobs to the people concerned. Each person will get work messages written for their own responsibilities.',
+      mtg: ['Work messages are to be written for each person\'s own responsibilities.'] },
+    1: { name: 'Project inception', by: ['head', 'lead'], sign: 'vp', docs: 'Project Initiation Document',
+      what: 'The R&D Head writes the Project Initiation Document, with the Lead of the product line. It names the project team.' },
+    2: { name: 'Market study', table: 'Market Study, Feasibility, Feedback', by: ['ops'], sign: 'vp', docs: 'Market Research Survey',
+      what: 'R&D Ops does the market study and feasibility. It does not depend on step 1, so the two start together.',
+      plat: 'People will be able to add the sources behind their research.',
+      mtg: ['People are to be able to add sources for their research.'] },
+    '2a': { name: 'Regulatory planning', isNew: true, by: ['lead', 'dard'], docs: 'The plan of the body approvals the product needs and the documents each body requires',
+      what: 'The regulatory work now starts at the top of the project instead of waiting until step 22. The plan sets out which bodies must approve the product (for example CE and FDA) and which documents each of them needs, so that every later step writes its documents in the form those bodies ask for. The submission itself stays at step 22.',
+      mtg: ['New step. The regulatory step is to come at the top of the project process.'],
+      ask: ['Where exactly at the top does this step sit, who does it and who signs it off? To be confirmed with Akhil. Until then it is shown starting together with steps 1 and 2, done by the Lead and DARD as at step 22, with no sign-off.'] },
+    3: { name: 'Project proposal', table: 'Project Proposal Preparation', by: ['head'], sign: 'vp', docs: 'Project proposal: Project Planning and the Project Approval Form',
+      what: 'Once the VP has approved both documents (steps 1 and 2), the R&D Head prepares the project proposal: Project Planning and the Project Approval Form. The VP approves it and takes it to the Board.' },
+    4: { name: 'Board approval', table: 'Management Meeting 1, Project Approval', gate: true, by: ['vp'], sign: 'board', docs: 'Project proposal, approved',
+      what: 'The VP puts the proposal to the Board. The papers go to each member concerned, and they decide when they meet or approve online. Step 5 waits for this, and steps 6 to 9 come after step 5.' },
+    5: { name: 'Action plan', table: 'Project Meeting, Overview 1', by: ['lead', 'head'], sign: 'vp', docs: 'Action Plan: one standard document that sets out the project team, the timeline, the budget and the raw material definition',
+      what: 'The Lead of the product line and the R&D Head write the action plan: the project team (the people named in the Project Initiation Document), the budget and the timeline. The action plan is written on a proper standard document. It defines the raw material by how each implant and instrument is used, based on research and FEA analysis. The timeline gives each role its own dates. Steps 6, 7, 8 and 9 come after the action plan and run in parallel.',
+      diff: 'The process table has the R&D Lead and team preparing this and the R&D Head approving it. In practice the Lead and the R&D Head prepare it and the VP signs.',
+      plat: 'Each role will get its own dates in the timeline, and the software will raise an alert when a date is not met. Any deviation from the timeline will be recorded with the reason for it and who caused it.',
+      mtg: ['The action plan needs a proper standard document.', 'It defines the raw material by implant and instrument use, from research and FEA analysis.', 'The timeline records the reason for any deviation and who caused it.', 'Each role gets its own dates, with an alert when a date is not met.'],
+      ask: ['The FEA runs at steps 7 and 8, after the action plan. Is the raw material definition added to the action plan once the FEA is done, or is it based on an earlier analysis?'] },
+    6: { name: 'Raw material', table: 'Raw Material Planning and Sourcing', by: ['lead', 'ops', 'dard'], out: ['vendors'], sign: 'head', docs: NO_DOC,
+      what: 'The Lead plans the raw material and tells the R&D Head what type is needed. The raw material is defined in the action plan (step 5), by how each implant and instrument is used. Once the Head approves, R&D Ops takes the requirement and buys from vendors. The order waits until the action plan and budget (step 5) are approved. DARD takes part in the raw material test.',
+      diff: 'The process table names the Lead and R&D Ops. DARD is also needed, for the raw material test.',
+      mtg: ['DARD needs to be in the raw material test.'],
+      ask: ['What exactly does DARD do at this step? To be checked with Akhil, together with the audit procedure and the documents that go with it.'] },
+    7: { name: 'Implant design', table: 'Implant Design Status', by: ['design', 'aems'], sign: 'lead', docs: '3D model, FEA report, and drawings with the critical dimensions marked for QC inspection',
+      what: 'Design engineers build the implant in 3D in SolidWorks (the design software), from the project documents written so far. At the start of the design the FEA expert in AEMS runs the FEA, a stress analysis of the model. The drawings are made from the model and carry all the critical measurements, marked on the drawing as critical dimensions for QC inspection. The role of the metallurgy expert in AEMS covers the metallurgy work, from identifying the material through to the FEA.',
+      fail: FAIL_FEA, plat: PLAT_DESIGN, mtg: MTG_DESIGN },
+    8: { name: 'Instrument design', table: 'Instrument Design Status', by: ['design', 'aems'], sign: 'lead', docs: '3D model, FEA report, and drawings with the critical dimensions marked for QC inspection',
+      what: 'The same work for the instruments: a 3D model in SolidWorks, the FEA by the expert in AEMS at the start of the design, and drawings that carry all the critical measurements, marked as critical dimensions for QC inspection. The role of the metallurgy expert in AEMS covers the metallurgy work, from identifying the material through to the FEA.',
+      fail: FAIL_FEA, plat: PLAT_DESIGN, mtg: MTG_DESIGN },
+    9: { name: 'Outsourcing', table: 'FG / Out Sourcing', by: ['lead', 'ops', 'dard'], out: ['outside makers'], sign: 'head', docs: NO_DOC,
+      what: 'The Lead and R&D Ops list the implants and instruments that cannot be made in-house. An item that is on the market in the form needed can be bought as it is. A custom item goes to an outside maker, and where that needs a drawing the order waits for it (steps 7 and 8). Every order waits until the action plan and budget (step 5) are approved. DARD is also involved in this step.',
+      diff: 'The process table names the Lead and R&D Ops. The process owner said DARD is also involved.' },
+    10: { name: 'Implant prototype', table: 'Critical Implant Prototype', by: ['pme', 'qc'], sign: 'lead', docs: 'Prototype sample, with its Material Issue Slip, prototype run card, QC inspection report and Prototype Approval Form',
+      what: 'Before the prototypes are made, the company QA team (not NPD QA) applies to the Central Licensing Authority (CDSCO) for the manufacturing test licence. PME makes the critical implant prototypes once the drawings are signed off and the material is in. Each prototype carries a Material Issue Slip and a prototype run card, so its material and every process can be traced. The run card gives the number of the Material Issue Slip, the material batch number, and the drawing number and revision. It lists each operation with its machine, and for each operation it logs the operator, the start and finish times and the quantity finished. After each prototype is made, the QC inspectors check it and write a separate inspection report for that prototype, with its measurements. The Prototype Approval Form is also used at this step, as well as at step 18. PME also handles machine efficiency (OEE). When a production or general-instruments machine is needed, the R&D Ops Assistant Manager asks the Chief Production Manager, who allocates it.',
+      fail: FAIL_IMPLANT, diff: DIFF_QC, plat: PLAT_PROTO, mtg: MTG_PROTO, ask: [ASK_SLIP] },
+    11: { name: 'Instrument prototype', table: 'Critical Instrument Prototype', by: ['pme', 'qc'], sign: 'lead', docs: 'Prototype sample, with its Material Issue Slip, prototype run card, QC inspection report and Prototype Approval Form',
+      what: 'See step 10 for the manufacturing test licence. PME makes the critical instrument prototypes once the drawings are signed off and the material is in. As in step 10, each prototype carries a Material Issue Slip and a prototype run card, so its material and every process can be traced. After each prototype is made, the QC inspectors check it and write a separate inspection report for that prototype, with its measurements. The Prototype Approval Form is also used at this step, as well as at step 18. A production or general-instruments machine is asked for in the same way as in step 10.',
+      fail: FAIL_INSTRUMENT, diff: DIFF_QC, plat: PLAT_PROTO, mtg: MTG_PROTO, ask: [ASK_SLIP] },
+    12: { name: 'Review meeting', table: 'Project Meeting, Overview 2', gate: true, by: ['lead', 'team'], sign: 'head', docs: 'Meeting minutes',
+      what: 'The project team (the people named in the Project Initiation Document) meets the R&D Head, in a room or online, in English and Malayalam, to assess progress. If the prototypes are OK, the Head\'s approval opens testing and validation (step 13). Market feedback (step 14) and any pre-clinical study (step 15) follow once testing is done. The Head decides at this meeting whether a pre-clinical study is needed.',
+      fail: 'If the prototypes are not OK, the R&D Head takes the call to rework them, and the work goes back to design (step 7 or 8).',
+      plat: 'An automatic note-taker for this meeting, in the room or online, in English and Malayalam, so the minutes come out with no extra work.',
+      mtg: ['The approval now opens testing only. Market feedback and the pre-clinical study come after testing.'] },
+    13: { name: 'Testing and validation', by: ['ops', 'dard', 'pme', 'design'], out: ['test lab'], sign: 'lead', docs: 'BP report on the testing parameters and the test labs, TRF, test plan, the test report, and the testing and validation document for CE and FDA',
+      what: 'The step opens with its sub-works: identifying the testing parameters and identifying the test labs. These are written up as a BP document or report, and the R&D Lead decides from it whether to proceed. An outside test lab then does the testing. DARD finds out which tests the product needs and the fixtures required for the testing. First the lab sends its TRF (test request form). It is filled in and sent back. The lab then sends a test plan. DARD and R&D Ops check it together against the company data, and it must have no discrepancy. Only then does the lab test. PME and the design engineers are also part of this step. R&D Ops handles all the signatures. When the result comes from the lab, R&D Ops, with the help of DARD, takes the first decision on whether it is a failure. That decision is then presented to the Lead and the R&D Head. The R&D Lead signs off the step. The final test report is submitted to the R&D Head, who does not sign it off. Market feedback (step 14) and any pre-clinical study (step 15) start only after this step.',
+      sub: ['Identify the testing parameters', 'Identify the test labs', 'Write both up as a BP document or report', 'The R&D Lead decides whether to proceed'],
+      fail: 'If the prototype fails testing, it goes back to implant design (step 7), because the design has to be reworked.',
+      diff: 'The process table names DARD and R&D Ops for this step. PME and the design engineers are also part of it, as the meeting confirmed.',
+      mtg: ['The step gets sub-works: the testing parameters and the test labs, written up as a BP document or report on which the Lead decides whether to proceed.', 'A testing and validation document for CE and FDA is needed.', 'PME and the design team are part of this step.', 'This step now runs on its own, before market feedback and the pre-clinical study.'],
+      ask: ['R&D Ops handles all the signatures and the R&D Lead signs off the step. Which documents does each of them sign?'] },
+    14: { name: 'Market feedback', by: ['ops', 'lead'], out: ['marketing', 'surgeons'], sign: 'lead', docs: 'Market Research Survey form with new questions about the prototype, and the surgeons\' answers',
+      what: 'This step starts after testing and validation (step 13). The Lead gives the questions and doubts to put to surgeons. R&D Ops prepares the feedback document for this product. It is the Market Research Survey form, with new questions about the prototype. Marketing takes the form to key surgeons (KOLs) and brings the filled form back to R&D Ops.',
+      diff: 'The process table calls this document the Usability Study Plan. It is the Market Research Survey form, with new questions about the prototype.',
+      mtg: ['Market feedback now comes after testing and validation, not alongside it.'] },
+    15: { name: 'Pre-clinical study', cond: true, by: ['ops', 'dard'], sign: 'lead', docs: 'Animal or cadaver report, or a justification',
+      what: 'A study on an animal or a cadaver, done only when the product needs one. The R&D Head decides that at the review meeting (step 12). It starts after testing and validation (step 13) and runs alongside market feedback.',
+      diff: 'The process table also lists the R&D Lead as responsible for this step. The Lead has been removed from that list here and only signs it off.',
+      mtg: ['The pre-clinical study now comes after testing and validation, not alongside it.'] },
+    16: { name: 'Prototype case study', table: 'Prototype Case Study Preparation', by: ['lead'], sign: 'head', docs: 'Prototype case study, a BP document: feedback and corrective action',
+      what: 'The Lead pulls everything learned from testing, market feedback and any pre-clinical study into one document, with the corrective actions. Those fixes are finished before prototype approval (step 18).',
+      mtg: ['A prototype case study BP document is required.'] },
+    17: { name: 'Marketing tools', table: 'Marketing Tools Status', by: ['lead', 'ops'], sign: 'head', docs: 'Surgical technique, catalogue and IFU (instructions for use)',
+      what: 'The Lead and R&D Ops prepare the surgical technique, the catalogue and the instructions for use.',
+      plat: 'A faster and better way to make the catalogue and the other material.' },
+    18: { name: 'Prototype approval', table: 'Management Meeting 2, Prototype Approval', gate: true, by: ['lead'], sign: 'head', docs: 'Prototype Approval Form',
+      what: 'The R&D Lead takes the final version of the prototype to the R&D Head for approval. The approval of the R&D Head is final; the VP does not approve at this step. The fixes from step 16 are done by then.',
+      fail: 'If the prototype is not approved, the work can go back as far as step 7, depending on the severity.',
+      diff: 'The process table has the R&D Head responsible and the VP approving. The process owner said that prototype approval goes from the R&D Lead to the R&D Head, and that the approval of the R&D Head is final.',
+      mtg: ['Confirmed: prototype approval is the R&D Head\'s approval, not the VP\'s.'] },
+    19: { name: 'Trial set planning', table: 'Clinical Trials Set Planning', by: ['head', 'lead', 'ops', 'pme'], sign: 'vp', docs: 'Trial set planning document. Its form is still to be defined',
+      what: 'The R&D Head, the Lead and R&D Ops plan the trial: which key surgeons (KOLs), where the sets go, how many sets to make and how many cases to do. The plan is written up as a trial set planning document. PME makes the trial sets. They will not be made on the prototype run cards. When a large number of implants is needed, production has at times worked with PME to make them.',
+      diff: 'The process table names the R&D Head, the Lead and R&D Ops, and no document. In practice PME also makes the trial sets, and the step now has a planning document.',
+      mtg: ['The step gets a trial set planning document.'] },
+    20: { name: 'Clinical trials', by: ['lead', 'ops', 'dard'], out: ['surgeons'], sign: 'head', docs: 'Surgery cases and PMCF (post-market clinical follow-up): each patient is followed up and scored; the follow-up goes on for one year after the product is used',
+      what: 'The Lead, R&D Ops and DARD are responsible for the trial: surgeons use the trial sets in surgery cases. After each surgery the patient is followed up and scored, and the doctor provides the details. The follow-up goes on for one year after the product is used. Step 21 (design revision and master set) starts after the trial surgery and does not wait for the follow-up to finish. If the trials show that design changes are required, the work starts again from the implant prototype (step 10). The company QA team applies for the manufacturing test licence before the prototypes are made (see step 10).',
+      fail: 'If design changes are required after the clinical trials, the work starts again from the implant prototype (step 10, the start of stage 3) and runs forward from there.',
+      mtg: ['Design changes after the clinical trials send the work back to the implant prototype (stage 3).'],
+      ask: ['How does the PMCF procedure run? To be understood from Akhil.'] },
+    21: { name: 'Design revision and master set', table: 'Design Revision & Master Set Manufacturing', by: ['lead', 'ops', 'pme'], sign: 'head', docs: 'Design revision (recorded on the QA investigation form), controlled copy documents, process plan, QC documents and costing',
+      what: 'This step starts after the trial surgery; the follow-up of the patients goes on alongside it. The Lead and R&D Ops are responsible for the design revision and the master set, with the controlled documents, the process plan, the quality control (QC) documents and the costing. The design revision is recorded on the QA (quality assurance) investigation form, titled Non-Conformity Investigation. The form itself can be changed, after a review with QA. PME makes the master set. When the trials call for design changes, the work starts again from the implant prototype (step 10).',
+      fail: 'If design changes are required after the clinical trials, the work starts again from the implant prototype (step 10, the start of stage 3) and runs forward from there.',
+      diff: 'The process table names the Lead and R&D Ops. In practice PME makes the master set. The table does not list a design revision record; the design revision is recorded on the QA investigation form.',
+      mtg: ['Design changes after the clinical trials send the work back to the implant prototype (stage 3).'],
+      ask: ['Before the meeting, a revision to the instrument design went back to instrument design (step 8). Does it now also restart at the implant prototype (step 10), or does it still go to step 8?'] },
+    22: { name: 'Regulatory approval', by: ['lead', 'dard'], out: ['company QA team'], sign: 'head', docs: 'The document submission to QA for each body, the trade mark, the registrations and the QA approval',
+      what: 'The Lead and DARD gather the documents from every activity up to this point and submit them to QA, set out for each body that has to approve the product. Which bodies, and which documents each one needs, comes from the regulatory planning at the top of the project (step 2a). This step also obtains the trade mark, the registrations and the quality assurance (QA) approval.',
+      mtg: ['Regulatory approval is a document submission to QA. It includes the documents of all activities so far, for the different bodies.'] },
+    23: { name: 'Release approval', table: 'Management Meeting 3, Project Release Approval', gate: true, by: ['vp', 'head'], sign: 'board', docs: 'Transfer Approval Form',
+      what: 'The VP and the R&D Head put the release to the Board, which approves the transfer to production.' },
+    '24a': { name: 'Pre-transfer', table: 'Production Transfer', isNew: true, by: ['lead', 'team', 'dard'], out: ['production', 'quality control', 'company QA team'], docs: 'The documents for the final transfer, sent to the departments outside R&D',
+      what: FEEDBACK_50 + ' The documents for the final transfer are then sent across to the departments outside R&D: production, the Quality Control department and the QA team. DARD is part of the transfer. The final transfer (step 24b) follows.',
+      diff: 'The process table has one step, Production Transfer. It is now two: pre-transfer, then final transfer and training.',
+      mtg: ['Production transfer is split in two. This is the first part: the documents for the final transfer go to the departments outside R&D.', 'The transfer includes the QA team. DARD is understood to be part of it.'],
+      ask: ['Which documents exactly make up the production transfer? They are to be defined more precisely.', 'Who signs off the pre-transfer?', 'Are the approximately 50 cases the trial surgery cases of step 20?', 'Does the Board release approval (step 23) also wait for the positive feedback, or only the hand-over?'] },
+    '24b': { name: 'Final transfer and training', table: 'Production Transfer', isNew: true, by: ['lead', 'team', 'dard'], out: ['production', 'quality control', 'company QA team'], sign: 'head', docs: 'Transfer forms, the master set, the signed handover checklist and the training',
+      what: 'The Lead and the project team hand the product over, with the transfer forms and the master set. The production documents are handed over to the Chief Manager, Production. The QC documents are handed over to the Quality Control department, which is outside R&D: the implant side to the Sr. Manager, Quality Control, and the instrument side to the Asst. Manager, Quality Control. The QA team is part of the transfer as well. The R&D Head signs off the transfer. The production head accepts it by signing a checklist of every item being transferred. The transfer ends with training.',
+      diff: 'The process table names only a transfer to production. The QC documents are also handed over, to the Quality Control department, and the QA team is included.',
+      mtg: ['Production transfer is split in two. This is the second part: the final transfer and the training.', 'The transfer includes the QA team. DARD is understood to be part of it.'],
+      ask: ['Do the two Quality Control managers also sign for the documents they receive, as the production head does?', 'Who gives the training, and who receives it?'] },
+    25: { name: 'Product launch', by: ['head', 'ops'], sign: 'vp', docs: 'Launch sets for the market',
+      what: 'The R&D Head and R&D Ops send the launch sets out to the market.' }
+  };
+  Object.keys(STEPS).forEach(function (k) {
+    const s = STEPS[k];
+    s.out = s.out || []; s.sign = s.sign || ''; s.table = s.table || ''; s.plat = s.plat || ''; s.diff = s.diff || ''; s.fail = s.fail || ''; s.ask = s.ask || [];
+    s.mtg = s.mtg || []; s.sub = s.sub || [];
+  });
+
+  /* What the meeting asked Jayon to supply. "who" is the person named in the meeting notes, where one was named. */
+  const NEEDS = [
+    { item: 'The full machine list, the software used and the instruments used for inspection', who: '', steps: ['7', '8', '10', '11'] },
+    { item: 'The Action Plan document, with the data for the BP', who: 'Bharath', steps: ['5'] },
+    { item: 'The documents required for the audit procedure', who: 'Akhil', steps: ['6'] },
+    { item: 'All manufacturing-related documents', who: '', steps: ['10', '24a'] },
+    { item: 'The NCP document, to be checked', who: 'Akhil', steps: ['21'] },
+    { item: 'The testing and validation document for CE and FDA', who: '', steps: ['13'] },
+    { item: 'The prototype case study BP document', who: '', steps: ['16'] },
+    { item: 'The trial set planning document', who: '', steps: ['19'] },
+    { item: 'The FEA report (BP)', who: '', steps: ['7', '8'] },
+    { item: 'The ERP version of the Material Issue Slip', who: '', steps: ['10', '11'] },
+    { item: 'A sample of the QC inspection report for a prototype', who: '', steps: ['10', '11'] }
+  ];
+
+  const FLOW = [
+    { short: 'Idea', title: 'Idea and go-ahead', sum: 'The VP\'s idea becomes a project the Board has approved. Regulatory planning now starts here too.', rows: [['C'], ['1', '2', '2a'], ['3'], ['4']] },
+    { short: 'Design', title: 'Plan, design and source', sum: 'Once the Board says yes, the action plan comes first. Then four jobs run in parallel: raw material, implant design, instrument design and outsourcing.', rows: [['5'], ['6', '7', '8', '9']] },
+    { short: 'Prototype', title: 'Make the prototype', sum: 'PME makes the critical parts and the QC inspectors check them. The team then reviews progress with the R&D Head.', rows: [['10', '11'], ['12']] },
+    { short: 'Testing', title: 'Test and gather feedback', sum: 'Lab testing comes first. Market feedback follows, with a pre-clinical study if one is needed. The final prototype then goes for approval.', rows: [['13'], ['14', '15'], ['16'], ['17'], ['18']] },
+    { short: 'Trials', title: 'Clinical trials', sum: 'The trial is planned, then surgeons use the trial sets in cases.', rows: [['19'], ['20']] },
+    { short: 'Launch', title: 'Release and launch', sum: 'The design is revised, the documents go to QA for approval, and production takes over in two parts.', rows: [['21'], ['22'], ['23'], ['24a'], ['24b'], ['25']] }
+  ];
+  const GROUPS = {
+    '1,2,2a': { label: 'These three start together', title: 'Three jobs start together', line: 'Steps 1 and 2 go to the VP for sign-off',
+      what: 'As soon as the VP puts the concept forward, the Project Initiation Document and the market study start. Neither waits for the other. The VP signs off both. Regulatory planning (step 2a) is new and is shown starting with them. Its exact place at the top is still to be confirmed.' },
+    '6,7,8,9': { label: 'All four run in parallel', title: 'Four jobs run in parallel', line: 'They come after the action plan (step 5)',
+      what: 'After the action plan (step 5), four jobs run in parallel: raw material, implant design, instrument design and outsourcing. Orders in steps 6 and 9 wait until the action plan and budget (step 5) are approved, and a custom item also waits for its drawing where it needs one.' },
+    '10,11': { label: 'Made side by side', title: 'Implant and instrument prototypes', line: 'They start once the drawings are signed off and the material is in',
+      what: 'PME makes the critical implant and instrument prototypes side by side, once their drawings are signed off and the material is in. Every prototype carries its Material Issue Slip and prototype run card, and the QC inspectors check each prototype after it is made and write a separate inspection report for it, with its measurements. The Prototype Approval Form is also used at both steps, as well as at step 18. The company QA team applies for the manufacturing test licence before the prototypes are made.' },
+    '14,15': { label: 'After testing, side by side', title: 'Market feedback, and sometimes a pre-clinical study', line: 'They start once testing and validation (step 13) is done',
+      what: 'Market feedback starts after testing and validation. A pre-clinical study runs beside it only when the product needs one, which the R&D Head decides at the review meeting (step 12).' }
+  };
+
+  const order = [];
+  FLOW.forEach(function (st) { st.rows.forEach(function (ids) { ids.forEach(function (id) { order.push(id); }); }); });
+  const NSTEPS = order.length - 1;
+  const beats = [];
+  FLOW.forEach(function (st, si) { st.rows.forEach(function (ids) { beats.push({ si: si, ids: ids, key: ids.join(',') }); }); });
+  const beatOf = {};
+  beats.forEach(function (b, i) { b.ids.forEach(function (id) { beatOf[id] = i; }); });
+  const LAST = beats.length - 1;
+
+  const $ = function (s, r) { return (r || document).querySelector(s); };
+  const $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
+  const esc = function (s) { return String(s).replace(/[&<>"]/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]; }); };
+  const join = function (a) { return a.length < 2 ? a.join('') : a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1]; };
+
+  const flow = $('#flow'), strip = $('#strip'), chips = $('#chips'), lensSum = $('#lens-sum'), matrix = $('#matrix'), tally = $('#tally');
+  const panel = $('#panel'), pHead = $('#p-head'), pBody = $('#p-body');
+  const bPrev = $('#b-prev'), bNext = $('#b-next'), bPlay = $('#b-play'), bAll = $('#b-all'), bMore = $('#b-more');
+  const wide = window.matchMedia('(min-width: 1180px)');
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const ICON_PLAY = '<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 1l9 5-9 5z" fill="currentColor"/></svg>';
+  const ICON_PAUSE = '<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 1h3v10H2zM7 1h3v10H7z" fill="currentColor"/></svg>';
+
+  let cur = { beat: 0, step: 'C' };
+  let touring = false, playing = false, finished = false, lens = '';
+  let timer = 0, signTimer = 0;
+
+  function involved(id, k) {
+    const s = STEPS[id];
+    if (k === 'ask') return s.ask.length ? 'ask' : '';
+    if (k === 'mtg') return s.mtg.length ? 'mtg' : '';
+    if (k === 'out') return s.out.length ? 'do' : '';
+    const d = s.by.indexOf(k) > -1, g = s.sign === k;
+    return d && g ? 'both' : d ? 'do' : g ? 'sign' : '';
+  }
+  function whoPlain(s) { return join(s.by.map(function (r) { return ROLES[r].name; }).concat(s.out)); }
+  function whoShortText(s) { return s.by.map(function (r) { return ROLES[r].short; }).join(', ') + (s.out.length ? ' + ' + s.out.join(', ') : ''); }
+  function whoShortHtml(s) {
+    return s.by.map(function (r) { return '<span class="r" data-role="' + r + '">' + esc(ROLES[r].short) + '</span>'; }).join(' · ') +
+      (s.out.length ? ' <span class="r ext" data-role="out">+ ' + esc(s.out.join(', ')) + '</span>' : '');
+  }
+  function balHtml(id) {
+    const s = STEPS[id];
+    return '<span class="bal' + (s.gate ? ' dia' : '') + (id === 'C' ? ' start' : '') + (id.length > 2 ? ' long' : '') + '"><span>' + (id === 'C' ? '' : id) + '</span></span>';
+  }
+  function stepsText(ids) {
+    const parts = [];
+    if (ids.indexOf('C') > -1) parts.push('the start');
+    const nums = ids.filter(function (id) { return id !== 'C'; });
+    if (nums.length) parts.push((nums.length === 1 ? 'step ' : 'steps ') + join(nums));
+    return parts.join(', ');
+  }
+
+  function tileHtml(id) {
+    const s = STEPS[id];
+    const label = (id === 'C' ? 'Start' : 'Step ' + id) + ': ' + s.name + '. Done by ' + whoPlain(s) + '.' + (s.sign ? ' Signed off by ' + ROLES[s.sign].name + '.' : '') + (s.ask.length ? ' Has an open question.' : '') + (s.mtg.length ? ' Changed at the COAL meeting.' : '');
+    const kicker = id === 'C' ? 'Start' : s.gate ? 'Checkpoint' : s.cond ? 'Only if needed' : s.isNew ? 'New step' : '';
+    return '<button type="button" class="tile' + (s.gate ? ' gate' : '') + (s.cond ? ' cond' : '') + '" data-step="' + id + '" aria-pressed="false" aria-label="' + esc(label) + '">' +
+      balHtml(id) +
+      '<span class="t-body">' + (kicker ? '<span class="t-kicker">' + kicker + '</span>' : '') +
+        '<span class="t-name">' + esc(s.name) + '</span><span class="t-who"><span class="by">' + (s.gate ? 'Brought by' : 'By') + '</span>' + whoShortHtml(s) + '</span></span>' +
+      (s.sign ? '<span class="t-sign"><span class="by">Signs</span><span class="stamp" data-role="' + s.sign + '">' + esc(ROLES[s.sign].short) + '</span></span>' : '') +
+      (s.ask.length ? '<span class="q" title="An open question, not yet confirmed">?</span>' : '') +
+      (s.mtg.length ? '<span class="q chg" title="Changed at the COAL meeting">\u0394</span>' : '') +
+      '</button>';
+  }
+
+  function buildFlow() {
+    let h = '', bi = 0;
+    FLOW.forEach(function (st, si) {
+      if (si) h += '<div class="link big" data-b="' + bi + '"></div>';
+      h += '<section class="stage"><div class="stage-h"><span class="mono">Stage ' + (si + 1) + '</span><h3>' + esc(st.title) + '</h3></div>' +
+        '<p class="stage-sum">' + esc(st.sum) + '</p><div class="rows">';
+      st.rows.forEach(function (ids, ri) {
+        if (ri) h += '<div class="link" data-b="' + bi + '"></div>';
+        if (ids.length > 1) {
+          h += '<div class="row par" data-beat="' + bi + '" style="--n:' + ids.length + '"><div class="par-label"><i></i>' + esc(GROUPS[ids.join(',')].label) + '<i></i></div>' +
+            '<div class="par-grid">' + ids.map(tileHtml).join('') + '</div></div>';
+        } else {
+          h += '<div class="row one" data-beat="' + bi + '">' + tileHtml(ids[0]) + '</div>';
+        }
+        bi++;
+      });
+      h += '</div></section>';
+    });
+    h += '<div class="link big" data-b="' + beats.length + '"></div><p class="end"><span class="oe"></span>In the market</p>';
+    flow.innerHTML = h;
+  }
+
+  function buildStrip() {
+    let h = '';
+    FLOW.forEach(function (st, si) {
+      h += '<div class="sg"><div class="sg-l"><b>' + (si + 1) + '</b>' + esc(st.short) + '</div><div class="sg-f">';
+      st.rows.forEach(function (ids, ri) {
+        if (ri) h += '<span class="oa"></span>';
+        const b = ids.map(function (id) {
+          const s = STEPS[id];
+          return '<button type="button" tabindex="-1" class="ob bal' + (s.gate ? ' dia' : '') + (id === 'C' ? ' start' : '') + (s.cond ? ' cond' : '') + (id.length > 2 ? ' long' : '') +
+            '" data-step="' + id + '" title="' + esc((id === 'C' ? 'Start: ' : id + ' ') + s.name) + '"><span>' + (id === 'C' ? '' : id) + '</span></button>';
+        }).join('');
+        h += ids.length > 1 ? '<span class="og">' + b + '</span>' : b;
+      });
+      h += '<span class="oa tail"></span>' + (si === FLOW.length - 1 ? '<span class="oe"></span>' : '') + '</div></div>';
+    });
+    strip.innerHTML = h;
+  }
+
+  function buildChips() {
+    const asks = order.filter(function (id) { return STEPS[id].ask.length; }).length;
+    const chgs = order.filter(function (id) { return STEPS[id].mtg.length; }).length;
+    chips.innerHTML = '<button type="button" class="chip" data-lens="" aria-pressed="true">Everyone</button>' +
+      ROLE_ORDER.map(function (k) { return '<button type="button" class="chip" data-lens="' + k + '" aria-pressed="false">' + esc(ROLES[k].name) + '</button>'; }).join('') +
+      (chgs ? '<button type="button" class="chip ask" data-lens="mtg" aria-pressed="false">Meeting changes (' + chgs + ')</button>' : '') +
+      (asks ? '<button type="button" class="chip ask" data-lens="ask" aria-pressed="false">Open questions (' + asks + ')</button>' : '');
+    $('#status').textContent = asks
+      ? 'Draft. ' + asks + (asks === 1 ? ' step has' : ' steps have') + ' an open question, marked ?'
+      : 'Draft. All follow-up questions answered.';
+    $('#lg-ask').hidden = !asks;
+    $('#key').innerHTML = '<span>On the tiles:</span>' + KEY.map(function (p) { return '<span><b>' + esc(p[0]) + '</b> = ' + esc(p[1]) + '</span>'; }).join('');
+  }
+
+  function buildMatrix() {
+    const groups = FLOW.map(function (st) { return st.rows.reduce(function (a, r) { return a.concat(r); }, []); });
+    let h = '<div class="mrow mhead"><span class="m-l"></span><div class="m-c">' +
+      groups.map(function (ids, si) {
+        return '<div class="mgh"><span class="mgh-l">' + (si + 1) + '</span><div class="mg">' +
+          ids.map(function (id) { return '<span class="cn' + (id.length > 2 ? ' long' : '') + '">' + (id === 'C' ? '' : id) + '</span>'; }).join('') + '</div></div>';
+      }).join('') + '</div><span class="m-n"></span></div>';
+    ROLE_ORDER.forEach(function (k) {
+      let d = 0, g = 0;
+      const r = ROLES[k];
+      const cells = groups.map(function (ids) {
+        return '<div class="mg">' + ids.map(function (id) {
+          const v = involved(id, k), isDo = v === 'do' || v === 'both', isSg = v === 'sign' || v === 'both';
+          if (isDo) d++;
+          if (isSg) g++;
+          return '<i class="c' + (isDo ? ' do' : '') + (isSg ? ' sn' : '') + '"></i>';
+        }).join('') + '</div>';
+      }).join('');
+      const sub = [r.full, r.note].filter(Boolean).join('. ');
+      h += '<div class="mrow" data-row="' + k + '"><button type="button" class="m-l" data-lens="' + k + '" data-scroll="1" aria-pressed="false"><b>' + esc(r.name) + '</b>' + (sub ? '<span>' + esc(sub) + '</span>' : '') + '</button>' +
+        '<div class="m-c">' + cells + '</div><span class="m-n">' + d + (d === 1 ? ' job' : ' jobs') + ' · ' + g + (g === 1 ? ' sign-off' : ' sign-offs') + '</span></div>';
+    });
+    matrix.innerHTML = h;
+  }
+
+  function buildTally() {
+    const who = ROLE_ORDER.map(function (k) {
+      return { k: k, n: order.filter(function (id) { return STEPS[id].sign === k; }).length };
+    }).filter(function (w) { return w.n; }).sort(function (a, b) { return b.n - a.n; });
+    const op = function (i) { return (1 - 0.74 * i / Math.max(1, who.length - 1)).toFixed(2); };
+    tally.innerHTML = '<div class="tally-bar" aria-hidden="true">' +
+      who.map(function (w, i) { return '<i style="flex:' + w.n + ' 1 0;opacity:' + op(i) + '"></i>'; }).join('') + '</div><ul class="tally-key">' +
+      who.map(function (w, i) { return '<li><i style="opacity:' + op(i) + '"></i><b>' + w.n + '</b>' + esc(ROLES[w.k].name) + '</li>'; }).join('') + '</ul>';
+  }
+  function buildNeeds() {
+    $('#needs').innerHTML = NEEDS.map(function (n) {
+      return '<li><span class="n-t">' + esc(n.item) + '</span>' + (n.who ? '<span class="n-w">From ' + esc(n.who) + '</span>' : '') +
+        n.steps.map(function (id) { return '<button type="button" class="jump" data-step="' + id + '" data-scroll="1" title="' + esc(STEPS[id].name) + '">Step ' + id + '</button>'; }).join('') + '</li>';
+    }).join('');
+  }
+  function buildFacts() {
+    const n = order.length - 1;
+    $('#f-steps').textContent = String(n);
+    $('#f-stages').textContent = String(FLOW.length);
+    $('#f-gates').textContent = String(order.filter(function (id) { return STEPS[id].gate; }).length);
+    $('#f-signs').textContent = String(order.filter(function (id) { return STEPS[id].sign; }).length);
+    $('#l-steps').textContent = String(n);
+    $('#tally-cap').textContent = 'Who gives the ' + order.filter(function (id) { return STEPS[id].sign; }).length + ' sign-offs';
+  }
+
+  function stepBody(id) {
+    const s = STEPS[id], rows = [];
+    const names = s.by.map(function (r) { return ROLES[r].name + (ROLES[r].full ? ' (' + ROLES[r].full + ')' : ''); });
+    rows.push(['Done by', esc(join(names)) + (s.out.length ? '<br>Outside R&amp;D: ' + esc(join(s.out)) : '')]);
+    rows.push(['Signed off by', s.sign ? '<span class="stamp">' + esc(ROLES[s.sign].name) + '</span>' : 'No sign-off at this point']);
+    rows.push(['What it produces', esc(s.docs)]);
+    if (s.sub.length) rows.push(['Sub-works', s.sub.map(function (a, i) { return '<p>' + (i + 1) + '. ' + esc(a) + '</p>'; }).join('')]);
+    if (s.mtg.length) rows.push(['Changed at the meeting', s.mtg.map(function (a) { return '<p>' + esc(a) + '</p>'; }).join('')]);
+    const mates = beats[beatOf[id]].ids.filter(function (x) { return x !== id; });
+    if (mates.length) rows.push(['Alongside', mates.map(function (m) { return '<button type="button" class="jump" data-step="' + m + '">' + m + ' ' + esc(STEPS[m].name) + '</button>'; }).join('')]);
+    if (s.fail) rows.push(['If it goes back', esc(s.fail)]);
+    if (s.diff) rows.push(['Differs from the process table', esc(s.diff)]);
+    if (s.plat) rows.push(['Planned in the new software', esc(s.plat)]);
+    if (s.ask.length) rows.push([s.ask.length > 1 ? 'Open questions' : 'Open question', s.ask.map(function (a) { return '<p>' + esc(a) + '</p>'; }).join('')]);
+    const need = NEEDS.filter(function (n) { return n.steps.indexOf(id) > -1; });
+    if (need.length) rows.push(['Still needed from Jayon', need.map(function (n) { return '<p>' + esc(n.item) + (n.who ? ' (' + esc(n.who) + ')' : '') + '</p>'; }).join('')]);
+    return '<p class="p-what">' + esc(s.what) + '</p>' +
+      (s.table ? '<p class="p-table">Name in the process table: ' + esc(s.table) + '</p>' : '') +
+      '<dl class="tb">' + rows.map(function (r) { return '<div><dt>' + r[0] + '</dt><dd>' + r[1] + '</dd></div>'; }).join('') + '</dl>';
+  }
+  function groupBody(b) {
+    return '<p class="p-what">' + esc(GROUPS[b.key].what) + '</p><ul class="g-list">' + b.ids.map(function (id) {
+      const s = STEPS[id];
+      return '<li><button type="button" class="g-item" data-step="' + id + '">' + balHtml(id) + '<span class="g-txt"><b>' + esc(s.name) + (s.cond ? ' (only if needed)' : '') + '</b>' +
+        '<span>' + esc(whoShortText(s)) + (s.sign ? ' → ' + esc(ROLES[s.sign].short) + ' signs' : ' · no sign-off set yet') + '</span></span></button></li>';
+    }).join('') + '</ul>';
+  }
+
+  function paintPanel() {
+    const b = beats[cur.beat], st = FLOW[b.si];
+    let k, t, l, body;
+    if (cur.step) {
+      const s = STEPS[cur.step];
+      k = (cur.step === 'C' ? 'Start' : 'Step ' + cur.step) + ' · Stage ' + (b.si + 1) + ', ' + st.short;
+      t = s.name;
+      l = whoPlain(s) + (s.sign ? ' → ' + ROLES[s.sign].name + ' signs off' : '');
+      body = stepBody(cur.step);
+    } else {
+      const g = GROUPS[b.key];
+      k = 'Steps ' + b.ids[0] + (b.ids.length === 2 ? ' and ' : ' to ') + b.ids[b.ids.length - 1] + ' · Stage ' + (b.si + 1) + ', ' + st.short;
+      t = g.title; l = g.line; body = groupBody(b);
+    }
+    pHead.innerHTML = '<p class="p-k">' + esc(k) + '</p><h3 class="p-t">' + esc(t) + '</h3><p class="p-l">' + esc(l) + '</p>';
+    pBody.innerHTML = body;
+    bPrev.setAttribute('aria-disabled', cur.beat === 0 ? 'true' : 'false');
+    bNext.setAttribute('aria-disabled', cur.beat === LAST ? 'true' : 'false');
+    const label = playing ? 'Pause' : (touring && cur.beat === LAST ? 'Replay' : (touring ? 'Resume' : 'Play'));
+    bPlay.innerHTML = (playing ? ICON_PAUSE : ICON_PLAY) + '<span>' + label + '</span>';
+    bAll.hidden = !touring;
+    syncPad();
+  }
+  function syncPad() {
+    document.documentElement.style.scrollPaddingBottom = wide.matches ? '' : Math.ceil(panel.getBoundingClientRect().height) + 'px';
+  }
+
+  function paint() {
+    const act = cur.step ? [cur.step] : beats[cur.beat].ids;
+    $$('.tile, .ob').forEach(function (n) {
+      const id = n.dataset.step, bi = beatOf[id], on = act.indexOf(id) > -1;
+      n.classList.toggle('is-on', on);
+      n.classList.toggle('is-done', touring && (bi < cur.beat || finished));
+      n.classList.toggle('is-next', touring && bi > cur.beat);
+      if (n.classList.contains('tile')) n.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+    $$('.link').forEach(function (n) { n.classList.toggle('is-done', touring && (Number(n.dataset.b) <= cur.beat || finished)); });
+    $$('.stamp.signing').forEach(function (n) { n.classList.remove('signing'); });
+    paintPanel();
+  }
+
+  function lensText(k) {
+    if (!k) return 'Showing every role.';
+    if (k === 'ask') {
+      const a = order.filter(function (id) { return STEPS[id].ask.length; });
+      return a.length + (a.length === 1 ? ' step has' : ' steps have') + ' an open question: ' + join(a) + '.';
+    }
+    if (k === 'mtg') {
+      const m = order.filter(function (id) { return STEPS[id].mtg.length; });
+      return 'The COAL meeting changed ' + m.length + ' of the ' + NSTEPS + ' steps: ' + stepsText(m) + '.';
+    }
+    const d = order.filter(function (id) { const v = involved(id, k); return v === 'do' || v === 'both'; });
+    const g = order.filter(function (id) { return STEPS[id].sign === k; });
+    const r = ROLES[k];
+    return r.name + (r.full ? ' (' + r.full + ')' : '') + '. Work: ' + (d.length ? stepsText(d) : 'none') + '. Sign-offs: ' + (g.length ? stepsText(g) : 'none') + '.';
+  }
+  function paintLens() {
+    $$('.tile, .ob').forEach(function (n) { n.classList.toggle('dim', !!lens && !involved(n.dataset.step, lens)); });
+    $$('.tile .hit').forEach(function (n) { n.classList.remove('hit'); });
+    if (lens === 'ask') $$('.tile .q:not(.chg)').forEach(function (n) { n.classList.add('hit'); });
+    else if (lens === 'mtg') $$('.tile .q.chg').forEach(function (n) { n.classList.add('hit'); });
+    else if (lens) $$('.tile .r[data-role="' + lens + '"], .tile .stamp[data-role="' + lens + '"]').forEach(function (n) { n.classList.add('hit'); });
+    $$('.chip, .m-l[data-lens]').forEach(function (n) { n.setAttribute('aria-pressed', n.dataset.lens === lens ? 'true' : 'false'); });
+    $$('.mrow[data-row]').forEach(function (n) { n.classList.toggle('is-lens', n.dataset.row === lens); });
+    lensSum.textContent = lensText(lens);
+  }
+
+  function smooth() { return reduce ? 'auto' : 'smooth'; }
+  function syncMore() {
+    const o = panel.classList.contains('open');
+    bMore.setAttribute('aria-expanded', o ? 'true' : 'false');
+    bMore.textContent = o ? 'Hide details' : 'Details';
+    syncPad();
+  }
+  function closeSheet() { panel.classList.remove('open'); syncMore(); }
+  function stop() { playing = false; clearTimeout(timer); clearTimeout(signTimer); }
+  function scrollToBeat(i) {
+    const n = flow.querySelector('[data-beat="' + i + '"]');
+    if (n) n.scrollIntoView({ block: 'center', behavior: smooth() });
+  }
+  function go(i, scroll) {
+    finished = false;
+    cur = { beat: i, step: beats[i].ids.length === 1 ? beats[i].ids[0] : '' };
+    paint();
+    if (scroll) scrollToBeat(i);
+  }
+  function schedule() {
+    clearTimeout(timer); clearTimeout(signTimer);
+    if (!playing) return;
+    const d = beats[cur.beat].ids.length > 1 ? 5200 : 3400;
+    signTimer = setTimeout(function () {
+      (cur.step ? [cur.step] : beats[cur.beat].ids).forEach(function (id) {
+        const st = flow.querySelector('.tile[data-step="' + id + '"] .stamp');
+        if (st) { st.classList.remove('signing'); void st.offsetWidth; st.classList.add('signing'); }
+      });
+    }, Math.round(d * 0.45));
+    timer = setTimeout(function () {
+      if (cur.beat < LAST) { go(cur.beat + 1, true); schedule(); }
+      else { stop(); finished = true; paint(); }
+    }, d);
+  }
+  function startTour() { stop(); touring = true; playing = true; closeSheet(); go(0, true); schedule(); }
+
+  $('#hero-play').addEventListener('click', startTour);
+  bPlay.addEventListener('click', function () {
+    if (playing) { stop(); paint(); return; }
+    if (!touring || cur.beat === LAST) { startTour(); return; }
+    playing = true; closeSheet(); go(cur.beat, true); schedule();
+  });
+  bNext.addEventListener('click', function () { if (cur.beat === LAST) return; stop(); touring = true; go(cur.beat + 1, true); });
+  bPrev.addEventListener('click', function () { if (cur.beat === 0) return; stop(); touring = true; go(cur.beat - 1, true); });
+  bAll.addEventListener('click', function () { stop(); touring = false; finished = false; bPlay.focus({ preventScroll: true }); paint(); });
+  bMore.addEventListener('click', function () {
+    if (playing && !panel.classList.contains('open')) stop();
+    panel.classList.toggle('open');
+    syncMore();
+    paint();
+  });
+  if (wide.addEventListener) wide.addEventListener('change', syncPad);
+  window.addEventListener('resize', syncPad);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(syncPad);
+
+  document.addEventListener('click', function (e) {
+    const t = e.target && e.target.closest ? e.target : (e.target ? e.target.parentElement : null);
+    if (!t) return;
+    const sEl = t.closest('[data-step]');
+    if (sEl) {
+      const id = sEl.dataset.step;
+      const inBody = !!sEl.closest('#p-body');
+      stop(); finished = false;
+      cur = { beat: beatOf[id], step: id };
+      paint();
+      if (inBody) pHead.focus({ preventScroll: true });
+      if (!wide.matches) { panel.classList.add('open'); syncMore(); }
+      if (sEl.classList.contains('ob') || sEl.dataset.scroll) {
+        const tile = flow.querySelector('.tile[data-step="' + id + '"]');
+        if (tile) tile.scrollIntoView({ block: 'center', behavior: smooth() });
+      }
+      return;
+    }
+    const lEl = t.closest('[data-lens]');
+    if (lEl) {
+      lens = lens === lEl.dataset.lens ? '' : lEl.dataset.lens;
+      paintLens();
+      if (lEl.dataset.scroll && lens) $('#h-steps').scrollIntoView({ block: 'start', behavior: smooth() });
+      return;
+    }
+    if (!wide.matches && panel.classList.contains('open') && !t.closest('#panel')) closeSheet();
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+    const tag = (e.target && e.target.tagName ? e.target.tagName : '').toLowerCase();
+    if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+    if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+      const fwd = e.key === 'ArrowRight';
+      if (fwd ? cur.beat === LAST : cur.beat === 0) return;
+      e.preventDefault();
+      const inBody = pBody.contains(document.activeElement);
+      (fwd ? bNext : bPrev).click();
+      if (inBody) pHead.focus({ preventScroll: true });
+    } else if (e.key === 'Escape' && panel.classList.contains('open')) closeSheet();
+  });
+  document.addEventListener('visibilitychange', function () { if (document.hidden && playing) { stop(); paint(); } });
+
+  buildStrip();
+  buildFlow();
+  buildChips();
+  buildMatrix();
+  buildTally();
+  buildFacts();
+  buildNeeds();
+  syncMore();
+  paint();
+  paintLens();
+})();
+</script>
+
+
+</body></html>

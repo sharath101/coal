@@ -6,7 +6,7 @@
 **The plans compared**
 
 - **Sharath's plan**: two documents, [S1: base layer](./01-base-layer-plan.md) and [S2: AI layer](./02-ai-layer-plan.md), 16 November 2026 (commit `c2cfdf7`).
-- **Madhav's plan**: [M: PLAN.md](../PLAN.md), draft 2, 16 November 2026 (commit `2950fb5`).
+- **Madhav's plan**: [M: PLAN.md](./PLAN.md), draft 2, 16 November 2026 (commit `2950fb5`).
 
 References such as "S1 §7.2" or "M §3.2" point to sections in those documents. "M step 10" means step 10 in Madhav's step-by-step section (M §4.3).
 
