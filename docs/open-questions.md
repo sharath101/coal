@@ -48,16 +48,19 @@
 | A6 | Will outside parties (labs, vendors, surgeons) get accounts or single-use links? | No access for now; R&D Ops or DARD upload what they send | R&D Head |
 | A7 | Must a person accept a task assigned to them, or only a request? | Only requests need accepting | Founders |
 | A8 | Which authentication method (company Microsoft or Google sign-in, email codes) and how admin works | Name-only placeholder; no admin | Founders |
+| A9 | When other departments join, does everyone in Jayon see the status of every R&D project (D6), or only R&D and the people involved? | Everyone in COAL, which is R&D and the people it works with for now | VP |
+| A10 | How will employees without a company email (for example on the shop floor) sign in, once real sign-in comes? | Not needed until real sign-in | Founders, Jayon IT |
 
 ## Documents and signing
 
 | ID | Question | Assumption in use | Ask |
 |---|---|---|---|
-| S1 | Who reviews each document type before approval? | The table in [documents-and-signing.md](./documents-and-signing.md#first-templates) | R&D Head, company QA |
+| S1 | Who reviews each document type before approval? | The table in [documents-and-signing.md](./documents-and-signing.md#reviewers-and-approvers) | R&D Head, company QA |
 | S2 | Jayon's document numbering, revision and retention conventions | `{project code}-{type}-{nn}`; keep everything | Company QA |
 | S3 | Are passkey signatures enough under Indian law, and where is Aadhaar eSign or a DSC needed? | Not needed while data is made-up | An Indian lawyer |
 | S4 | May someone sign on another's behalf during leave? | Not for now | VP |
 | S5 | What is the policy on AI-drafted documents that will be signed? Should "AI-assisted" be printed on the PDF? | Allowed, as drafts that people review and sign; marked in the record only | Company QA |
+| S6 | Who adds templates and makes a version active: company QA, the R&D Head, or both? Must templates go through Jayon's document control? | The R&D Head or company QA | Company QA |
 
 ## AI
 
@@ -68,6 +71,9 @@
 | AI3 | What is the AI budget per person or per month, and what response time is acceptable? | A daily budget per person, set in configuration | Founders, Jayon |
 | AI4 | May we use past Jayon documents to test the AI? Who scores the AI's drafts for each role? | Made-up examples until then | Jayon |
 | AI5 | Is Malayalam needed in the chat and screens, or only for meetings later? | English screens; the AI may answer in Malayalam if asked | Jayon |
+| AI6 | WhatsApp: Meta's own Cloud API, or a provider such as Twilio or Gupshup? | Not needed until the WhatsApp phase | Founders |
+| AI7 | What may be shown in WhatsApp? Messages pass through Meta's servers | Nothing confidential until Jayon decides | Jayon |
+| AI8 | How is a phone number linked to an employee's account, and unlinked when they change phones or leave? | Not needed until the WhatsApp phase | Founders, Jayon IT |
 
 ## Regulatory
 
@@ -91,8 +97,9 @@ These matter when the [regulatory notes](./regulatory-notes.md) are taken up.
 | I3 | Which SolidWorks version, PDM, Simulation licences, and how many CAD editors? | Jayon IT |
 | I4 | The machine, software and instrument lists. The collection sheet is in [archive/PLAN.md, Appendix C](./archive/PLAN.md#appendix-c--what-to-collect-for-the-machine-software-and-instrument-lists) | Jayon |
 | I5 | Where are existing R&D documents kept? Which projects are under way, at which steps, and do they move into COAL? | R&D Head |
-| I6 | COAL's web domain. It must be decided before passkeys are built, because the app and website share passkeys through it | Founders |
+| I6 | COAL's web domain. Decided at the end (D13). Until then, passkeys work on `localhost`, and passkeys made on a demo host are registered again once the domain is set. The mobile app needs it too | Founders |
 | I7 | Who in Jayon's IT will look after COAL day to day? | Jayon |
+| I8 | Which simple host for showing COAL to employees? The plan suggests one small server running the same setup as local, behind a shared password | Founders |
 
 ## Business
 
@@ -102,12 +109,13 @@ These matter when the [regulatory notes](./regulatory-notes.md) are taken up.
 | X2 | After go-live: who fixes problems, how fast, and who is on call? | Founders |
 | X3 | If Jayon ever leaves COAL, how do they get all their records and files out? | Founders |
 | X4 | The to-do list: "My tasks" or "Docket"? | Founders |
+| X5 | Which departments come after R&D, and in what order? | Founders, Jayon |
 
 ## Inputs needed from Jayon
 
 These were listed at the COAL meeting, plus what the build needs:
 
-- **Every current R&D form and template**, as Word files, starting with stages 1 and 2: the product concept, PID, Market Research Survey, Project Planning, Project Approval Form and Action Plan.
+- **Every current R&D form and template, as Word files, for every step.** The founders are providing these, starting with stages 1 and 2: the product concept, PID, Market Research Survey, Project Planning, Project Approval Form and Action Plan. They go in `private/templates/`, never in the repository.
 - **The Action Plan document**, with the data for its boilerplate (Bharath).
 - **The audit procedure documents and the NCP document** (Akhil).
 - **Step documents:**

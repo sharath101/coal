@@ -1,34 +1,33 @@
 # Architecture
 
-**Read this when** you set up the code, add a module, work on the process engine, events, the AI module, files, sign-in or hosting.
+**Read this when** you set up the code, add a module or a department, work on the process engine, events, the AI module, files, sign-in or hosting.
 **Related:** [api.md](./api.md) for the endpoints, [data-model.md](./data-model.md) for the tables, [decisions.md](./decisions.md) for why things were chosen.
 
 ---
 
 ## The parts
 
-COAL is four parts in one repository. The backend is separate, so every client uses the same API: the website, the mobile app, and later a WhatsApp AI bot.
+COAL is four parts in one repository. The backend is separate, so every client uses the same API: the website now, and later the WhatsApp chat and the mobile app.
 
 ```mermaid
 flowchart TB
   WEB["web: website (Next.js)"]
-  APP["app: mobile app (Expo, iOS and Android)"]
-  BOT["Later: WhatsApp AI bot"]
+  BOT["Later: WhatsApp chat"]
+  APP["Later: mobile app (Expo)"]
   subgraph BACKEND["backend"]
     API["REST API: every request is permission-checked"]
     ENG["Process engine (from shared)"]
-    AIM["AI module: gateway and tools"]
+    AIM["AI module: gateway, tools and channels"]
     WRK["Workers: jobs, reminders, PDFs, notifications"]
   end
   PG[("PostgreSQL")]
   S3[("File storage (S3)")]
   GOT["Gotenberg: Word to PDF"]
   LLM["AI providers: Anthropic (Claude) and OpenAI"]
-  PUSH["Push notifications (Expo)"]
 
   WEB --> API
-  APP --> API
   BOT -.-> API
+  APP -.-> API
   API --> ENG
   API --> AIM
   AIM --> LLM
@@ -36,15 +35,14 @@ flowchart TB
   WRK --> PG
   API --> S3
   WRK --> GOT
-  WRK --> PUSH
 ```
 
 | Part | Folder | What it does |
 |---|---|---|
 | Backend | `backend/` | The REST API, the process engine's database side, the AI module, background workers, document generation and the audit trail. **All rules live here.** |
 | Website | `web/` | The Dashboard and Workstation in the browser. |
-| Mobile app | `app/` | The same features as the website, on iOS and Android, with push notifications and Face ID or fingerprint signing. |
-| Shared code | `shared/` | Used by all three: API schemas and types, the R&D route definition and the pure engine, widget definitions, and shared rules. |
+| Mobile app | `app/` | **A later phase** (web first). The same features as the website, on iOS and Android, with push notifications and Face ID or fingerprint signing. |
+| Shared code | `shared/` | Used by the backend and the website, and later the app: API schemas and types, route definitions and the pure engine, widget definitions, and shared rules. |
 
 **Import rules**
 
@@ -62,15 +60,40 @@ flowchart TB
 | Schemas | zod in `shared/`; the OpenAPI spec is generated from them | One definition gives validation, types for the clients, and the API document |
 | Database | PostgreSQL, with Drizzle for queries and migrations | Relational data, JSON fields for document content, full-text search, and the job queue in one place |
 | Jobs | pg-boss, a job queue inside PostgreSQL | No extra server to run |
-| Website | Next.js (React), Tailwind, shadcn/ui, TanStack Query | Widely known; quick to build dashboards and chat |
-| Mobile app | React Native with Expo; TanStack Query | Shares TypeScript and logic with the website; one codebase for iOS and Android |
+| Website | Next.js (React), Tailwind, shadcn/ui, TanStack Query; next-intl for the text | Widely known; quick to build dashboards and chat; every piece of text ready for translation |
+| Mobile app | Later: React Native with Expo; TanStack Query | Shares TypeScript and logic with the website; one codebase for iOS and Android |
 | AI | Vercel AI SDK, with the Anthropic and OpenAI providers | One interface for both providers, tool calling and streaming |
-| Passkeys | SimpleWebAuthn on the backend and website; a React Native passkey library in the app | Standard WebAuthn passkeys |
+| Passkeys | SimpleWebAuthn on the backend and website; later, a React Native passkey library in the app | Standard WebAuthn passkeys |
 | Documents | docxtemplater (fills Word templates) and Gotenberg (Word to PDF) | Keeps Jayon's own layouts |
 | Files | S3-compatible storage (MinIO for local development) | Cheap and durable |
 | Live updates | Server-Sent Events | Simple one-way updates, and AI streaming |
-| Push | Expo push notifications | Covers iOS and Android |
-| Hosting | AWS Mumbai | Keeps data in India; widely used |
+| Push | Later, with the app: Expo push notifications | Covers iOS and Android |
+| Hosting | Local for now; simple hosting for demos; production decided later (AWS Mumbai proposed) | Simple while testing; AWS Mumbai keeps data in India |
+
+**Sized for all of Jayon.** This stack comfortably serves about 800 employees with one backend service (several copies when needed) and one PostgreSQL database. See the next section.
+
+## Growing to all of Jayon
+
+COAL starts with R&D (about 60 people) and will grow to the whole company (about 800 employees). No microservices, Kubernetes, Kafka or Redis are needed for that. What matters is that adding a department doesn't mean rebuilding the base:
+
+- **Departments, roles and processes are data.** Departments and roles are tables ([data-model.md](./data-model.md#people-and-sessions)). Each department's processes are route files run by the same engine; the R&D route is the first.
+- **Platform and department modules.** The platform modules serve everyone: people, processes, tasks, documents, templates, signing, notifications, AI, audit and files. Each department gets its own module for its own records and rules. R&D's holds projects, project teams and its task routing. A lint rule stops modules reaching into each other's tables.
+- **Departments plug in.** A department's module adds its own widgets, AI tools, templates and notification rules. The platform doesn't change.
+- **Ready for translation.** All website text lives in message files from the start. English first.
+- **Several backend copies** share live updates through the database ([below](#events-and-live-updates)).
+- **Before other departments join:**
+  - real company sign-in, including a way in for employees without a company email;
+  - the org chart;
+  - an admin role ([roadmap.md](./roadmap.md#after-the-first-release)).
+
+**When the stack would change**
+
+| If… | Then |
+|---|---|
+| One department's work or team grows very large | Its module becomes a separate service, behind the same API |
+| Permission rules outgrow code | A policy engine such as Cerbos |
+| Background jobs outgrow PostgreSQL | A managed queue (AWS SQS) behind the same job interface |
+| Search needs to match meaning, not just words | pgvector in the same database; a search server only if that isn't enough |
 
 ## Repository layout
 
@@ -78,21 +101,23 @@ flowchart TB
 coal/
   backend/
     src/
-      modules/        One folder per area: auth, users, projects, process, tasks, documents,
-                      signatures, dashboard, notifications, files, audit, ai
+      modules/        Platform modules: auth, users, org (departments and roles), process,
+                      tasks, documents, templates, signatures, dashboard, notifications,
+                      files, audit, ai
+                      Department modules: rnd (projects, teams, task routing); others later
       jobs/           Background jobs
-    templates/        Word boilerplates and their specifications
     prompts/          The AI's instructions, versioned
     migrations/       Database migrations
   web/                The website
-  app/                The mobile app
+  app/                The mobile app (a later phase)
   shared/
     src/
       schemas/        zod schemas: API requests and responses, shared types
-      process/        The R&D route definition (YAML) and the pure engine, with its tests
+      process/        Route definitions (YAML, one per process and version) and the pure engine, with tests
       widgets/        Dashboard widget definitions
       rules/          Small rules both clients and the backend use
   docs/               This plan
+  private/            Jayon's files on this computer, such as templates. Git-ignored: never committed
   AGENTS.md           Rules for AI coding agents (CLAUDE.md imports it)
 ```
 
@@ -100,10 +125,10 @@ Each backend module owns its tables, its services and its routes. Modules call e
 
 ## The process engine
 
-COAL runs the R&D route on its own small engine, not a workflow product. The route is paced by people over months, its rules are specific (milestones, conditional steps, rework that resets only dependent steps), and the engine's state and the audit trail must be written together.
+COAL runs its processes, starting with the R&D route, on its own small engine, not a workflow product. The route is paced by people over months, its rules are specific (milestones, conditional steps, rework that resets only dependent steps), and the engine's state and the audit trail must be written together.
 
-- **The route is a file.** It lives in `shared/src/process/` as a YAML file per version (for example `rnd-route.v2.yaml`) and is checked against a schema. On deploy it's loaded into the database as a process version. Each project stays on the version it started with.
-- **A pure engine.** The engine is one function: given the route, the project's current state and an action (submit, sign, return, decide, record a milestone, send back), it returns the new state and a list of **effects**: open steps, create or cancel tasks, request signatures, notify people, emit events. It touches nothing else, so it's easy to test.
+- **Routes are files.** Each process's route lives in `shared/src/process/` as a YAML file per version (for example `rnd-route.v2.yaml`) and is checked against a schema. On deploy it's loaded into the database as a process version. Each run (for R&D, each project) stays on the version it started with.
+- **A pure engine.** The engine is one function: given the route, the run's current state and an action (submit, sign, return, decide, record a milestone, send back), it returns the new state and a list of **effects**: open steps, create or cancel tasks, request signatures, notify people, emit events. It touches nothing else, so it's easy to test.
 - **One transaction per action.** Each action runs in one database transaction:
   1. check permission;
   2. run the engine;
@@ -149,9 +174,9 @@ The full step list is in [workflow.md](./workflow.md). When the route changes, u
 
 REST and JSON under `/api/v1`. The details and the endpoint list are in [api.md](./api.md). In short:
 
-- **The contract.** The OpenAPI spec is generated from the zod schemas in `shared/`. The website and the app use typed clients built from the same schemas.
+- **The contract.** The OpenAPI spec is generated from the zod schemas in `shared/`. The website, and later the app, use typed clients built from the same schemas.
 - **AI tier.** Every endpoint declares its permission and its AI tier ([workstation-and-ai.md](./workstation-and-ai.md#what-the-ai-may-do)).
-- **Sessions.** The website and the app send the user's session token.
+- **Sessions.** The website sends the user's session token in a cookie. Later, the app sends it as a bearer token.
 
 ## Events and live updates
 
@@ -161,7 +186,8 @@ REST and JSON under `/api/v1`. The details and the endpoint list are in [api.md]
   - live updates to open clients;
   - recalculating the forecast;
   - updating search.
-- **Live updates.** Each signed-in client keeps one Server-Sent Events stream (`GET /api/v1/stream`). It carries "this widget changed" hints and new notifications. The mobile app uses the stream while open, and push notifications otherwise.
+- **Live updates.** Each signed-in client keeps one Server-Sent Events stream (`GET /api/v1/stream`). It carries "this widget changed" hints and new notifications. The mobile app, when it comes, uses the stream while open and push notifications otherwise.
+- **Several backend copies.** When more than one copy of the backend runs, events reach every copy through PostgreSQL's LISTEN/NOTIFY, so no extra server is needed.
 - **The event list** is in [api.md](./api.md#events).
 
 ## AI module
@@ -174,6 +200,8 @@ The AI lives inside the backend (`backend/src/modules/ai/`) for now. It can be s
   - `confirm`-tier services accept "via AI" calls only to create proposals.
   - `never`-tier services refuse them outright.
 - **Chats** are kept in the database. Replies stream to the client over Server-Sent Events.
+- **Channels.** The chat is channel-neutral. A channel passes in messages and gets back text, citations and action cards, which it shows in its own way. The website is the first channel; WhatsApp and the app come later ([workstation-and-ai.md](./workstation-and-ai.md#channels)).
+- **Templates.** Drafting always loads the active template from the template library ([documents-and-signing.md](./documents-and-signing.md#the-template-library)).
 - **Search.** The AI finds documents with PostgreSQL full-text search, filtered by permission before ranking. Vector search comes later.
 - **Logged.** Every AI call and tool call is recorded: who, which model, tokens, cost, the tools used and the records returned.
 
@@ -181,10 +209,10 @@ The AI lives inside the backend (`backend/src/modules/ai/`) for now. It can be s
 
 - **Name-only sign-in, for now.** A placeholder module ([roles-and-access.md](./roles-and-access.md#accounts-for-now)) creates accounts and signs people in by name. It issues an opaque session token stored in the database:
   - the website keeps it in an HTTP-only cookie;
-  - the app keeps it in the device's secure storage.
+  - later, the app keeps it in the device's secure storage.
 
   Replacing this module with real sign-in later doesn't change the rest of the backend.
-- **Passkeys** are registered and used only for signing ([documents-and-signing.md](./documents-and-signing.md#signing-with-face-id-or-fingerprint)). For the app to use the same passkeys as the website, the app must be linked to COAL's web domain: Associated Domains on iOS and Digital Asset Links on Android. The domain must be decided before passkeys are built.
+- **Passkeys** are registered and used only for signing ([documents-and-signing.md](./documents-and-signing.md#signing-with-face-id-or-fingerprint)). They're tied to COAL's web address. They work on `localhost` while testing, and passkeys made on a demo host are registered again once the final domain is set; the domain is decided at the end. When the mobile app comes, it must be linked to that domain (Associated Domains on iOS, Digital Asset Links on Android) to use the same passkeys.
 
 ## Background jobs
 
@@ -203,7 +231,7 @@ Jobs are written so that running one twice does no harm.
 
 - **Encryption.** TLS everywhere, and storage and database encryption.
 - **Secrets** live in a secrets manager, never in the code.
-- **Database accounts.** The app's database account can't change or delete audit entries or signatures.
+- **Database accounts.** The backend's database account can't change or delete audit entries or signatures.
 - **Uploads** are virus-scanned and limited by type and size. Files are served only through short-lived links.
 - **Rate limits** on sign-in and the AI endpoints.
 - **Logs** never contain document content, prompts or AI results. Error reports are scrubbed before they're stored.
@@ -213,9 +241,9 @@ Jobs are written so that running one twice does no harm.
 | Environment | What | Data |
 |---|---|---|
 | Local | Docker Compose: PostgreSQL, Gotenberg, MinIO | Made-up |
-| Staging | AWS Mumbai: the backend and website in containers, RDS PostgreSQL, S3 | Made-up |
-| Production | AWS Mumbai, with daily backups and point-in-time restore | Real Jayon data, **only once real sign-in exists** |
+| Demo, when needed | Simple hosting to show COAL to employees: for example, one small server running the same Docker Compose setup, behind a shared password ⚠ | Made-up |
+| Production | Decided at the end (AWS Mumbai proposed), with daily backups and point-in-time restore | Real Jayon data, **only once real sign-in exists** |
 
-The mobile app is distributed for testing through Expo's internal distribution or TestFlight first.
+When the mobile app comes, it's tested through Expo's internal distribution or TestFlight first.
 
 Madhav's hosting research and monthly cost estimates are in [archive/PLAN.md, Part 10](./archive/PLAN.md#part-10--hosting-and-running-cost). Re-check them before quoting.

@@ -10,7 +10,7 @@ This is the first-release endpoint list. The generated OpenAPI spec is the exact
 ## Conventions
 
 - **Base path.** REST and JSON under `/api/v1`. Times are in UTC (ISO 8601) and shown in Indian time by the clients.
-- **Auth.** Every request carries the user's session token: a cookie on the website, a bearer token in the app. Calls made by the AI also carry a "via AI" mark, set by the backend.
+- **Auth.** Every request carries the user's session token: a cookie on the website (later, a bearer token in the app). Calls made by the AI also carry a "via AI" mark, set by the backend.
 - **The contract.** The OpenAPI spec is generated from the zod schemas in `shared/`.
 - **Permission and AI tier.** Every endpoint declares both, in its schema:
 
@@ -42,6 +42,7 @@ This is the first-release endpoint list. The generated OpenAPI spec is the exact
 | `GET /me` | My profile, role and product line | read |
 | `PATCH /me` | Change my name, role or product line (only until there is an admin) | — |
 | `GET /users`, `GET /users/{id}` | The people directory | read |
+| `GET /roles` | Departments and their roles, for the sign-up form | read |
 
 ### Passkeys and signing
 
@@ -54,12 +55,13 @@ This is the first-release endpoint list. The generated OpenAPI spec is the exact
 | `POST /signatures` | Sign, with the passkey response | never |
 | `POST /signature-requests/{id}/return` | Return to the authors with comments | never |
 
-### The R&D route
+### Processes
 
 | Endpoint | Purpose | Tier |
 |---|---|---|
-| `GET /process/current` | The current route version: steps, doers, signers, links | read |
-| `GET /process/steps/{key}` | One step's definition | read |
+| `GET /processes` | The processes COAL runs; the R&D route is the first | read |
+| `GET /processes/{key}` | A process's current version: steps, doers, signers, links | read |
+| `GET /processes/{key}/steps/{step}` | One step's definition | read |
 
 ### Projects
 
@@ -105,12 +107,15 @@ This is the first-release endpoint list. The generated OpenAPI spec is the exact
 | `POST /deviations/{id}/review` | The next role up confirms or corrects it | confirm |
 | `POST /deviations/{id}/comments` | The person named as the cause comments | confirm |
 
-### Documents, files and sources
+### Documents, templates, files and sources
 
 | Endpoint | Purpose | Tier |
 |---|---|---|
-| `GET /document-templates`, `GET /document-templates/{id}` | Templates and their specifications | read |
-| `POST /documents` | A new document from a template or an upload, as a draft I own | auto |
+| `GET /templates`, `GET /templates/{id}` | The template library: each template's versions, status, specification and sample | read |
+| `GET /templates/active?document_type=` | The active template for a document type. The AI calls this every time it drafts | read |
+| `POST /templates` | Add a template, or a new version of one: the Word file and its specification. COAL checks the placeholders and makes a sample PDF | — |
+| `POST /templates/{id}/versions/{n}/activate` | Make a version active; the previous one is retired (R&D Head or company QA ⚠) | never |
+| `POST /documents` | A new document from the active template or an upload, as a draft I own | auto |
 | `GET /documents`, `GET /documents/{id}` | List and read | read |
 | `POST /documents/{id}/versions` | Save a new draft version | auto (my draft) / confirm |
 | `GET /documents/{id}/versions/{n}`, `…/pdf` | A version's content and PDF | read |
@@ -127,7 +132,6 @@ This is the first-release endpoint list. The generated OpenAPI spec is the exact
 | `GET /widgets` | The widgets I can use and my layout | read |
 | `GET /widgets/{key}?view=compact\|expanded&tab=&filter[...]=` | One widget's data | read |
 | `GET /notifications`, `POST /notifications/{id}/read` | My notifications | read / auto |
-| `POST /push-tokens` | Register this phone for push notifications | — |
 | `GET /stream` | Server-Sent Events: live widget refreshes and notifications | — |
 | `GET /search?q=` | Projects, documents, tasks and people, filtered by permission | read |
 
@@ -168,7 +172,7 @@ Events are written in the same transaction as the change ([architecture.md](./ar
 | Project | `project.created`, `project.held`, `project.resumed`, `project.dropped`, `project.launched` |
 | Step | `step.ready`, `step.started`, `step.submitted`, `step.returned`, `step.approved`, `step.done`, `step.reset`, `decision.recorded`, `milestone.recorded` |
 | Task | `task.created`, `task.assigned`, `task.updated`, `task.done`, `task.due_soon`, `task.overdue`, `request.declined` |
-| Document | `document.created`, `document.version_saved`, `document.submitted`, `document.approved`, `document.returned` |
+| Document | `document.created`, `document.version_saved`, `document.submitted`, `document.approved`, `document.returned`, `template.added`, `template.activated` |
 | Signature | `signature.requested`, `signature.signed` |
 | Timeline | `deviation.required`, `deviation.recorded`, `timeline.changed`, `forecast.changed` |
 | Collaboration | `comment.added`, `mention.created`, `attachment.added` |

@@ -9,12 +9,12 @@ This is the main doc. It gives the whole picture on one page and points to the d
 
 ## The plan on one page
 
-**What COAL is.** An AI-assisted platform that runs Jayon's R&D: from the VP's product idea, through 28 steps, to the launch. Every person sees their own work and what matters to them, and has an AI assistant to help with it. Jayon is an orthopaedic implant maker; its R&D product lines are Arthroscopy, Spine and Trauma.
+**What COAL is.** An AI-assisted platform that runs Jayon's R&D: from the VP's product idea, through 28 steps, to the launch. Every person sees their own work and what matters to them, and has an AI assistant to help with it. Jayon is an orthopaedic implant maker; its R&D product lines are Arthroscopy, Spine and Trauma. COAL starts with R&D and is built to grow to the whole company, about 800 employees.
 
-**Two pages per person**, on the website and in the mobile app:
+**Two pages per person**, on the website first (WhatsApp and a mobile app come later):
 
 - **Dashboard:** expandable widgets that answer three questions: *What needs me now? What's coming? How are we doing?* → [dashboard.md](./dashboard.md)
-- **Workstation:** a chat assistant organised by project, where people ask questions, draft documents, assign work and sign → [workstation-and-ai.md](./workstation-and-ai.md)
+- **Workstation:** a chat assistant organised by project, where people ask questions, draft documents, assign work and sign. The same chat comes to WhatsApp later → [workstation-and-ai.md](./workstation-and-ai.md)
 
 **How work moves.**
 
@@ -29,7 +29,7 @@ This is the main doc. It gives the whole picture on one page and points to the d
 
 - it answers questions;
 - turns an idea into a project;
-- drafts documents from Jayon's templates;
+- drafts documents from Jayon's templates, always loading the current one from COAL's template library;
 - assigns work;
 - explains documents before you sign.
 
@@ -41,9 +41,9 @@ It acts as you, sees only what you can see, and anything that affects other peop
 
 **Accounts, for now.** Sign up with a name and a role; sign in with your name. This is a placeholder until real authentication is chosen, so COAL holds **made-up data only** until then. → [roles-and-access.md](./roles-and-access.md#accounts-for-now)
 
-**How it's built.** A separate backend (its API also serves a future WhatsApp bot), a Next.js website, an Expo mobile app, and shared TypeScript code. PostgreSQL, hosted in AWS Mumbai. → [architecture.md](./architecture.md)
+**How it's built.** A separate backend (its API also serves the WhatsApp chat and the mobile app later), a Next.js website, and shared TypeScript code, on PostgreSQL. Platform modules serve every department, and each department adds its own. It runs locally for now; demos use simple hosting. → [architecture.md](./architecture.md)
 
-**First release.** The whole route, end to end, with made-up data, on the website and the app, with basic AI. Step-specific modules (prototypes, QC, trials, regulatory) come after, designed from Jayon's real documents. → [roadmap.md](./roadmap.md)
+**First release.** The whole route, end to end, with made-up data, on the website, with basic AI and the template library. Step-specific modules (prototypes, QC, trials, regulatory) come after, designed from Jayon's real documents. → [roadmap.md](./roadmap.md)
 
 ## Principles
 
@@ -52,17 +52,21 @@ These hold everywhere. If a change breaks one, raise it first.
 1. **People decide; the AI prepares.** The AI never signs, decides, or sends anything outside Jayon. Changes that affect others need a person's confirmation.
 2. **Facts come from records.** Numbers, dates, names and statuses come from the database, with their source, never from the AI.
 3. **The backend enforces the rules.** Permissions, AI tiers and signatures are checked in the backend, never only in a client or in the AI's instructions.
-4. **The route is data.** Jayon's process lives in a versioned definition, not in code. Projects stay on the version they started with.
+4. **Processes are data.** Jayon's processes, starting with the R&D route, live in versioned definitions, not in code. Projects stay on the version they started with.
 5. **Nothing important is overwritten.** Versions, signatures, decisions and the audit trail are add-only.
 6. **Build from real information.** Don't design tables or rules from guesses. Mark assumptions ⚠ and list them in [open-questions.md](./open-questions.md).
 7. **Keep it simple.** Build the smallest thing that works, and leave room to grow.
+8. **Build for all of Jayon.** Platform code serves every department; anything specific to R&D stays in R&D's module ([architecture.md](./architecture.md#growing-to-all-of-jayon)).
 
 ## Key decisions
 
 The full log, with reasons, is in [decisions.md](./decisions.md).
 
-- **Parts:** a separate backend, website and mobile app, with shared code (D1). The app matches the website for now (D9).
-- **AI:** Claude and OpenAI behind one gateway, to choose later (D2). Basic AI in the first release, only when asked (D3).
+- **Scope:** R&D first, built to grow to all of Jayon, about 800 employees (D11).
+- **Parts:** a separate backend, website and mobile app, with shared code (D1). Web first; the app comes in a later phase (D12).
+- **Hosting:** local first; simple hosting for demos; the domain and production hosting are decided at the end (D13).
+- **AI:** Claude and OpenAI behind one gateway, to choose later (D2). Basic AI in the first release, only when asked (D3). The chat also comes to WhatsApp (D14).
+- **Templates:** a template for each step's documents, kept in COAL's template library; the AI checks it every time (D15).
 - **Signing:** Face ID or fingerprint passkeys, with the device PIN as fallback (D4).
 - **Accounts:** name and role sign-up, and name sign-in, for now; no admin (D5).
 - **Visibility:** project status visible to everyone (D6).
@@ -76,9 +80,9 @@ The full log, with reasons, is in [decisions.md](./decisions.md).
 | [workflow.md](./workflow.md) | Jayon's R&D route: the 28 steps, who does and signs each one, when each starts, checkpoints, decisions, milestones, rework |
 | [roles-and-access.md](./roles-and-access.md) | Roles, accounts, project teams, who sees what, who can do what, assigning work, task routing, enforcement |
 | [dashboard.md](./dashboard.md) | Widgets, layouts, the project page, measures, health, deadlines and deviations, notifications |
-| [workstation-and-ai.md](./workstation-and-ai.md) | The Workstation, the AI's features, tiers and action cards, the main flows, AI providers, safety, AI tests |
-| [documents-and-signing.md](./documents-and-signing.md) | Documents, boilerplates, versions, signature rows, step sign-off records, passkey signing, audit trail, files |
-| [architecture.md](./architecture.md) | The parts, stack, repo layout, process engine, events, AI module, sign-in, jobs, security, hosting |
+| [workstation-and-ai.md](./workstation-and-ai.md) | The Workstation, the AI's features, tiers and action cards, the main flows, channels (website, WhatsApp, app), AI providers, safety, AI tests |
+| [documents-and-signing.md](./documents-and-signing.md) | Documents, the template library, versions, signature rows, step sign-off records, passkey signing, audit trail, files |
+| [architecture.md](./architecture.md) | The parts, stack, growing to all of Jayon, repo layout, process engine, events, AI module, sign-in, jobs, security, hosting |
 | [api.md](./api.md) | API conventions, every first-release endpoint with its AI tier, proposals, events |
 | [data-model.md](./data-model.md) | Conventions and the first-release tables; what isn't modelled yet |
 | [regulatory-notes.md](./regulatory-notes.md) | Reference only: what the rules may require, and what's needed before COAL holds official records |
@@ -98,9 +102,11 @@ The full log, with reasons, is in [decisions.md](./decisions.md).
 | An API endpoint | [api.md](./api.md), plus the doc for its area |
 | A database table or migration | [data-model.md](./data-model.md), plus the doc for its area |
 | A Dashboard widget, dates, alerts or notifications | [dashboard.md](./dashboard.md) |
-| The Workstation, the AI, a tool or a prompt | [workstation-and-ai.md](./workstation-and-ai.md) |
-| A document template, versions or signing | [documents-and-signing.md](./documents-and-signing.md) |
+| The Workstation, the AI, a tool, a prompt or a chat channel | [workstation-and-ai.md](./workstation-and-ai.md) |
+| A template or the template library | [documents-and-signing.md § The template library](./documents-and-signing.md#the-template-library) |
+| Documents, versions or signing | [documents-and-signing.md](./documents-and-signing.md) |
 | The repo setup, the stack, hosting or security | [architecture.md](./architecture.md) |
+| A new department or process | [architecture.md § Growing to all of Jayon](./architecture.md#growing-to-all-of-jayon), [data-model.md](./data-model.md), [roles-and-access.md](./roles-and-access.md) |
 | A new step module (prototypes, QC, testing, trials…) | [roadmap.md](./roadmap.md), [data-model.md § Not modelled yet](./data-model.md#not-modelled-yet-on-purpose), [regulatory-notes.md](./regulatory-notes.md), [workflow.md](./workflow.md) |
 | Deciding what to build next | [roadmap.md](./roadmap.md), [open-questions.md](./open-questions.md) |
 | An unfamiliar term | [glossary.md](./glossary.md) |
@@ -111,9 +117,10 @@ The full log, with reasons, is in [decisions.md](./decisions.md).
 coal/
   backend/   The API, process engine (database side), AI module, workers
   web/       The website
-  app/       The mobile app
-  shared/    Schemas and types, the route definition and pure engine, widget definitions
+  app/       The mobile app (a later phase)
+  shared/    Schemas and types, route definitions and the pure engine, widget definitions
   docs/      This plan
+  private/   Jayon's files on this computer, such as templates. Git-ignored: never committed
   AGENTS.md  Rules for AI coding agents (CLAUDE.md imports it)
 ```
 
@@ -140,6 +147,7 @@ The docs are the plan. Keep them true:
    | New widget | [dashboard.md](./dashboard.md) |
    | New AI feature, tool or tier | [workstation-and-ai.md](./workstation-and-ai.md) |
    | New role or access rule | [roles-and-access.md](./roles-and-access.md) |
+   | New department or process | [architecture.md](./architecture.md#growing-to-all-of-jayon), [data-model.md](./data-model.md), [roles-and-access.md](./roles-and-access.md) |
    | Moving something from "later" into scope | [roadmap.md](./roadmap.md), plus the area doc |
 7. **Mark assumptions.** Put ⚠ next to anything assumed, and give it an entry in [open-questions.md](./open-questions.md).
 8. **Keep docs small.** Each doc stays focused, under about 20 KB. If one grows past that, split it and update the map above.

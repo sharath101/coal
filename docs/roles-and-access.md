@@ -28,6 +28,12 @@
 
 **The project team** isn't a role. It's the people named in a project's PID (step 1).
 
+**Departments.** Each role belongs to a department. Both are stored as data, so new departments and roles can be added without changing the code ([data-model.md](./data-model.md#people-and-sessions)). For now:
+
+- **R&D:** `rd_head` to `qc_inspector` in the table above;
+- **the departments R&D works with:** Quality Assurance (`company_qa`), Quality Control (`quality_control`), Production and Marketing;
+- **above departments:** the Board and the VP.
+
 **Product lines:** Arthroscopy, Spine and Trauma.
 
 **People outside Jayon** (vendors, outside makers, test labs, surgeons) have no accounts for now. R&D Ops or DARD upload what they send.
@@ -60,7 +66,7 @@ COAL starts with the simplest possible accounts, so we can build and demo everyt
 
 ### Project status is visible to everyone
 
-Everyone with an account can see the **status** of every project. Status means:
+Everyone with an account can see the **status** of every project. For now, that means R&D and the people it works with. Whether this stays true for everyone once other departments join is open ⚠ ([A9](./open-questions.md#people-and-access)). Status means:
 
 - the code, name, product line, stage and health;
 - each step's state, doers and signer;
@@ -105,7 +111,8 @@ Everyone with an account can see the **status** of every project. Status means:
 | Record a deviation | The task's assignee, the Lead, the Head |
 | Change dates after the Action Plan is signed | The Lead or the Head proposes; the Head approves; the VP also approves if the launch date moves ⚠ |
 | Add comments, pictures and sources | Anyone who can see the record |
-| Change the R&D route or a template | Not in the app yet. Developers change it in the repository, with review |
+| Change the R&D route | Not in COAL yet. Developers change it in the repository, with review |
+| Add a template; make a template version active | R&D Head or company QA ⚠ ([documents-and-signing.md](./documents-and-signing.md#adding-a-template)) |
 
 ## Assigning work and making requests
 
@@ -150,7 +157,13 @@ When a step opens, the engine creates one task for each doer role on the step, p
 
 These are planned but deliberately left out until we know more ([roadmap.md](./roadmap.md#later)):
 
-- **Identity and administration:** real authentication (company sign-in), an admin role, the org chart with real reporting lines, and several roles per person.
+- **Identity and administration:**
+  - real authentication (company sign-in), with a way in for employees without a company email;
+  - an admin role;
+  - the org chart with real reporting lines;
+  - several roles per person.
+
+  All of these come before other departments join.
 - **Finer access control:** sensitivity labels and compartments on records and document sections, and row-level security in the database as a backstop.
 - **Signing on someone's behalf:** covering a person's signatures during leave.
 - **Outside access:** accounts or single-use links for outside parties, such as survey links for surgeons and accounts for test labs.

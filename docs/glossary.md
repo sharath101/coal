@@ -11,27 +11,30 @@
 | **Action card** | How a proposal appears in the Workstation: what will happen, with Confirm, Edit and Cancel |
 | **AI tier** | What the AI may do with an endpoint: `read`, `auto`, `confirm` or `never` ([workstation-and-ai.md](./workstation-and-ai.md#what-the-ai-may-do)) |
 | **Baseline** | The planned dates from the signed Action Plan (step 5). The on-time rate is measured against it |
-| **Boilerplate (BP)** | A company template that new documents start from, such as the Action Plan or the FEA report. In COAL, a Word template plus a specification |
+| **Boilerplate (BP)** | A company template that new documents start from, such as the Action Plan or the FEA report. In COAL, a template in the template library |
+| **Channel** | Where a person uses the AI chat: the website now; WhatsApp and the mobile app later |
 | **Checkpoint** | A go or no-go step: 4, 12, 18 and 23. Nothing after it starts until it is signed |
 | **Content** | What's inside a project's documents and records. Visible on a need-to-know basis (compare *status*) |
 | **Decision** | A signed choice recorded at a step: Go, a checkpoint outcome, "prototypes OK", "pre-clinical study needed", hold, drop |
+| **Department module** | The part of the backend that holds one department's own records and rules. R&D's is the first |
 | **Deviation** | A record explaining late work: the reason, the cause and the new date |
 | **Doer** | A role or person who does the work of a step (as opposed to its signer) |
 | **Draft, version, revision** | Each save makes a new numbered draft version. A revision letter (A, B, C) is given when a version is approved |
-| **Fields and written sections** | The two kinds of part in a boilerplate. Fields are filled from records by code; written sections are written by a person or the AI |
+| **Fields and written sections** | The two kinds of part in a template. Fields are filled by code, from records or from the person's answers; written sections are written by a person or the AI |
 | **Forecast** | The expected end of each open step, and the expected launch, worked out from planned durations and progress |
 | **Go** | The VP's signed decision that creates a project and opens steps 1, 2 and 2a |
 | **Health** | Green, amber or red, for a step or project, from its dates ([dashboard.md](./dashboard.md#health)) |
-| **Iteration** | One run of a step in a project. Sending work back opens a new iteration; earlier ones stay on record |
+| **Iteration** | One pass through a step. Sending work back opens a new iteration; earlier ones stay on record |
 | **Milestone** | A recorded fact that can open a step, such as "material received" or "trial surgeries complete" |
 | **Outside document** | A file from outside Jayon (a lab report, a vendor PDF). Treated with extra care by the AI |
 | **Passkey** | The standard behind Face ID, fingerprint and Windows Hello sign-in. COAL uses passkeys for signing |
-| **Project** | One product idea going through R&D, from Go to launch |
+| **Process run** | One run of a process's route. For R&D, each project has one run |
+| **Project** | One product idea going through R&D, from Go to launch. It has one process run |
 | **Project team** | The people on a project, named in its PID (step 1) |
 | **Proposal** | One or more actions with a preview of their effects, waiting for the user to confirm. The AI creates proposals for anything that affects other people |
 | **Queue** | Where a task waits when no one person is assigned. Anyone with the role can claim it |
 | **Request** | A task asked of someone outside your reporting line. They can accept or decline it |
-| **Route** | Jayon's R&D process: the 28 steps, who does and signs each one, and how work moves. Stored as a versioned definition |
+| **Route** | A process's steps, who does and signs each one, and how work moves. Stored as a versioned definition. Jayon's R&D route has 28 steps |
 | **Send back** | Returning work to an earlier step after a failure or a rejected checkpoint |
 | **Sign-off** | The signature that completes a step, given by the step's signer |
 | **Signature row** | One of the signatures a document needs, in order: Prepared, Reviewed, Approved |
@@ -41,6 +44,7 @@
 | **Step** | One step of the route: C, 1 to 23, 2a, 24a, 24b and 25 |
 | **Step sign-off record** | A record COAL generates when a step is submitted, listing its outputs and their hashes. The signer signs it |
 | **Task** | One person's piece of work. Kinds: work, review, sign, decision, corrective action, request, own |
+| **Template library** | Where COAL keeps the template for each document type, with its versions. One version per type is active, and the AI uses it every time |
 | **Via AI** | The mark on every request the AI makes on a user's behalf. The backend uses it to apply the AI tiers |
 | **Widget** | A Dashboard card that expands into a full view |
 | **Workstation** | Each person's chat page, organised by project, where they work with the AI |
@@ -71,6 +75,6 @@
 | PME | Prototype Manufacturing and Engineering | Jayon's prototype makers |
 | QA | Quality Assurance | The company QA team, outside R&D |
 | QC | Quality Control | QC inspectors (inside R&D, part of DARD) or the Quality Control department (outside R&D) |
-| SSE | Server-Sent Events | How the backend pushes live updates to the website and app |
+| SSE | Server-Sent Events | How the backend pushes live updates to the website |
 | TRF | Test Request Form | The test lab's own request form (step 13) |
 | UDI | Unique Device Identification | The identifiers the EU and FDA require on device labels |

@@ -7,7 +7,7 @@
 
 ## What the Dashboard is for
 
-The Dashboard is one of each person's two pages; the Workstation is the other. A toggle in the top bar switches between them, on the web and in the mobile app.
+The Dashboard is one of each person's two pages; the Workstation is the other. A toggle in the top bar switches between them. The website comes first; the mobile app comes later.
 
 The Dashboard answers three questions, in this order:
 
@@ -24,14 +24,14 @@ The Dashboard is a grid of **widgets**.
 - **Compact card.** Each widget starts as a card with counts and the top few items.
 - **Expanded view.** Clicking the card opens it into a full view with tabs, filters, a table or chart, and actions.
   - *On the web* it opens as a large panel over the Dashboard, so the grid doesn't jump.
-  - *In the mobile app* it opens full screen.
+  - *On a phone* it opens full screen.
   - Each expanded view has its own link (for example `/dashboard?w=my-tasks&tab=done`). Back or Esc closes it.
 - **Drill-down.** Rows open the project page, the step, the document or the task.
 - **Ask AI.** Every widget has an Ask AI button that opens the Workstation with that widget's data as context ([workstation-and-ai.md](./workstation-and-ai.md)).
 - **Live.** When something relevant changes, the widget refreshes itself ([architecture.md](./architecture.md#events-and-live-updates)).
 - **Layouts.** Each role has a default layout (below). Personal layouts come later.
 
-**Every widget is defined in `shared/`**, so the web and mobile apps render the same thing:
+**Every widget is defined in `shared/`**, so the website, and later the mobile app, render the same thing. Each department's module adds its own widgets the same way:
 
 ```ts
 interface WidgetDefinition {
@@ -157,13 +157,13 @@ The next role up confirms or corrects it. A correction is a new record pointing 
 | A checkpoint is decided; a project is put on hold or dropped | The project team |
 | I'm mentioned in a comment | Me |
 
-- **Channels:** in-app (web and mobile) and mobile push. Email follows once accounts have email addresses. WhatsApp comes later.
+- **Channels:** in-app on the website for now. Email follows once accounts have email addresses. WhatsApp alerts come later, and push notifications come with the mobile app.
 - **Work messages** are written from templates in the route definition. For example: *"Your part on SPN-26-004: step 1, the Project Initiation Document, with the Spine Lead. The VP signs. Due 27 Nov. Input: the concept."*
-- **Privacy.** Push notifications show no project details, for example "You have 1 new task in COAL". Opening the app shows the details.
+- **Privacy.** Messages sent outside COAL (email, and later WhatsApp and push) show no project details, for example "You have 1 new task in COAL". Opening COAL shows the details.
 
 ## Later
 
 - **Widgets for the step modules** as they're built: budget and cost, procurement and outsourcing, design and FEA, prototypes and QC queue, machines and OEE, testing, regulatory readiness, market feedback, clinical trials and follow-up, transfer readiness, risk file, launches.
 - **History:** trend charts, using daily snapshots.
 - **Personalisation:** personal layouts and saved filters.
-- **More channels:** a daily email digest, WhatsApp alerts, and work messages written by the AI.
+- **More channels:** push notifications with the mobile app, a daily email digest, WhatsApp alerts, and work messages written by the AI.

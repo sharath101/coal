@@ -3,7 +3,7 @@
 **Read this when** you work on the Workstation page, the AI assistant, its tools, action cards, AI providers, or AI safety.
 **Related:**
 - [roles-and-access.md](./roles-and-access.md) — what the user may see
-- [documents-and-signing.md](./documents-and-signing.md) — boilerplates and signing
+- [documents-and-signing.md](./documents-and-signing.md) — the template library and signing
 - [api.md](./api.md#proposals-and-action-cards) — proposals
 - [architecture.md](./architecture.md#ai-module) — where the AI runs
 
@@ -13,7 +13,7 @@
 
 ## The Workstation
 
-The Workstation is each person's second page: a chat assistant like ChatGPT or Claude, organised by project. It works the same on the web and in the mobile app.
+The Workstation is each person's second page: a chat assistant like ChatGPT or Claude, organised by project. It's on the website first; the same chat comes to WhatsApp and the mobile app later ([channels](#channels)).
 
 ```
 ┌──────────────────┬──────────────────────────────────────┬───────────────────────┐
@@ -38,7 +38,7 @@ The Workstation is each person's second page: a chat assistant like ChatGPT or C
 - **Right: the preview.** Whatever is being worked on: a document draft, a table, a project's route. Submit and Sign live here, so reviewing and signing happen in one place.
 - **Context.** A chat can be pinned to a project, step, document or task. "Ask AI" on a Dashboard widget, and "Open in Workstation" on a task, open a chat with that context already attached.
 - **Input.** @mentions for people, projects and documents; `/` for commands; files and photos.
-- **On the phone** the three panes become tabs.
+- **On a narrow screen,** such as a phone's browser, the three panes become tabs.
 
 ## How the AI works in the first release
 
@@ -53,7 +53,7 @@ The Workstation is each person's second page: a chat assistant like ChatGPT or C
 |---|---|---|---|
 | 1 | **Answer questions** about projects, tasks, documents and status | "What's waiting on me?" · "Which Spine projects are late, and why?" · "What did the FEA report conclude?" · "When does my part start?" | Nothing |
 | 2 | **Turn an idea into a project** (step C) | The VP describes an idea in their own words | A concept draft. Go needs the VP's signature ([below](#idea-to-project)) |
-| 3 | **Draft a document** from a boilerplate | "Draft the PID from the concept" · "Draft the market study" | A draft the user owns ([below](#drafting-a-document)) |
+| 3 | **Draft a document** from its template | "Draft the PID from the concept" · "Draft the market study" | A draft the user owns ([below](#drafting-a-document)) |
 | 4 | **Assign work and make requests** | "Ask Anil to rerun the FEA by Friday, and tell Priya to update the drawing" | Tasks or requests, after the user confirms ([below](#assigning-work)) |
 | 5 | **Explain and check documents** | "What am I signing, and what changed?" · "Compare draft 2 with draft 3" · "Is anything missing from this Action Plan?" | Nothing |
 
@@ -103,15 +103,16 @@ The same flow works without the AI: New idea is also a plain form.
 
 ### Drafting a document
 
-1. **Start.** The user asks for a draft, or presses "Draft it" on a task.
-2. **Gather.** The AI loads the boilerplate's specification ([documents-and-signing.md](./documents-and-signing.md#boilerplates)): which sections are **fields**, filled from records by code, and which are **written** by the AI. It then gathers the inputs with tools: earlier documents, the team, dates.
-3. **Write.** Fields are filled from records, never by the AI. The AI writes only the written sections, each with citations.
-4. **Check.** Every required section is present, every field has a value or is flagged as a gap, and no written section states a number that isn't in a source.
-5. **Preview.** The draft opens in the preview, with gaps highlighted. The user edits by chatting ("make the scope narrower") or directly.
-6. **Save.** Saving creates a new draft version owned by the user (`auto` tier). Submitting it for signatures goes through an action card. Signing is always the user's own act.
-7. **Record.** Each draft records which model, instructions and sources produced it, and AI-written sections are marked as such until a person edits or approves them.
+1. **Start.** The user asks for a document, or presses "Draft it" on a task.
+2. **Find the template.** Every time, the AI looks up the document type's **active template** in the [template library](./documents-and-signing.md#the-template-library). It never works from memory or an earlier chat, so a changed template applies at once. If there's no template, it says so; it can still write a plain draft, marked "no template".
+3. **Gather.** The template's specification says which sections are **fields** and which are **written**. The AI gathers the inputs with tools: earlier documents, the team, dates. It asks the person for any field COAL doesn't hold.
+4. **Write.** Fields are filled from records or from the person's answers, never by the AI. The AI writes only the written sections, each with citations.
+5. **Check.** Every required section is present, every field has a value or is flagged as a gap, and no written section states a number that isn't in a source.
+6. **Preview.** The draft opens in the preview, with gaps highlighted. The user edits by chatting ("make the scope narrower") or directly.
+7. **Save.** Saving creates a new draft version owned by the user (`auto` tier). Submitting it for signatures goes through an action card. Signing is always the user's own act.
+8. **Record.** Each draft records the template version, model, instructions and sources that produced it. AI-written sections are marked as such until a person edits or approves them.
 
-**First release templates:** the stage 1 and 2 documents (concept, PID, market study, regulatory plan, Project Planning and Project Approval Form, Action Plan). The AI can still help with any document as a chat.
+**Which templates:** every step's documents, as their templates are added to the library, starting with stages 1 and 2. For steps whose data COAL doesn't hold yet, most fields come from the person. The AI can still help with any document as a chat.
 
 ### Assigning work
 
@@ -120,6 +121,18 @@ The same flow works without the AI: New idea is also a plain form.
 3. **Assign or request.** Each item becomes an assignment, if the person is below the manager on the [ladder](./roles-and-access.md#assigning-work-and-making-requests), or a request otherwise.
 4. **Confirm.** One action card shows both items: who, what, due date and the message. The manager confirms.
 5. **Deliver.** The tasks show "Assigned by R&D Head via the Workstation", and the assignees are notified.
+
+## Channels
+
+The chat is built **channel-neutral**. A channel passes in a person's message; the AI module returns text, citations and action cards in a neutral form, and each channel shows them in its own way. The rules, tiers and permissions are the same in every channel.
+
+| Channel | When | Notes |
+|---|---|---|
+| Website | First release | The Workstation described above |
+| WhatsApp | After the first release | Action cards become WhatsApp buttons. A person's phone number is linked to their account. What may be shown in WhatsApp is agreed with Jayon first ([open-questions.md](./open-questions.md#ai)) |
+| Mobile app | A later phase | The Workstation, as on the website |
+
+**Signing and other `never`-tier actions don't happen in a chat channel.** In WhatsApp, the AI sends a link that opens the right screen on the website.
 
 ## AI providers
 
@@ -174,5 +187,5 @@ The instructions are versioned files in `backend/`. Any change runs the evaluati
 - **SolidWorks.** A connector on designers' own PCs (read and export first).
 - **Search and data rules.** Vector search over documents, and routing each request by data sensitivity, for example keeping some data in India.
 - **More checks.** A second model checking drafts of high-risk documents (labelling, submissions, FEA reports).
-- **A WhatsApp bot,** using the same backend API and the same rules.
+- **More channels:** WhatsApp, then the mobile app ([channels](#channels)).
 - **Personal features.** Memory that a person can see and edit, and sharing chats.
