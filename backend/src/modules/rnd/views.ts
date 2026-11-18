@@ -1,0 +1,276 @@
+import {
+  decisionValue,
+  milestoneOpen,
+  milestoneReached,
+  runActionRoles,
+  stepActions,
+  waitsFor,
+  type ActivityItem,
+  type ProjectDetail,
+  type ProjectSummary,
+  type RouteView,
+  type StepKey,
+  type StepView,
+} from '@coal/shared';
+import type { Executor } from '../../core/db/client';
+import { listProjectEvents } from '../events/service';
+import { getRuns, stepHistory } from '../process/service';
+import { activeTasksOfRun, presentTasks } from '../tasks/service';
+import { findUsersByIds, present } from '../users/service';
+import type { Env } from './actions';
+import { canSeeProjectContent, may } from './env';
+import { activeMembers, type ProjectRow } from './projects';
+import { roleName } from './routing';
+import { listProductLines } from './service';
+
+const roleRef = (key: string) => ({ key, name: key === 'team' ? 'Project team' : roleName(key) });
+
+export async function presentProjects(
+  ex: Executor,
+  orgId: string,
+  rows: ProjectRow[],
+): Promise<ProjectSummary[]> {
+  if (rows.length === 0) return [];
+  const [runs, lines, creators] = await Promise.all([
+    getRuns(
+      ex,
+      orgId,
+      rows.map((r) => r.processRunId),
+    ),
+    listProductLines(ex, orgId),
+    findUsersByIds(
+      ex,
+      orgId,
+      rows.map((r) => r.createdBy),
+    ),
+  ]);
+  const lineById = new Map(lines.map((l) => [l.id, l]));
+  const creatorName = new Map(creators.map((u) => [u.id, u.name]));
+  return rows.map((row) => {
+    const run = runs.get(row.processRunId);
+    return {
+      id: row.id,
+      code: row.code,
+      name: row.name,
+      description: row.description,
+      productLine: lineById.get(row.productLineId) as ProjectSummary['productLine'],
+      status: run?.status ?? 'active',
+      stage: run?.stage ?? 1,
+      createdAt: row.createdAt.toISOString(),
+      createdBy: creatorName.get(row.createdBy) ?? 'Unknown',
+    };
+  });
+}
+
+export async function presentTeam(ex: Executor, env: Env) {
+  const members = await activeMembers(ex, env.orgId, env.project.id);
+  const users = await present(
+    ex,
+    env.orgId,
+    members.map((m) => m.user),
+  );
+  return members.map((m, i) => ({
+    user: users[i] as ProjectDetail['team'][number]['user'],
+    addedAt: m.addedAt.toISOString(),
+  }));
+}
+
+export async function presentProject(ex: Executor, env: Env): Promise<ProjectDetail> {
+  const { run, route, state } = env.loaded;
+  const [summary] = await presentProjects(ex, env.orgId, [env.project]);
+  const roles = runActionRoles(route, state);
+  return {
+    ...(summary as ProjectSummary),
+    holdReason: run.holdReason,
+    dropReason: run.dropReason,
+    team: await presentTeam(ex, env),
+    can: {
+      hold: may(env, 'projects.hold', roles.hold),
+      resume: may(env, 'projects.resume', roles.resume),
+      drop: may(env, 'projects.drop', roles.drop),
+      editTeam: may(env, 'projects.team.write', ['rd_head', 'rd_lead']),
+    },
+  };
+}
+
+/** The route view: every step's state, what is open, and what this person may do. */
+export async function presentRoute(ex: Executor, env: Env): Promise<RouteView> {
+  const { route, state, run, stepIds, version } = env.loaded;
+  const taskRows = await activeTasksOfRun(ex, run.id);
+  const tasks = await presentTasks(ex, env.orgId, taskRows);
+  const tasksByStep = new Map<string, typeof tasks>();
+  taskRows.forEach((row, i) => {
+    if (row.runStepId && row.runStepId === stepIds.get(row.stepKey ?? '')) {
+      const key = row.stepKey as string;
+      tasksByStep.set(key, [...(tasksByStep.get(key) ?? []), tasks[i] as (typeof tasks)[number]]);
+    }
+  });
+  const approvers = await findUsersByIds(
+    ex,
+    env.orgId,
+    Object.values(state.steps).flatMap((s) => s.approvedBy),
+  );
+  const approverName = new Map(approvers.map((u) => [u.id, u.name]));
+
+  const seesContent = canSeeProjectContent(env);
+  const steps: StepView[] = route.steps.map((step) => {
+    const s = state.steps[step.key] as (typeof state.steps)[string];
+    const a = stepActions(route, state, step.key);
+    const signer = step.signer ? [step.signer] : [];
+    const myBoardTurn =
+      !step.all_must_sign ||
+      (s.signers.includes(env.actor.userId) && !s.approvedBy.includes(env.actor.userId));
+    const mySignOff = may(env, 'steps.approve', signer) && myBoardTurn;
+    const deciders = (key: string) => {
+      const def = step.decisions.find((d) => d.key === key);
+      return def ? [def.by] : [];
+    };
+    const sendBackTargets = step.send_back
+      .filter((rule) => may(env, 'steps.sendBack', [rule.decided_by]))
+      .flatMap((rule) => rule.to);
+
+    return {
+      key: step.key,
+      name: step.name,
+      stage: step.stage,
+      checkpoint: step.checkpoint,
+      new: step.new,
+      iteration: s.iteration,
+      status: s.status,
+      path: s.path,
+      doers: step.doers.map(roleRef),
+      signer: step.signer ? roleRef(step.signer) : null,
+      outside: step.outside,
+      outputs:
+        s.path && step.path
+          ? (step.path.options.find((o) => o.value === s.path)?.outputs ?? [])
+          : step.outputs,
+      waitsFor: s.status === 'locked' && !step.done_at_go ? waitsFor(route, state, step.key) : [],
+      submitNeeds: a.submitNeeds,
+      approveNeeds: a.approveNeeds,
+      approvedBy: s.approvedBy.map((id) => ({ id, name: approverName.get(id) ?? 'Unknown' })),
+      decisions: step.decisions.map((d) => ({
+        key: d.key,
+        name: d.name,
+        by: roleRef(d.by),
+        options: d.options,
+        answer: decisionValue(state, step.key, d.key) ?? null,
+      })),
+      tasks: (tasksByStep.get(step.key) ?? []).map((t) => ({
+        id: t.id,
+        // A corrective action's text is content (it describes a finding); its existence is status.
+        title: t.kind === 'corrective_action' && !seesContent ? 'Corrective action' : t.title,
+        kind: t.kind,
+        status: t.status,
+        assignee: t.assignee,
+        queueRole: t.queueRole,
+      })),
+      actions: {
+        start: a.start && may(env, 'steps.start', step.doers),
+        submit: a.submit && may(env, 'steps.submit', step.doers),
+        approve: a.approve && mySignOff,
+        return: a.return && mySignOff,
+        decide: a.decide.filter((key) => may(env, 'steps.decide', deciders(key))),
+        sendBack: a.sendBack.filter((to) => sendBackTargets.includes(to)),
+        correctiveActions: a.correctiveActions && may(env, 'correctiveActions.create', ['rd_lead']),
+      },
+    };
+  });
+
+  return {
+    process: version.key,
+    version: version.version,
+    status: state.status,
+    stage: run.stage,
+    stages: route.stages,
+    steps,
+    milestones: route.milestones.map((m) => ({
+      key: m.key,
+      name: m.name,
+      recordedAt: m.recorded_at,
+      recordedBy: m.recorded_by.map(roleRef),
+      reached: milestoneReached(route, state, m.key),
+      canRecord: milestoneOpen(route, state, m.key) && may(env, 'milestones.record', m.recorded_by),
+    })),
+    openCorrectiveActions: state.openCorrectiveActions,
+  };
+}
+
+export async function presentStep(ex: Executor, env: Env, key: StepKey) {
+  const route = await presentRoute(ex, env);
+  const step = route.steps.find((s) => s.key === key);
+  const history = await stepHistory(ex, env.loaded.run.id, key);
+  const seesContent = canSeeProjectContent(env);
+  const people = await findUsersByIds(
+    ex,
+    env.orgId,
+    history.decisions.map((d) => d.decidedBy),
+  );
+  const nameOf = new Map(people.map((u) => [u.id, u.name]));
+  return {
+    step,
+    iterations: history.iterations.map(({ step: row, resetReason }) => ({
+      iteration: row.iteration,
+      status: row.status,
+      openedAt: row.openedAt?.toISOString() ?? null,
+      submittedAt: row.submittedAt?.toISOString() ?? null,
+      completedAt: row.completedAt?.toISOString() ?? null,
+      resetReason: seesContent ? (resetReason ?? null) : null,
+    })),
+    decisions: history.decisions.map((d) => ({
+      iteration: d.iteration,
+      decision: d.decision,
+      value: d.value,
+      reason: seesContent ? d.reason : null,
+      decidedBy: nameOf.get(d.decidedBy) ?? null,
+      at: d.createdAt.toISOString(),
+    })),
+  };
+}
+
+/** What an event says about status. The rest of a payload (comments, titles, reasons) is content. */
+const STATUS_PAYLOAD_KEYS = [
+  'step',
+  'iteration',
+  'newIteration',
+  'decision',
+  'value',
+  'milestone',
+  'project',
+];
+
+export async function presentActivity(
+  ex: Executor,
+  env: Env,
+  query: { cursor?: string | undefined; limit: number },
+): Promise<{ items: ActivityItem[]; nextCursor: string | null }> {
+  const { rows, nextCursor } = await listProjectEvents(ex, env.orgId, env.project.id, query);
+  const people = await findUsersByIds(
+    ex,
+    env.orgId,
+    rows.flatMap((r) => (r.actorId ? [r.actorId] : [])),
+  );
+  const nameOf = new Map(people.map((u) => [u.id, u.name]));
+  const seesContent = canSeeProjectContent(env);
+  const visible = (payload: Record<string, unknown>) =>
+    seesContent
+      ? payload
+      : Object.fromEntries(
+          Object.entries(payload).filter(([k]) => STATUS_PAYLOAD_KEYS.includes(k)),
+        );
+  return {
+    items: rows.map((row) => ({
+      id: row.id,
+      type: row.type,
+      at: row.createdAt.toISOString(),
+      actor: {
+        type: row.actorType,
+        id: row.actorId,
+        name: row.actorId ? (nameOf.get(row.actorId) ?? null) : null,
+      },
+      stepKey: row.stepKey,
+      payload: visible(row.payload as Record<string, unknown>),
+    })),
+    nextCursor,
+  };
+}

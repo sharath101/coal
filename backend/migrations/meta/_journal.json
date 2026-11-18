@@ -15,6 +15,20 @@
       "when": 1795020467781,
       "tag": "0001_insert_only_and_outbox_notify",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1795032375545,
+      "tag": "0002_route_projects_tasks",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1795032378699,
+      "tag": "0003_insert_only_process_tables",
+      "breakpoints": true
     }
   ]
 }

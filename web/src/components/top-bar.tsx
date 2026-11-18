@@ -2,7 +2,14 @@
 
 import { signOut, type Me } from '@coal/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { LayoutDashboard, LogOut, MessagesSquare, UserRound } from 'lucide-react';
+import {
+  FolderKanban,
+  LayoutDashboard,
+  ListChecks,
+  LogOut,
+  MessagesSquare,
+  UserRound,
+} from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -41,6 +48,35 @@ function PageToggle() {
   );
 }
 
+/** Where the work is: every project, and the tasks that are mine. */
+function MainLinks() {
+  const t = useTranslations('nav');
+  const pathname = usePathname();
+  const links = [
+    { href: '/projects', label: t('projects'), icon: FolderKanban },
+    { href: '/tasks', label: t('tasks'), icon: ListChecks },
+  ];
+  return (
+    <nav aria-label={t('main')} className="flex gap-1">
+      {links.map(({ href, label, icon: Icon }) => (
+        <Link
+          key={href}
+          href={href}
+          aria-current={pathname.startsWith(href) ? 'page' : undefined}
+          className={cn(
+            'flex items-center gap-2 rounded-md px-2.5 py-1.5 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-foreground',
+            pathname.startsWith(href) && 'bg-accent text-foreground',
+          )}
+        >
+          <Icon className="size-4" aria-hidden />
+          <span className="hidden md:inline">{label}</span>
+          <span className="sr-only md:hidden">{label}</span>
+        </Link>
+      ))}
+    </nav>
+  );
+}
+
 export function TopBar({ me }: { me: Me }) {
   const t = useTranslations('nav');
   const tApp = useTranslations('app');
@@ -59,6 +95,7 @@ export function TopBar({ me }: { me: Me }) {
       <Link href="/dashboard" className="text-lg font-semibold tracking-tight">
         {tApp('name')}
       </Link>
+      <MainLinks />
       <div className="flex flex-1 justify-center">
         <PageToggle />
       </div>

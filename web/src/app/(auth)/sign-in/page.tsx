@@ -59,7 +59,7 @@ export default function SignInPage() {
               onChange={(e) => setName(e.target.value)}
             />
           </div>
-          <ProblemMessage error={mutation.error} />
+          <ProblemMessage error={mutation.error} overrides={{ NOT_FOUND: t('noSuchAccount') }} />
         </CardContent>
         <CardFooter className="flex flex-col items-stretch gap-3">
           <Button type="submit" disabled={mutation.isPending || name.trim() === ''}>

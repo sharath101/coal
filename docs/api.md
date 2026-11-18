@@ -34,8 +34,8 @@ This is the first-release endpoint list. The generated OpenAPI spec is the exact
 
     Successful responses are kept for a day.
   - Edits take an `If-Match` header with the version the user saw, so two people, or a person and the AI, can't overwrite each other. A stale version gets `412 VERSION_CONFLICT`. For `PATCH /me`, the version is the profile's `updatedAt`.
-- **Preview.** Workflow actions accept `?preview=true`. It returns what would happen (steps opened or reset, tasks with their assignees, signatures requested, people notified, warnings) without saving anything.
-- **Errors** use the standard problem format (`application/problem+json`) with a code. The codes are listed in `shared/src/api/problem.ts`; for example `NOT_SIGNED_IN`, `NOT_ALLOWED`, `AI_NOT_ALLOWED`, `NOT_FOUND`, `VALIDATION_FAILED` (with the fields), `NAME_TAKEN`, `VERSION_CONFLICT`, `RATE_LIMITED`, `STEP_NOT_READY`, `SIGNATURE_REQUIRED` and `PREVIEW_CHANGED`. "Not allowed" names who can do it (`whoCan`); it never reveals content.
+- **Preview.** Every workflow action (Go, start, submit, approve, return, decisions, send back, milestones, corrective actions, hold, resume and drop) accepts `?preview=true`. An action that can't preview refuses it with `400 VALIDATION_FAILED` instead of ignoring it, so a caller that adds `preview=true` to everything never changes anything by accident. It returns what would happen (steps opened or reset, tasks with their assignees, signatures requested, people notified, warnings) without saving anything. It is the real action run inside a transaction that is rolled back, so the preview and the result can't drift apart.
+- **Errors** use the standard problem format (`application/problem+json`) with a code. The codes are listed in `shared/src/api/problem.ts`; for example `NOT_SIGNED_IN`, `NOT_ALLOWED`, `AI_NOT_ALLOWED`, `NOT_FOUND`, `VALIDATION_FAILED` (with the fields), `NAME_TAKEN`, `VERSION_CONFLICT`, `RATE_LIMITED`, `STEP_NOT_READY`, `PROJECT_NOT_ACTIVE`, `DECISION_REQUIRED`, `CORRECTIVE_ACTIONS_OPEN`, `ALREADY_DONE`, `SIGNATURE_REQUIRED` and `PREVIEW_CHANGED`. "Not allowed" names who can do it (`whoCan`); it never reveals content.
 
 ## Endpoints
 
@@ -68,43 +68,49 @@ This is the first-release endpoint list. The generated OpenAPI spec is the exact
 | Endpoint | Purpose | Tier |
 |---|---|---|
 | `GET /processes` | The processes COAL runs; the R&D route is the first | read |
-| `GET /processes/{key}` | A process's current version: steps, doers, signers, links | read |
+| `GET /processes/{key}` | A process's latest version: stages, steps, doers, signers, conditions, milestones | read |
 | `GET /processes/{key}/steps/{step}` | One step's definition | read |
 
 ### Projects
 
 | Endpoint | Purpose | Tier |
 |---|---|---|
-| `POST /projects?preview=true` | Preview Go: the steps that open, the tasks and who gets them, warnings | read |
-| `POST /projects` | Go: create the project from a concept. Needs the VP's signature on the Go decision | never |
-| `GET /projects`, `GET /projects/{id}` | Every project's status (open to all); content as permitted | read |
-| `PATCH /projects/{id}` | Edit the name and description | confirm |
-| `GET /projects/{id}/route` | Each step's state and iteration, for the route view | read |
-| `GET /projects/{id}/team`, `PUT /projects/{id}/team` | See or change the project team (Lead or Head) | read / confirm |
-| `GET /projects/{id}/timeline` | Baseline, current and forecast dates | read |
-| `PUT /projects/{id}/timeline` (preview) | Set the baseline from the signed Action Plan, or propose new dates | confirm |
-| `POST /projects/{id}/hold`, `/resume`, `/drop` | With a reason | never |
-| `GET /projects/{id}/activity` | The project's activity and history | read |
+| `POST /projects` | Go: create the project from a concept, with its team and its first tasks. **Today a confirmed click by the VP**; it becomes a signed decision with passkeys. With `?preview=true`: the steps that open, the tasks and who gets them, the team and warnings, and nothing is saved | never |
+| `GET /projects`, `GET /projects/{id}` | Every project's status (open to everyone signed in), with `filter[status]`, `filter[productLine]` and cursor paging. The detail also says what the signed-in person may do (`can`: hold, resume, drop, edit the team) | read |
+| `GET /projects/{id}/route` | Each step's state, iteration, doers, signer, what it waits for, its decisions and tasks, and what the signed-in person may do there now (`actions`); the milestones; the open corrective actions. This is the route view | read |
+| `GET /projects/{id}/team`, `PUT /projects/{id}/team` | See or change the project team (Lead or Head). The change is audited, and removed members keep their record | read / confirm |
+| `POST /projects/{id}/hold`, `/resume`, `/drop` | With a reason. Who may, and when, comes from the route and the project's state | never |
+| `GET /projects/{id}/activity` | The project's events, newest first, with who did them. People outside the project's scope see the status of each event only, not comments, titles or reasons | read |
+
+*Later:* `PATCH /projects/{id}` (edit the name and description), `GET` and `PUT /projects/{id}/timeline` (with the Dashboard block).
 
 ### Steps
 
 | Endpoint | Purpose | Tier |
 |---|---|---|
-| `GET /projects/{id}/steps/{key}` | The current iteration and earlier ones | read |
-| `POST /projects/{id}/steps/{key}/submit` (preview) | Submit for sign-off; generates the step sign-off record. For steps without a sign-off, marks the step done | confirm |
-| `POST /projects/{id}/steps/{key}/decisions` | Record a decision (checkpoint, prototypes OK, pre-clinical needed). Needs a signature | never |
-| `POST /projects/{id}/steps/{key}/send-back` (preview) | Send work back to an earlier step. The preview shows what resets | never |
-| `POST /projects/{id}/milestones` | Record a milestone, with evidence | confirm |
+| `GET /projects/{id}/steps/{key}` | The step's view, every iteration with the reason a send-back closed it, and its decisions with their reasons (the reasons only for people in the project's scope) | read |
+| `POST /projects/{id}/steps/{key}/start` | A doer starts a step that is ready | confirm |
+| `POST /projects/{id}/steps/{key}/submit` | Submit for sign-off, which gives the signer a task (every Board member at steps 4 and 23). For steps without a sign-off, marks the step done. `?preview=true` shows what happens | confirm |
+| `POST /projects/{id}/steps/{key}/approve` | Sign off. **Today a confirmed click by the signer**, replaced by `POST /signatures` with passkeys. `?preview=true` supported | never |
+| `POST /projects/{id}/steps/{key}/return` | Return to the authors with a comment (the same placeholder) | never |
+| `POST /projects/{id}/steps/{key}/decisions` | Record a decision (prototypes OK, pre-clinical study needed). Only the role the route names may. Same placeholder | never |
+| `POST /projects/{id}/steps/{key}/send-back` | Send work back to an earlier step the route allows, with a reason and optional evidence file. `?preview=true` lists the steps that would reset and the tasks that would be cancelled | never |
+| `POST /projects/{id}/milestones` | Record a milestone, with an optional note or evidence file | confirm |
+| `POST /projects/{id}/corrective-actions` | Raise a corrective action while the case study (step 16) is open. Step 18 waits until all are closed | confirm |
+
+Every action returns `{ saved, preview }`: what changed (steps, tasks made with their assignees or queues, tasks cancelled, warnings). With `?preview=true`, `saved` is `false`. The preview runs the real code and rolls back at the end, so it can't differ from the real result.
 
 ### Tasks and requests
 
 | Endpoint | Purpose | Tier |
 |---|---|---|
-| `GET /tasks`, `GET /tasks/{id}` | My tasks, and others' tasks that I can see | read |
-| `POST /tasks` (preview) | A task for myself, an assignment, or a request | auto (for myself) / confirm |
-| `PATCH /tasks/{id}` | Update the status, due date or notes | auto (my own) / confirm |
-| `POST /tasks/{id}/accept`, `/decline`, `/claim`, `/reassign` | Respond to a request; claim from a role queue; reassign | confirm |
-| `POST /tasks/{id}/comments` | Comment, with @mentions | auto (no mentions) / confirm |
+| `GET /tasks` | My tasks (`scope=mine`) or the tasks waiting in my role's queue (`scope=queue`), open or closed | read |
+| `GET /tasks/{id}` | One task: mine, or one waiting in my role's queue | read |
+| `PATCH /tasks/{id}` | Set my own task to open, in progress or done | auto (my own) |
+| `POST /tasks/{id}/claim` | Claim a task from my role's queue. I join the project team if I'm not on it. A Lead may claim only for their own product line's projects | confirm |
+| `POST /tasks/{id}/reassign` | Give a task to someone who holds its role (the VP or the Head; the Lead only within the project team) | confirm |
+
+*Later:* `POST /tasks` (own tasks, assignments and requests), `accept`, `decline` and comments.
 
 ### Deviations
 
@@ -180,9 +186,9 @@ Events are written in the same transaction as the change ([architecture.md](./ar
 
 | Group | Events |
 |---|---|
-| Project | `project.created`, `project.held`, `project.resumed`, `project.dropped`, `project.launched` |
-| Step | `step.ready`, `step.started`, `step.submitted`, `step.returned`, `step.approved`, `step.done`, `step.reset`, `decision.recorded`, `milestone.recorded` |
-| Task | `task.created`, `task.assigned`, `task.updated`, `task.done`, `task.due_soon`, `task.overdue`, `request.declined` |
+| Project | `project.created`, `project.held`, `project.resumed`, `project.dropped`, `project.launched`, `project.team_changed`, `project.closed` |
+| Step | `step.ready`, `step.started`, `step.submitted`, `step.signed` (one of several required approvals), `step.returned`, `step.approved`, `step.done`, `step.reset`, `step.cancelled`, `decision.recorded`, `milestone.recorded` |
+| Task | `task.created`, `task.assigned`, `task.updated`, `task.done`, `task.cancelled`, `task.due_soon`, `task.overdue`, `request.declined` |
 | Document | `document.created`, `document.version_saved`, `document.submitted`, `document.approved`, `document.returned`, `template.added`, `template.activated` |
 | Signature | `signature.requested`, `signature.signed` |
 | Timeline | `deviation.required`, `deviation.recorded`, `timeline.changed`, `forecast.changed` |

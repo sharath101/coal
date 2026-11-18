@@ -53,6 +53,9 @@ export default tseslint.config(
       '@typescript-eslint/no-unsafe-assignment': 'off',
       '@typescript-eslint/no-unsafe-argument': 'off',
       '@typescript-eslint/no-unsafe-call': 'off',
+      '@typescript-eslint/no-unsafe-return': 'off',
+      // Tests read untyped JSON from the API.
+      '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-non-null-assertion': 'off',
     },
   },
@@ -70,7 +73,7 @@ export default tseslint.config(
       // All website text lives in web/messages, ready for translation (P22).
       'react/jsx-no-literals': [
         'error',
-        { noStrings: true, ignoreProps: true, allowedStrings: [' ', '·', '—', '/', '×'] },
+        { noStrings: true, ignoreProps: true, allowedStrings: [' ', '·', '—', '/', '×', '→'] },
       ],
       '@next/next/no-html-link-for-pages': 'off',
     },

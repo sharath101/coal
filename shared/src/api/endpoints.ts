@@ -1,6 +1,29 @@
 import type { EndpointSpec } from './contract';
 import { completeUpload, createUpload, getFileLink } from '../schemas/files';
 import { listRoles } from '../schemas/org';
+import { getProcess, getProcessStep, listProcesses } from '../schemas/process';
+import {
+  approveStep,
+  createCorrectiveAction,
+  createProject,
+  decideStep,
+  dropProject,
+  getActivity,
+  getProject,
+  getProjectRoute,
+  getStep,
+  getTeam,
+  holdProject,
+  listProjects,
+  putTeam,
+  recordMilestone,
+  resumeProject,
+  returnStep,
+  sendBackStep,
+  startStep,
+  submitStep,
+} from '../schemas/projects';
+import { claimTask, getTask, listTasks, reassignTask, updateTask } from '../schemas/tasks';
 import { listProductLines } from '../schemas/rnd';
 import { getMe, getUser, listUsers, signIn, signOut, signUp, updateMe } from '../schemas/users';
 
@@ -21,6 +44,33 @@ export const ENDPOINTS = [
   createUpload,
   completeUpload,
   getFileLink,
+  listProcesses,
+  getProcess,
+  getProcessStep,
+  createProject,
+  listProjects,
+  getProject,
+  getProjectRoute,
+  getTeam,
+  putTeam,
+  holdProject,
+  resumeProject,
+  dropProject,
+  getActivity,
+  getStep,
+  startStep,
+  submitStep,
+  approveStep,
+  returnStep,
+  decideStep,
+  sendBackStep,
+  recordMilestone,
+  createCorrectiveAction,
+  listTasks,
+  getTask,
+  updateTask,
+  claimTask,
+  reassignTask,
 ] as const satisfies readonly EndpointSpec[];
 
 export type Endpoint = (typeof ENDPOINTS)[number];

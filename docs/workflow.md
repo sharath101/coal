@@ -17,7 +17,16 @@ A product goes from the VP's idea (step **C**) to launch (step **25**) through *
 - **Sign-offs.** 25 steps have a sign-off: the R&D Head signs 10, the R&D Lead 7, the VP 6 and the Board 2. C, 2a and 24a have none.
 - **Parallel steps.** Some steps start together (1, 2 and 2a; 6 to 9; 10 and 11; 14 and 15).
 
-**The route is data, not code.** It is stored as a versioned definition (see [architecture.md](./architecture.md#the-process-engine)). Each project stays on the version it started with. To change the route, edit the definition and this doc together.
+**The route is data, not code.** It is stored as a versioned definition, `shared/src/process/rnd-route.v2.yaml` (see [architecture.md](./architecture.md#the-process-engine)). Each project stays on the version it started with. A version is never edited once it is loaded: to change the route, add a new version file, and update its tests and this doc together.
+
+**Where this is built.** The whole route runs in COAL: tasks, sign-offs, decisions, milestones, sending work back, hold and drop. What is not built yet, and which block adds it:
+
+| Not yet | Comes with |
+|---|---|
+| Signing with Face ID or a fingerprint. Until then, a sign-off, a decision or Go is a confirmed click by the right role, recorded with who and when | Documents and signing |
+| Documents on each step, and carrying them forward when work is sent back | Documents and signing |
+| Due dates, reminders and recording the delay as a deviation | Dashboard |
+| Notifications. Events are written; nothing sends them yet | Dashboard |
 
 ## The steps
 
@@ -84,14 +93,15 @@ flowchart LR
 
 - **The signer's choices.** At a sign-off the signer either approves, or returns the work to its authors with comments (rework within the same step).
 - **Checkpoints and failure points** also allow sending the work back to an earlier step (see "Failure and rework" below).
-- **Signed online.** Every sign-off is signed online with Face ID or fingerprint, and produces a sign-off record ([documents-and-signing.md](./documents-and-signing.md#step-sign-off-records)).
-- **The Board.** The MD and the CEO sign only as the Board, at steps 4 and 23. We assume both must sign ⚠.
+- **Signed online.** Every sign-off is signed online with Face ID or fingerprint, and produces a sign-off record ([documents-and-signing.md](./documents-and-signing.md#step-sign-off-records)). *Until passkeys arrive, the signer confirms with a click; the website says so.*
+- **The Board.** The MD and the CEO sign only as the Board, at steps 4 and 23. We assume both must sign ⚠. When the step is submitted, every person holding the Board role gets a sign-off task, and the step is approved when all of them have approved. If any one returns it, it goes back to its authors and the approvals so far are cleared. Anyone who joins the Board later doesn't join a sign-off already under way.
+- **Who may submit and sign.** Any doer of a step may start and submit it; only the step's signer may approve or return it. For checkpoints, approving records a `checkpoint` decision. Step 12 can't be approved until the Head has answered both of its questions, and "Are the prototypes OK?" must be *yes*.
 - **Steps without a sign-off.** C, 2a and 24a are complete when a doer marks them done. C is completed by the VP's signed Go.
 
 ### Starting steps
 
 - **When a step opens.** It opens (becomes *ready*) when everything in its "Starts when" column is true.
-- **Tasks.** The engine then creates tasks for its doers ([roles-and-access.md](./roles-and-access.md#who-gets-a-task)).
+- **Tasks.** The engine then creates tasks for its doers ([roles-and-access.md](./roles-and-access.md#who-gets-a-task)): one for each doer role. Where the doer is "the project team" (steps 12, 24a and 24b), every team member who has no other task at the step gets one ⚠ ([W18](./open-questions.md#workflow)). When a step is submitted, its signer gets a sign-off task; approving, returning or resetting the step closes its tasks.
 - **Milestones** are facts recorded by a person, with a note or a file as evidence:
 
   | Milestone | Recorded at | Opens |
@@ -102,7 +112,7 @@ flowchart LR
   | Positive feedback threshold reached (about 50 cases) ⚠ | Step 20, by the Lead | Step 24a, together with step 23 |
   | Follow-up complete | Step 20, by the Lead or Ops | Step 20 can be signed off ⚠ |
 
-  Until the step modules exist, milestones are recorded by hand. Later, some of them will be worked out from records (see [roadmap.md](./roadmap.md)).
+  Until the step modules exist, milestones are recorded by hand, by the roles in the table, with an optional note or file as evidence. A milestone recorded at a step can be recorded once the step has opened. Milestones recorded at step 20 count for that iteration of the step only, so sending work back to 10 means they are needed again. Later, some will be worked out from records (see [roadmap.md](./roadmap.md)).
 - **Item-level rules.** Some rules apply to individual items, not whole steps. For example, a custom outsourced item at step 9 waits for its approved drawing. These are followed by people, and the engine will enforce them once the item records exist ([roadmap.md](./roadmap.md)).
 
 ### Decisions recorded at steps
@@ -121,7 +131,7 @@ Step 15 always opens after step 13. If the Head decided at step 12 that a study 
 
 ### Step 16 to 18: corrective actions
 
-The case study at step 16 lists corrective actions. Each becomes a task of kind *corrective action*. Step 18 can't be submitted while any of them is open.
+The case study at step 16 lists corrective actions. Each becomes a task of kind *corrective action*: the Lead raises them while the case study is open ⚠ ([W19](./open-questions.md#workflow)), and the person they are assigned to closes them. Step 18 can't be submitted while any of them is open (`CORRECTIVE_ACTIONS_OPEN`), and its page says so.
 
 ### Failure and rework
 
@@ -139,19 +149,22 @@ The case study at step 16 lists corrective actions. Each becomes a task of kind 
 **What happens when work goes back to an earlier step**
 
 1. **Preview first.** The decider sees which steps would be reset before confirming. Then they give the reason and any evidence, such as a QC or lab report.
-2. **Reopen.** The earlier step reopens as a new **iteration** (iteration 2, 3 and so on). History is never edited: earlier versions and signatures stay on record.
-3. **Reset what depends on it.** Every later step that depends on the reopened one, directly or indirectly, is reset to a new iteration that waits for its inputs. This includes the step where the failure happened. Steps that don't depend on it carry on: for example, rework on the implant design (7) doesn't touch the instrument design (8) or the instrument prototype (11).
-4. **Clean up.** Open tasks on the reset steps are cancelled.
+2. **Reopen.** The earlier step reopens as a new **iteration** (iteration 2, 3 and so on). History is never edited: the closed iteration, its decisions and the send-back with its reason stay on record. The reopened step is ready at once, because everything it waits for is upstream and untouched.
+3. **Reset what depends on it.** Every later step that depends on the reopened one, directly or indirectly, is reset to a new iteration that waits for its inputs. This includes the step where the failure happened. A step that hadn't opened yet has nothing to reset. Decisions and milestones belong to an iteration, so those of a reset step are needed again (for example, the Head answers step 12's questions again). Steps that don't depend on it carry on: for example, rework on the implant design (7) doesn't touch the instrument design (8) or the instrument prototype (11).
+4. **Clean up.** Open tasks on the reset steps are cancelled, and their new iterations create tasks again when they open.
 5. **Carry the documents forward.** The latest version of each document becomes a new draft in the new iteration, so people revise rather than start again.
-6. **Never reset the follow-up.** The step-20 patient follow-up is never reset, because patients already treated must still be followed.
-7. **Record the delay.** The delay is recorded as a deviation with the reason "rework" ([dashboard.md](./dashboard.md#deadlines-alerts-and-deviations)).
+6. **Never reset the follow-up.** The step-20 patient follow-up is never reset, because patients already treated must still be followed. It is a task of its own, which a send-back never cancels, and which isn't created twice when step 20 reopens.
+7. **Record the delay.** The delay is recorded as a deviation with the reason "rework" ([dashboard.md](./dashboard.md#deadlines-alerts-and-deviations)). *Comes with the Dashboard block.*
+
+Sending work back is a decision of the person named in the table, with a reason and optional evidence (a file the person uploaded). The preview and the real thing run the same code; the preview rolls back at the end, so it can't differ from what happens.
 
 ### Hold and drop ⚠
 
 - **The VP** can put a project on hold, resume it, or drop it, always with a reason.
-- **The Board** can drop it at steps 4 and 23.
-- **Hold** pauses dates and alerts.
-- **Drop** cancels open tasks and keeps every record.
+- **The Board** can drop it only while step 4 or 23 is open.
+- **Hold** stops all step work (submitting, signing, deciding, recording milestones, raising corrective actions, sending back) until the VP resumes. Open tasks stay. Pausing dates and alerts comes with the Dashboard block.
+- **Drop** cancels open steps and tasks and keeps every record. A dropped project can't be resumed.
+- **After launch.** When step 25 is approved the project is *launched*, and step 20's follow-up can still be finished. When every step is finished, the project is *closed*.
 
 Who else may do this is an open question.
 
@@ -192,6 +205,8 @@ These are details from the workflow page that matter for tasks and documents. St
 | Step 20 is signed off when the follow-up is complete; step 21 starts at "surgeries complete" | [W5](./open-questions.md#workflow) |
 | Step 24a: no sign-off; the threshold is the positive step-20 cases, recorded by hand | [W6](./open-questions.md#workflow) |
 | Hold and drop: the VP at any time, the Board at 4 and 23 | [W7](./open-questions.md#workflow) |
+| Steps 12, 24a and 24b: every team member gets a task | [W18](./open-questions.md#workflow) |
+| Step 16: the Lead raises corrective actions and the assignee closes them | [W19](./open-questions.md#workflow) |
 | Design changes after the trials restart at 10; instrument-only changes are open | [W8](./open-questions.md#workflow) |
 
 Possible regulatory additions to this route, such as design reviews, risk management, clinical approvals and UDI, are reference only for now: see [regulatory-notes.md](./regulatory-notes.md). They are not part of the route until we have the full picture and Jayon agrees.

@@ -29,7 +29,7 @@ This roadmap gives an **order, not dates**. Madhav's effort estimates and costs 
 
 Each block depends on the ones before it. Within a block, the work can run side by side.
 
-**Progress:** block 1 (Foundations) is done, except virus scanning of uploads, which comes with block 3. Block 2 (the route) is next.
+**Progress:** blocks 1 (Foundations) and 2 (the route) are done. Virus scanning of uploads comes with block 3. Block 3 (Documents and signing) is next.
 
 1. **Foundations** ✅
    - The monorepo (pnpm workspaces): `backend/`, `web/` and `shared/`; `app/` waits for its phase.
@@ -41,10 +41,12 @@ Each block depends on the ones before it. Within a block, the work can run side 
    - The audit trail and the event outbox.
    - File storage.
    - The website skeleton with the Dashboard and Workstation toggle, with its text ready for translation.
-2. **The route**
+2. **The route** ✅
    - The route definition (version 2) in YAML, and the pure engine, with tests for every step, rework path, branch and milestone.
    - Process runs and their steps, R&D projects, tasks and their routing; Go as a plain form.
    - Decisions, sending work back, milestones, hold and drop.
+   - On the website: Go with its preview, the projects list, the project page (the route by stage, with each step's actions, team, milestones and activity), and My tasks.
+   - Left for later blocks, as planned: signing with passkeys (sign-offs are a confirmed click until then), documents on steps, due dates and deviations (route durations, `default_days`, arrive with the Dashboard), notifications.
 3. **Documents and signing**
    - Document types and the template library: adding, checking and activating templates; the import command for `private/templates/`; the templates provided so far.
    - Documents from templates and uploads; versions, comparison and PDFs.

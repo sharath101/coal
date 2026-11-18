@@ -12,7 +12,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { assertCanUse } from '../../modules/permissions';
 import type { AppDeps } from '../deps';
-import { AppError } from './errors';
+import { AppError, validationFailed } from './errors';
 import type { Actor, RequestContext } from './context';
 
 export interface HandlerArgs<E extends EndpointSpec> {
@@ -71,6 +71,17 @@ export function guard(endpoint: EndpointSpec, ctx: RequestContext): void {
   assertCanUse(endpoint.permission as Parameters<typeof assertCanUse>[0], ctx.actor);
 }
 
+/**
+ * `?preview=true` means "change nothing". An endpoint that can't preview must refuse it, not
+ * ignore it, or a caller that adds it to every action would make real changes.
+ */
+export function rejectStrayPreview(endpoint: EndpointSpec, query: unknown): void {
+  if (endpoint.method === 'GET') return;
+  if (!query || typeof query !== 'object' || !('preview' in query)) return;
+  if (endpoint.query && 'preview' in endpoint.query.shape) return;
+  throw validationFailed('This action has no preview.', 'preview');
+}
+
 /** Registers the implementations, refusing to start if any endpoint has none. */
 export function registerEndpoints(
   app: FastifyInstance,
@@ -99,7 +110,10 @@ export function registerEndpoints(
       },
       config: impl.rateLimit ? { rateLimit: impl.rateLimit(deps) } : {},
       // Before validation, so callers who may not use the endpoint learn nothing about its input.
-      preValidation: async (request) => guard(endpoint, request.ctx),
+      preValidation: async (request) => {
+        guard(endpoint, request.ctx);
+        rejectStrayPreview(endpoint, request.query);
+      },
       handler: async (request, reply) => {
         const ctx = request.ctx;
         const result = await impl.handler({

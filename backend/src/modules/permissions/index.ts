@@ -1,7 +1,14 @@
 import type { PermissionKey } from '@coal/shared';
 import type { Actor } from '../../core/http/context';
 import { AppError } from '../../core/http/errors';
-import { RULES, type Decision, type ResourceOf, type ResourcePermission } from './rules';
+import {
+  RULES,
+  inScope,
+  type Decision,
+  type ResourceOf,
+  type ResourcePermission,
+  type Scope,
+} from './rules';
 
 export type { Decision } from './rules';
 
@@ -46,4 +53,12 @@ export function assertCanAccess<K extends ResourcePermission>(
 ): void {
   const decision = canAccess(permission, actor, resource);
   if (!decision.allowed) throw toError(decision);
+}
+
+/**
+ * May this person read the content of a project's activity and history (return comments, reasons)?
+ * Everyone signed in sees its status; content is need-to-know (docs/roles-and-access.md#what-people-can-see).
+ */
+export function canSeeContent(actor: Actor, scope: Scope): boolean {
+  return inScope(actor, scope);
 }

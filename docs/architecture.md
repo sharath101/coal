@@ -108,10 +108,11 @@ coal/
                       transaction with its audit entries and events), the endpoint layer
                       (session, AI tier and permission checks, problem responses, Idempotency-Key)
       modules/        Platform modules: auth, users, org (departments and roles), permissions,
-                      audit, events (the outbox), files; later process, tasks, documents,
+                      audit, events (the outbox), files, process (route versions, runs and
+                      their steps, decisions, milestones, send-backs), tasks; later documents,
                       templates, signatures, dashboard, notifications, ai
-                      Department modules: rnd (product lines; later projects, teams, task
-                      routing); others later
+                      Department modules: rnd (product lines, projects, teams, task routing,
+                      and the actions that turn the engine's effects into tasks); others later
                       Each module has tables.ts, service.ts and routes.ts
       jobs/           Background jobs (pg-boss) and the worker
       server.ts       The API. worker.ts: the worker. dev.ts: both, for local work
@@ -127,7 +128,9 @@ coal/
     src/
       api/            The endpoint contract, the list of every endpoint, problem codes, the typed client
       schemas/        zod schemas and endpoint contracts, by area
-      process/        Route definitions (YAML, one per process and version) and the pure engine, with tests (block 2)
+      process/        Route definitions (YAML, one per process and version), their schema and
+                      validation, and the pure engine, with tests. files.ts reads the YAML (Node
+                      only; imported as @coal/shared/process-files by the backend and the tests)
       widgets/        Dashboard widget definitions (block 4)
       rules/          Small rules both clients and the backend use (names, upload limits)
   docs/               This plan
@@ -143,17 +146,18 @@ Each backend module owns its tables, its services and its routes. Modules call e
 
 COAL runs its processes, starting with the R&D route, on its own small engine, not a workflow product. The route is paced by people over months, its rules are specific (milestones, conditional steps, rework that resets only dependent steps), and the engine's state and the audit trail must be written together.
 
-- **Routes are files.** Each process's route lives in `shared/src/process/` as a YAML file per version (for example `rnd-route.v2.yaml`) and is checked against a schema. On deploy it's loaded into the database as a process version. Each run (for R&D, each project) stays on the version it started with.
-- **A pure engine.** The engine is one function: given the route, the run's current state and an action (submit, sign, return, decide, record a milestone, send back), it returns the new state and a list of **effects**: open steps, create or cancel tasks, request signatures, notify people, emit events. It touches nothing else, so it's easy to test.
-- **One transaction per action.** Each action runs in one database transaction:
-  1. check permission;
-  2. run the engine;
-  3. save the new state;
-  4. write the audit entries;
-  5. write the events (see below).
-- **Previews.** The same function runs without saving. This powers the action cards and the "what would reset" preview for rework.
-- **Conditions are named rules** written in code and used by name in the route file: `step_approved`, `step_done`, `milestone_reached`, `decision_equals`, `no_open_corrective_actions`.
-- **Tests.** Table-driven tests walk whole projects through the route in seconds, including every rework path, both paths of step 15, and the milestones.
+- **Routes are files.** Each process's route lives in `shared/src/process/` as a YAML file per version (`rnd-route.v2.yaml`), checked against a strict schema (`definition.ts`) and by `validateRoute`: every step, milestone, decision and role it names exists, there are no cycles, and every send-back goes to a step the sender depends on. On deploy (`db:migrate`) the files are loaded into `process_versions`, with a hash. A loaded version never changes: a changed file is refused until it is a new version. Each run (for R&D, each project) stays on the version it started with.
+- **A pure engine.** `apply(route, state, action)` takes a run's state and an action (start, submit, approve, return, decide, record a milestone, send back, hold, resume, drop) and returns the new state and a list of **effects**: steps becoming ready, started, submitted, approved, done, returned, reset or cancelled; decisions and milestones recorded; the run held, resumed, dropped, completed or closed. `startRun` does the same for Go. It touches nothing else, and refuses with an `EngineError` that carries the API's problem code. It also answers questions the screens need: what a step waits for, what it can do now (`stepActions`), and who may hold or drop (`runActionRoles`).
+- **Opening steps.** After every action the engine opens each step whose conditions hold, until nothing changes. A send-back closes the iterations of the step and of everything that depends on it, and reopens the target at once.
+- **One transaction per action.** Each action runs in one database transaction, in `backend/src/modules/rnd/actions.ts`:
+  1. lock the run, so actions on one project happen one after the other;
+  2. check the permission (the role the route names, and the person's scope);
+  3. run the engine;
+  4. save the new state (a send-back closes the old iteration rows and adds new ones);
+  5. turn the effects into tasks, audit entries and events (see below).
+- **Previews.** The same code runs inside the transaction and rolls back at the end (`previewable()` in `core/db/change.ts`). A preview can't drift from the real action, because it is the real action.
+- **Conditions are named rules** written in code and used by name in the route file: `step_approved`, `step_done`, `milestone_reached`, `decision_equals`, `decision_recorded`, `no_open_corrective_actions`.
+- **Tests.** Table-driven tests walk whole projects through the route in seconds (`shared/src/process/engine.test.ts`), including every rework path, both paths of step 15, the Board's two signatures, hold and drop, and the milestones. API tests (`backend/test/route.test.ts`) walk it through the real endpoints, with the permissions, tasks and audit trail.
 
 ```yaml
 process: rnd-route
@@ -164,24 +168,26 @@ steps:
     stage: 3
     doers: [pme, qc_inspector]
     signer: rd_lead
-    default_days: 20                     # placeholder until Jayon gives typical durations
     starts_when:
       - { step_approved: "7" }
       - { milestone_reached: material_received_implant }
       - { milestone_reached: test_licence_recorded }
-    outputs: [prototype_documents]       # uploads until the templates exist
+    outputs: [Material Issue Slip, Run card, Prototype Approval Form]
     send_back:
       - { to: ["7"], decided_by: rd_head }
+    assumptions: [W3, W11]               # open questions this step relies on
   - key: "15"
     name: Pre-clinical study
     stage: 4
     doers: [rd_ops, dard]
     signer: rd_lead
     starts_when: [{ step_approved: "13" }]
-    paths:
+    path:                                # the Head's answer at step 12 chooses the outputs
       decided_at: { step: "12", decision: preclinical_needed }
-      yes: { outputs: [preclinical_report] }
-      no:  { outputs: [preclinical_justification] }
+      options:
+        - { value: "yes", name: Study, outputs: [Animal or cadaver study report] }
+        - { value: "no", name: Justification, outputs: [Justification that no study is needed] }
+    outputs: []
 ```
 
 The full step list is in [workflow.md](./workflow.md). When the route changes, update the YAML, its tests and `workflow.md` together.

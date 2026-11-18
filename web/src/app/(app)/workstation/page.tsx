@@ -1,10 +1,13 @@
 'use client';
 
 import { Plus, SendHorizontal } from 'lucide-react';
+import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import type { ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
+import { ProjectStatusBadge } from '@/components/status-badge';
 import { Input } from '@/components/ui/input';
+import { flatten, useProjects, useTasks } from '@/lib/queries';
 
 function Pane({
   title,
@@ -33,14 +36,56 @@ function Pane({
  */
 export default function WorkstationPage() {
   const t = useTranslations('workstation');
+  const myTasks = flatten(useTasks('mine', 'active').data?.pages).slice(0, 6);
+  const projects = flatten(useProjects('').data?.pages).slice(0, 8);
   return (
     <div className="grid flex-1 grid-cols-1 md:grid-cols-[16rem_1fr] lg:grid-cols-[16rem_1fr_20rem]">
       <aside className="grid content-start gap-6 border-b p-4 md:border-r md:border-b-0">
         <Pane title={t('myTasks')}>
-          <p className="text-sm text-muted-foreground">{t('noTasks')}</p>
+          {myTasks.length === 0 ? (
+            <p className="text-sm text-muted-foreground">{t('noTasks')}</p>
+          ) : (
+            <ul className="grid gap-1.5 text-sm">
+              {myTasks.map((task) => (
+                <li key={task.id}>
+                  <Link
+                    href={task.subject ? `/projects/${task.subject.id}` : '/tasks'}
+                    className="hover:underline"
+                  >
+                    {task.title}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+          <Link
+            href="/tasks"
+            className="mt-2 inline-block text-xs text-muted-foreground hover:underline"
+          >
+            {t('allTasks')}
+          </Link>
         </Pane>
         <Pane title={t('projects')}>
-          <p className="text-sm text-muted-foreground">{t('noProjects')}</p>
+          {projects.length === 0 ? (
+            <p className="text-sm text-muted-foreground">{t('noProjects')}</p>
+          ) : (
+            <ul className="grid gap-1.5 text-sm">
+              {projects.map((p) => (
+                <li key={p.id} className="flex items-center justify-between gap-2">
+                  <Link href={`/projects/${p.id}`} className="truncate hover:underline">
+                    {p.code} · {p.name}
+                  </Link>
+                  <ProjectStatusBadge status={p.status} />
+                </li>
+              ))}
+            </ul>
+          )}
+          <Link
+            href="/projects"
+            className="mt-2 inline-block text-xs text-muted-foreground hover:underline"
+          >
+            {t('allProjects')}
+          </Link>
         </Pane>
         <Pane title={t('generalChats')}>
           <Button variant="outline" size="sm" disabled>

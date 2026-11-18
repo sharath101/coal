@@ -1,5 +1,5 @@
 import { normalizePersonName, type Me, type User } from '@coal/shared';
-import { and, asc, eq, ilike, sql, type SQL } from 'drizzle-orm';
+import { and, asc, eq, ilike, inArray, sql, type SQL } from 'drizzle-orm';
 import type { Executor, Tx } from '../../core/db/client';
 import { isUniqueViolation } from '../../core/db/errors';
 import { AppError, validationFailed } from '../../core/http/errors';
@@ -55,6 +55,39 @@ export async function findUser(
     .where(and(eq(users.orgId, orgId), eq(users.id, id)));
   const [row] = options.forUpdate ? await query.for('update') : await query;
   return row ?? null;
+}
+
+export async function findUsersByIds(
+  ex: Executor,
+  orgId: string,
+  ids: string[],
+): Promise<UserRow[]> {
+  if (ids.length === 0) return [];
+  return ex
+    .select()
+    .from(users)
+    .where(and(eq(users.orgId, orgId), inArray(users.id, [...new Set(ids)])));
+}
+
+/** Active people holding a role, optionally only those on one product line (a Lead's). */
+export async function findActiveUsersByRole(
+  ex: Executor,
+  orgId: string,
+  roleKey: string,
+  options: { productLineId?: string | null } = {},
+): Promise<UserRow[]> {
+  return ex
+    .select()
+    .from(users)
+    .where(
+      and(
+        eq(users.orgId, orgId),
+        eq(users.roleKey, roleKey),
+        eq(users.status, 'active'),
+        options.productLineId ? eq(users.productLineId, options.productLineId) : undefined,
+      ),
+    )
+    .orderBy(asc(users.name), asc(users.id));
 }
 
 export async function findUserByName(ex: Executor, orgId: string, name: string) {

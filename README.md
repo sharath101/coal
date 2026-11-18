@@ -2,7 +2,7 @@
 
 An AI-assisted platform for Jayon. It starts by running R&D, from the VP's product idea to the product launch, and is built to grow to the whole company. Each person gets a Dashboard of expandable widgets and a Workstation with an AI assistant: on the website first, with a WhatsApp chat and a mobile app later.
 
-**Status:** building. Block 1 of the build order, Foundations, is done: the monorepo, accounts, permissions, the audit trail, file storage and the website skeleton ([docs/roadmap.md](docs/roadmap.md#build-order)).
+**Status:** building. Blocks 1 and 2 of the build order are done: the foundations (monorepo, accounts, permissions, the audit trail, file storage, the website skeleton) and the route (the 28 steps, the engine, projects, tasks, sign-offs, sending work back, hold and drop, and their pages). Documents and signing come next ([docs/roadmap.md](docs/roadmap.md#build-order)).
 
 ## Start here
 

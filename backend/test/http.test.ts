@@ -1,4 +1,4 @@
-import { ENDPOINTS, fillPath } from '@coal/shared';
+import { ENDPOINTS, fillPath, pathParamNames } from '@coal/shared';
 import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTestApp, signUp, type SignedIn, type TestApp } from './helpers';
@@ -14,7 +14,9 @@ afterAll(async () => {
 });
 
 const SOME_ID = '01936b2e-7c3a-7cc0-8000-000000000001';
-const urlOf = (path: string) => `/api/v1${fillPath(path, { id: SOME_ID })}`;
+// The session check runs before the input is validated, so any value fills a path parameter.
+const urlOf = (path: string) =>
+  `/api/v1${fillPath(path, Object.fromEntries(pathParamNames(path).map((name) => [name, SOME_ID])))}`;
 
 describe('every endpoint', () => {
   it.each(ENDPOINTS.filter((e) => e.auth === 'session').map((e) => [e.id, e] as const))(

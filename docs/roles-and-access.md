@@ -101,13 +101,15 @@ Everyone with an account can see the **status** of every project. For now, that 
 |---|---|
 | Create a project (Go) | VP ⚠ |
 | Work on a step's documents and tasks | That step's doers, while the step is open |
-| Submit a step for sign-off | Any doer of the step |
+| Start or submit a step | Any doer of the step, and the project team where the route names it |
 | Sign a document row (Prepared, Reviewed, Approved) | The person the row names ([documents-and-signing.md](./documents-and-signing.md#signature-rows)) |
 | Sign off a step | The step's signer ([workflow.md](./workflow.md#the-steps)) |
 | Decide at a checkpoint, choose the step-15 path, send work back | As in [workflow.md](./workflow.md#decisions-recorded-at-steps) |
 | Record a milestone | As in [workflow.md](./workflow.md#starting-steps) |
-| Put on hold, resume, drop | VP; the Board can drop at steps 4 and 23 ⚠ |
-| Change the team | Lead or Head |
+| Put on hold, resume, drop | VP; the Board can drop only while step 4 or 23 is open ⚠ |
+| Change the team | Lead (of the product line) or Head |
+| Raise a corrective action | The Lead, while the case study is open ⚠ |
+| Claim a queued task; give a task to someone | Anyone with the role; the VP or Head; the Lead within the project team |
 | Record a deviation | The task's assignee, the Lead, the Head |
 | Change dates after the Action Plan is signed | The Lead or the Head proposes; the Head approves; the VP also approves if the launch date moves ⚠ |
 | Add comments, pictures and sources | Anyone who can see the record |
@@ -134,19 +136,25 @@ Until there's an org chart, the reporting line comes from the roles ⚠:
 
 ## Who gets a task
 
-When a step opens, the engine creates one task for each doer role on the step, plus review and signature tasks as documents are submitted. Each task goes to the first match in this order:
+When a step opens, the engine creates one task for each doer role on the step, plus a sign-off task when the step is submitted (and review tasks as documents are submitted, later). Where the doer is "the project team", every team member without another task at the step gets one ⚠ ([W18](./open-questions.md#workflow)). Each task goes to the first match in this order:
 
-1. The project team member who holds that role. If several do, the task goes to the role's queue for the project.
-2. For the Lead role: the Lead of the project's product line. For VP and Head: the person holding that role.
-3. Otherwise: the role's queue. Anyone with that role can claim it, and the Lead or Head can assign it.
+1. The project team member who holds that role, when exactly one does. If several do, the task goes to the role's queue.
+2. For the Lead role: the Lead of the project's product line. For VP and Head: the person holding that role. Each only when exactly one person qualifies; with several, the task goes to the queue ⚠ ([W20](./open-questions.md#workflow)).
+3. Otherwise: the role's queue. Anyone with that role can claim it.
 
-**Board tasks** go to every Board member, because both must sign ⚠.
+**Claiming.** Anyone with the role can claim a task from the queue (a role queue never shows another role's tasks), except that a Lead can claim only for projects of their own product line. Claiming joins the person to the project team, so they can act on the step. The VP or the Head can give a task to anyone holding its role; the Lead can give it to people already on the project team.
+
+**The starting team.** At Go, the team is the Lead of the product line, the Head and an AEMS expert, each when exactly one person holds the role, plus anyone the VP ticks. Anyone else joins by claiming a task or when the Lead or Head changes the team.
+
+**Board tasks** go to every Board member, because both must sign ⚠. If nobody holds the Board role yet, the task goes to the Board queue.
 
 **Previews show gaps.** When a task would land in a queue, the preview at Go or at assignment says so ("No DARD user yet, so this goes to the DARD queue").
 
 ## How access is enforced
 
 - **One permission module** in the backend (`backend/src/modules/permissions/`) decides every "can this person see or do this?" question. Screens, APIs, lists, search, Dashboard widgets, notifications and the AI's tools all use it, so they can't drift apart.
+- **Project rules.** Acting on a project takes two things. The role must be one the route names for that action *right now* (for example, only the signer approves, only the Head sends work back, and who may drop depends on which step is open). And the person must be in scope: the Board, the VP and the Head on any project, a Lead on their product line's projects, and everyone else on projects whose team they are on. A refusal names who can.
+- **Comments and reasons are content.** A return comment, a send-back reason, a decision's reason and a corrective action's text are visible to people in the project's scope. Everyone else sees the status of each event and step, not the words.
 - **Lists are filtered, not just checked.** Lists and searches only return what the person may see.
 - **Files** are only served through short-lived links issued after the permission check.
 - **Refusals.** When content is restricted, the response says so and names who can see it. It never hints at the content itself.

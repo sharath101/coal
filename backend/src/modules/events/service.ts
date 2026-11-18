@@ -1,4 +1,6 @@
-import type { Tx } from '../../core/db/client';
+import { and, desc, eq, sql } from 'drizzle-orm';
+import type { Executor, Tx } from '../../core/db/client';
+import { validationFailed } from '../../core/http/errors';
 import type { RequestContext } from '../../core/http/context';
 import { actorOf } from '../audit/service';
 import { outboxEvents } from './tables';
@@ -25,4 +27,45 @@ export async function writeEvents(tx: Tx, ctx: RequestContext, events: EventInpu
       payload: e.payload,
     })),
   );
+}
+
+export type ProjectEvent = typeof outboxEvents.$inferSelect;
+
+/** A project's events, newest first, for its activity page. */
+export async function listProjectEvents(
+  ex: Executor,
+  orgId: string,
+  projectId: string,
+  query: { cursor?: string | undefined; limit: number },
+): Promise<{ rows: ProjectEvent[]; nextCursor: string | null }> {
+  const conditions = [eq(outboxEvents.orgId, orgId), eq(outboxEvents.projectId, projectId)];
+  if (query.cursor) {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(Buffer.from(query.cursor, 'base64url').toString('utf8'));
+    } catch {
+      parsed = null;
+    }
+    if (!Array.isArray(parsed) || typeof parsed[0] !== 'string' || typeof parsed[1] !== 'string') {
+      throw validationFailed('The cursor is not valid.', 'cursor');
+    }
+    conditions.push(
+      sql`(${outboxEvents.createdAt}, ${outboxEvents.id}) < (${parsed[0]}::timestamptz, ${parsed[1]}::uuid)`,
+    );
+  }
+  const rows = await ex
+    .select()
+    .from(outboxEvents)
+    .where(and(...conditions))
+    .orderBy(desc(outboxEvents.createdAt), desc(outboxEvents.id))
+    .limit(query.limit + 1);
+  const page = rows.slice(0, query.limit);
+  const last = page.at(-1);
+  return {
+    rows: page,
+    nextCursor:
+      rows.length > query.limit && last
+        ? Buffer.from(JSON.stringify([last.createdAt.toISOString(), last.id])).toString('base64url')
+        : null,
+  };
 }

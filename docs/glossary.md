@@ -17,6 +17,7 @@
 | **Content** | What's inside a project's documents and records. Visible on a need-to-know basis (compare *status*) |
 | **Decision** | A signed choice recorded at a step: Go, a checkpoint outcome, "prototypes OK", "pre-clinical study needed", hold, drop |
 | **Department module** | The part of the backend that holds one department's own records and rules. R&D's is the first |
+| **Corrective action** | A fix listed in the prototype case study (step 16). Each is a task, and step 18 can't be submitted while any is open |
 | **Deviation** | A record explaining late work: the reason, the cause and the new date |
 | **Doer** | A role or person who does the work of a step (as opposed to its signer) |
 | **Draft, version, revision** | Each save makes a new numbered draft version. A revision letter (A, B, C) is given when a version is approved |

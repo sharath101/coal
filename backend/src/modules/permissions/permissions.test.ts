@@ -27,7 +27,47 @@ const ENDPOINT_TABLE: Record<PermissionKey, Who[]> = {
   'rnd.productLines.read': EVERYONE,
   'files.upload': SIGNED_IN,
   'files.read': SIGNED_IN,
+  'processes.read': SIGNED_IN,
+  'projects.read': SIGNED_IN,
+  // ⚠ Only the VP creates projects (A5).
+  'projects.create': ['vp'],
+  'projects.team.write': ['rd_head', 'rd_lead'],
+  'projects.hold': ['vp'],
+  'projects.resume': ['vp'],
+  'projects.drop': ['vp', 'board'],
+  'steps.start': SIGNED_IN,
+  'steps.submit': SIGNED_IN,
+  'steps.approve': SIGNED_IN,
+  'steps.return': SIGNED_IN,
+  'steps.decide': SIGNED_IN,
+  'steps.sendBack': SIGNED_IN,
+  'milestones.record': SIGNED_IN,
+  'correctiveActions.create': ['rd_lead'],
+  'tasks.read': SIGNED_IN,
+  'tasks.readOne': SIGNED_IN,
+  'tasks.update': SIGNED_IN,
+  'tasks.claim': SIGNED_IN,
+  'tasks.reassign': ['vp', 'rd_head', 'rd_lead'],
 };
+
+/** Rules that need a project and the roles the route allows right now. */
+const SCOPED = [
+  'projects.team.write',
+  'projects.hold',
+  'projects.resume',
+  'projects.drop',
+  'steps.start',
+  'steps.submit',
+  'steps.approve',
+  'steps.return',
+  'steps.decide',
+  'steps.sendBack',
+  'milestones.record',
+  'correctiveActions.create',
+  'tasks.reassign',
+] as const satisfies readonly PermissionKey[];
+/** Roles that act on any project, whoever is on its team. */
+const ANY_PROJECT: Who[] = ['board', 'vp', 'rd_head'];
 
 /** Record-level rules: for each case, which roles are allowed. */
 const RESOURCE_TABLE = {
@@ -78,6 +118,134 @@ describe('permission table', () => {
   });
 });
 
+describe('project-scoped rules', () => {
+  const LINE = 'line-spine';
+  const project = (memberIds: string[]) => ({ productLineId: LINE, memberIds });
+  const actor = (who: Who, line: string | null = null): Actor => ({
+    userId: 'user-1',
+    name: `A ${who}`,
+    roleKey: who,
+    productLineId: line,
+  });
+
+  const cases = SCOPED.flatMap((permission) =>
+    ROLE_KEYS.flatMap(
+      (who) =>
+        [
+          [permission, who, 'a team member', true],
+          [permission, who, 'someone not on the project', ANY_PROJECT.includes(who)],
+          [permission, who, 'a Lead of another product line', ANY_PROJECT.includes(who)],
+        ] as const,
+    ),
+  );
+
+  it.each(cases)(
+    '%s by %s as %s, when the route allows their role → allowed: %s',
+    (permission, who, as, expected) => {
+      const member = as === 'a team member';
+      const line = as === 'a Lead of another product line' ? 'line-trauma' : null;
+      const resource = { ...project(member ? ['user-1'] : []), roles: [who] };
+      expect(canAccess(permission, actor(who, line), resource).allowed).toBe(expected);
+    },
+  );
+
+  it.each(SCOPED)(
+    '%s: a Lead of the same product line may act without being on the team',
+    (permission) => {
+      const resource = { ...project([]), roles: ['rd_lead'] };
+      expect(canAccess(permission, actor('rd_lead', LINE), resource).allowed).toBe(true);
+    },
+  );
+
+  const wrongRole = SCOPED.flatMap((permission) =>
+    ROLE_KEYS.filter((who) => who !== 'rd_head').map((who) => [permission, who] as const),
+  );
+  it.each(wrongRole)(
+    '%s by %s when the route allows only the Head → denied, and names the Head',
+    (permission, who) => {
+      const resource = { ...project(['user-1']), roles: ['rd_head'] };
+      expect(canAccess(permission, actor(who, LINE), resource)).toEqual({
+        allowed: false,
+        code: 'NOT_ALLOWED',
+        whoCan: ['R&D Head'],
+      });
+    },
+  );
+
+  it('lets the project team in where the route names "team"', () => {
+    const asMember = canAccess('steps.submit', actor('pme'), {
+      ...project(['user-1']),
+      roles: ['team'],
+    });
+    const asOutsider = canAccess('steps.submit', actor('pme'), { ...project([]), roles: ['team'] });
+    expect(asMember.allowed).toBe(true);
+    expect(asOutsider.allowed).toBe(false);
+  });
+});
+
+describe('task rules', () => {
+  const taskFor = (who: Who, kind: string) => {
+    const other = who === 'pme' ? 'dard' : 'pme';
+    return {
+      'my task': { assigneeId: 'user-1', queueRole: null },
+      "someone else's task": { assigneeId: 'user-2', queueRole: null },
+      'queued for my role': { assigneeId: null, queueRole: who },
+      'queued for another role': { assigneeId: null, queueRole: other },
+    }[kind] as { assigneeId: string | null; queueRole: string | null };
+  };
+  const TABLE = {
+    'tasks.readOne': {
+      'my task': true,
+      "someone else's task": false,
+      'queued for my role': true,
+      'queued for another role': false,
+    },
+    'tasks.update': {
+      'my task': true,
+      "someone else's task": false,
+      'queued for my role': false,
+      'queued for another role': false,
+    },
+    'tasks.claim': {
+      'my task': false,
+      "someone else's task": false,
+      'queued for my role': true,
+      'queued for another role': false,
+    },
+  } as const;
+  const cases = Object.entries(TABLE).flatMap(([permission, byCase]) =>
+    Object.entries(byCase).flatMap(([name, expected]) =>
+      ROLE_KEYS.map((who) => [permission as keyof typeof TABLE, name, who, expected] as const),
+    ),
+  );
+
+  it.each(cases)('%s on %s by %s → allowed: %s', (permission, name, who, expected) => {
+    const task = { ...taskFor(who, name), productLineId: null };
+    expect(canAccess(permission, actorFor(who) as Actor, task).allowed).toBe(expected);
+  });
+
+  it('claiming from the Lead queue needs the same product line as the project', () => {
+    const queued = { assigneeId: null, queueRole: 'rd_lead' };
+    const lead = (line: string): Actor => ({
+      userId: 'user-1',
+      name: 'A lead',
+      roleKey: 'rd_lead',
+      productLineId: line,
+    });
+    const spineTask = { ...queued, productLineId: 'spine' };
+    expect(canAccess('tasks.claim', lead('spine'), spineTask).allowed).toBe(true);
+    expect(canAccess('tasks.claim', lead('trauma'), spineTask)).toEqual({
+      allowed: false,
+      code: 'NOT_ALLOWED',
+      whoCan: ['The R&D Lead of this product line'],
+    });
+    // Other roles aren't tied to a product line: the queue is their own role's.
+    const dard = actorFor('dard') as Actor;
+    const dardTask = { assigneeId: null, queueRole: 'dard', productLineId: 'spine' };
+    expect(canAccess('tasks.claim', dard, dardTask).allowed).toBe(true);
+  });
+});
+
 describe('endpoints', () => {
   it('each have exactly one implementation', () => {
     const implemented = IMPLEMENTATIONS.map((i) => i.endpoint.id).sort();
@@ -122,8 +290,18 @@ describe('AI tiers', () => {
     },
   );
 
-  it('refuses signing in, signing up and editing the profile via AI', () => {
-    for (const endpoint of ENDPOINTS.filter((e) => e.aiTier === 'none')) {
+  it('refuses signing in, signing up, signing off and every other endpoint the AI may not use', () => {
+    const closed = ENDPOINTS.filter((e) => ['none', 'never', 'confirm'].includes(e.aiTier));
+    expect(closed.map((e) => e.id)).toEqual(
+      expect.arrayContaining([
+        'auth.signIn',
+        'projects.create',
+        'steps.approve',
+        'steps.sendBack',
+        'steps.submit',
+      ]),
+    );
+    for (const endpoint of closed) {
       expect(() => guard(endpoint, ctx(true))).toThrow(
         expect.objectContaining({ code: 'AI_NOT_ALLOWED' }),
       );

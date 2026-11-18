@@ -1,0 +1,397 @@
+# Jayon's R&D route, version 2 (docs/workflow.md).
+# Source: Jayon's workflow page, revision 2 with the COAL meeting points, 16 November 2026
+# (docs/source/jayon-rnd-workflow-rev2.html). Where this file and the page differ, the page wins.
+#
+# A project stays on the version it started with. To change the route, add a new version file
+# (rnd-route.v3.yaml), and update its tests and docs/workflow.md in the same change.
+# `assumptions` lists the open questions (docs/open-questions.md) a step relies on: marked ⚠ there.
+#
+# Role keys are those in backend/src/modules/org/catalogue.ts. `team` means the project team.
+# Conditions are named rules, explained in shared/src/process/definition.ts.
+
+process: rnd-route
+version: 2
+name: R&D route
+department: RND
+source: Jayon's workflow page, revision 2 with the COAL meeting points (16 November 2026)
+
+stages:
+  - { no: 1, name: Idea and go-ahead }
+  - { no: 2, name: 'Plan, design and source' }
+  - { no: 3, name: Make the prototype }
+  - { no: 4, name: Test and gather feedback }
+  - { no: 5, name: Clinical trials }
+  - { no: 6, name: Release and launch }
+
+milestones:
+  - key: material_received_implant
+    name: Material received (implant)
+    recorded_at: '6'
+    recorded_by: [rd_ops]
+    per_iteration: false
+  - key: material_received_instrument
+    name: Material received (instrument)
+    recorded_at: '6'
+    recorded_by: [rd_ops]
+    per_iteration: false
+  - key: test_licence_recorded
+    name: Test licence recorded
+    recorded_at: null
+    recorded_by: [dard]
+    per_iteration: false
+    assumptions: [W3]
+  - key: trial_surgeries_complete
+    name: Trial surgeries complete
+    recorded_at: '20'
+    recorded_by: [rd_lead, rd_ops]
+    per_iteration: true
+  - key: positive_feedback_threshold
+    name: Positive feedback threshold reached (about 50 cases)
+    recorded_at: '20'
+    recorded_by: [rd_lead]
+    per_iteration: true
+    assumptions: [W6]
+  - key: follow_up_complete
+    name: Follow-up complete
+    recorded_at: '20'
+    recorded_by: [rd_lead, rd_ops]
+    per_iteration: true
+    assumptions: [W5]
+
+run:
+  completed_when: { step_approved: '25' }
+  hold: [vp]
+  resume: [vp]
+  drop:
+    - { role: vp }
+    - { role: board, while_open: ['4', '23'] }
+  assumptions: [W7]
+
+steps:
+  # Stage 1: idea and go-ahead
+  - key: C
+    name: The idea
+    stage: 1
+    doers: [vp]
+    signer: null
+    done_at_go: true
+    starts_when: []
+    outputs: [Product concept]
+
+  - key: '1'
+    name: Project inception
+    stage: 1
+    doers: [rd_head, rd_lead]
+    signer: vp
+    starts_when: [{ step_done: C }]
+    outputs: ['Project Initiation Document (PID), naming the team']
+
+  - key: '2'
+    name: Market study
+    stage: 1
+    doers: [rd_ops]
+    signer: vp
+    starts_when: [{ step_done: C }]
+    outputs: ['Market Research Survey, with sources']
+
+  - key: 2a
+    name: Regulatory planning
+    stage: 1
+    new: true
+    doers: [rd_lead, dard]
+    signer: null
+    starts_when: [{ step_done: C }]
+    outputs: ['Regulatory plan: the bodies that must approve and the documents each needs']
+    assumptions: [W1]
+
+  - key: '3'
+    name: Project proposal
+    stage: 1
+    doers: [rd_head]
+    signer: vp
+    starts_when: [{ step_approved: '1' }, { step_approved: '2' }]
+    outputs: [Project Planning, Project Approval Form]
+
+  - key: '4'
+    name: Board approval
+    stage: 1
+    checkpoint: true
+    doers: [vp]
+    signer: board
+    all_must_sign: true
+    starts_when: [{ step_approved: '3' }]
+    outputs: [The approved proposal]
+    assumptions: [W2]
+
+  # Stage 2: plan, design and source
+  - key: '5'
+    name: Action plan
+    stage: 2
+    doers: [rd_lead, rd_head]
+    signer: vp
+    starts_when: [{ step_approved: '4' }]
+    outputs: ['Action Plan: the team, dates for each role, budget and raw material definition']
+    assumptions: [W9]
+
+  - key: '6'
+    name: Raw material
+    stage: 2
+    doers: [rd_lead, rd_ops, dard]
+    outside: [vendors]
+    signer: rd_head
+    starts_when: [{ step_approved: '5' }]
+    outputs: [Requirement, Purchase, Raw material test]
+    assumptions: [W10]
+
+  - key: '7'
+    name: Implant design
+    stage: 2
+    doers: [design_engineer, aems]
+    signer: rd_lead
+    starts_when: [{ step_approved: '5' }]
+    outputs: [3D model, FEA report, Drawings with critical dimensions marked for QC]
+
+  - key: '8'
+    name: Instrument design
+    stage: 2
+    doers: [design_engineer, aems]
+    signer: rd_lead
+    starts_when: [{ step_approved: '5' }]
+    outputs: [3D model, FEA report, Drawings with critical dimensions marked for QC]
+
+  - key: '9'
+    name: Outsourcing
+    stage: 2
+    doers: [rd_lead, rd_ops, dard]
+    outside: [outside makers]
+    signer: rd_head
+    starts_when: [{ step_approved: '5' }]
+    outputs: [List of items made outside or bought, Orders]
+
+  # Stage 3: make the prototype
+  - key: '10'
+    name: Implant prototype
+    stage: 3
+    doers: [pme, qc_inspector]
+    signer: rd_lead
+    starts_when:
+      - { step_approved: '7' }
+      - { milestone_reached: material_received_implant }
+      - { milestone_reached: test_licence_recorded }
+    outputs:
+      [Material Issue Slip, Run card, QC inspection report per prototype, Prototype Approval Form]
+    send_back:
+      - { to: ['7'], decided_by: rd_head }
+    assumptions: [W3, W11]
+
+  - key: '11'
+    name: Instrument prototype
+    stage: 3
+    doers: [pme, qc_inspector]
+    signer: rd_lead
+    starts_when:
+      - { step_approved: '8' }
+      - { milestone_reached: material_received_instrument }
+      - { milestone_reached: test_licence_recorded }
+    outputs:
+      [Material Issue Slip, Run card, QC inspection report per prototype, Prototype Approval Form]
+    send_back:
+      - { to: ['8'], decided_by: rd_head }
+    assumptions: [W3, W11]
+
+  - key: '12'
+    name: Review meeting
+    stage: 3
+    checkpoint: true
+    doers: [rd_lead, team]
+    signer: rd_head
+    starts_when: [{ step_approved: '10' }, { step_approved: '11' }]
+    decisions:
+      - key: prototypes_ok
+        name: Are the prototypes OK?
+        by: rd_head
+        options:
+          - { value: 'yes', name: 'Yes' }
+          - { value: 'no', name: 'No: send the work back to design' }
+      - key: preclinical_needed
+        name: Is a pre-clinical study needed?
+        by: rd_head
+        options:
+          - { value: 'yes', name: 'Yes: an animal or cadaver study' }
+          - { value: 'no', name: 'No: a justification' }
+    approve_requires:
+      - { decision_equals: { step: '12', decision: prototypes_ok, value: 'yes' } }
+      - { decision_recorded: { step: '12', decision: preclinical_needed } }
+    send_back:
+      - { to: ['7', '8'], decided_by: rd_head }
+    outputs: [Minutes, The Head's decisions]
+    assumptions: [W18]
+
+  # Stage 4: test and gather feedback
+  - key: '13'
+    name: Testing and validation
+    stage: 4
+    doers: [rd_ops, dard, pme, design_engineer]
+    outside: [test lab]
+    signer: rd_lead
+    starts_when: [{ step_approved: '12' }]
+    send_back:
+      - { to: ['7', '8'], decided_by: rd_head }
+    outputs:
+      - Testing parameters and test labs report (BP)
+      - Test request form (TRF)
+      - Checked test plan
+      - Test report
+      - Testing and validation document for CE and FDA
+    assumptions: [W4, W15]
+
+  - key: '14'
+    name: Market feedback
+    stage: 4
+    doers: [rd_ops, rd_lead]
+    outside: [marketing, surgeons]
+    signer: rd_lead
+    starts_when: [{ step_approved: '13' }]
+    outputs: [Market Research Survey with questions about the prototype, The surgeons' answers]
+
+  - key: '15'
+    name: Pre-clinical study
+    stage: 4
+    doers: [rd_ops, dard]
+    signer: rd_lead
+    starts_when: [{ step_approved: '13' }]
+    path:
+      decided_at: { step: '12', decision: preclinical_needed }
+      options:
+        - { value: 'yes', name: Study, outputs: [Animal or cadaver study report] }
+        - { value: 'no', name: Justification, outputs: [Justification that no study is needed] }
+    outputs: []
+    assumptions: [W12]
+
+  - key: '16'
+    name: Prototype case study
+    stage: 4
+    doers: [rd_lead]
+    signer: rd_head
+    starts_when: [{ step_approved: '14' }, { step_approved: '15' }]
+    corrective_actions: true
+    outputs: ['Case study (BP), with corrective actions']
+    assumptions: [W19]
+
+  - key: '17'
+    name: Marketing tools
+    stage: 4
+    doers: [rd_lead, rd_ops]
+    signer: rd_head
+    starts_when: [{ step_approved: '16' }]
+    outputs: [Surgical technique, Catalogue, Instructions for use (IFU)]
+
+  - key: '18'
+    name: Prototype approval
+    stage: 4
+    checkpoint: true
+    doers: [rd_lead]
+    signer: rd_head
+    starts_when: [{ step_approved: '17' }]
+    submit_requires: [{ no_open_corrective_actions: true }]
+    send_back:
+      - to: ['7', '8', '10', '11', '12', '13', '14', '15', '16', '17']
+        decided_by: rd_head
+    outputs: [Prototype Approval Form]
+
+  # Stage 5: clinical trials
+  - key: '19'
+    name: Trial set planning
+    stage: 5
+    doers: [rd_head, rd_lead, rd_ops, pme]
+    signer: vp
+    starts_when: [{ step_approved: '18' }]
+    outputs: [Trial set planning document, Trial sets]
+    assumptions: [W16]
+
+  - key: '20'
+    name: Clinical trials
+    stage: 5
+    doers: [rd_lead, rd_ops, dard]
+    outside: [surgeons]
+    signer: rd_head
+    starts_when: [{ step_approved: '19' }]
+    submit_requires: [{ milestone_reached: follow_up_complete }]
+    tasks:
+      - key: follow_up
+        name: Follow up and score each treated patient for one year
+        role: rd_ops
+        keep_on_reset: true
+    send_back:
+      - { to: ['10'], decided_by: rd_head }
+    outputs: [Surgery cases, Each patient's follow-up and scores for one year]
+    assumptions: [W5, W8]
+
+  # Stage 6: release and launch
+  - key: '21'
+    name: Design revision and master set
+    stage: 6
+    doers: [rd_lead, rd_ops, pme]
+    signer: rd_head
+    starts_when: [{ milestone_reached: trial_surgeries_complete }]
+    send_back:
+      - { to: ['10'], decided_by: rd_head }
+    outputs:
+      - Design revision on the Non-Conformity Investigation form
+      - Controlled copies
+      - Process plan
+      - QC documents
+      - Costing
+      - Master set
+    assumptions: [W8]
+
+  - key: '22'
+    name: Regulatory approval
+    stage: 6
+    doers: [rd_lead, dard]
+    outside: [company QA team]
+    signer: rd_head
+    starts_when: [{ step_approved: '21' }, { step_done: 2a }]
+    outputs: [Submission to QA for each body, Trade mark, Registrations, QA approval]
+    assumptions: [W1]
+
+  - key: '23'
+    name: Release approval
+    stage: 6
+    checkpoint: true
+    doers: [vp, rd_head]
+    signer: board
+    all_must_sign: true
+    starts_when: [{ step_approved: '22' }]
+    outputs: [Transfer Approval Form]
+    assumptions: [W2]
+
+  - key: 24a
+    name: Pre-transfer
+    stage: 6
+    new: true
+    doers: [rd_lead, team, dard]
+    outside: [production, Quality Control department, company QA team]
+    signer: null
+    starts_when: [{ step_approved: '23' }, { milestone_reached: positive_feedback_threshold }]
+    outputs: ['The transfer documents, sent to each receiving department']
+    assumptions: [W6, W18]
+
+  - key: 24b
+    name: Final transfer and training
+    stage: 6
+    new: true
+    doers: [rd_lead, team, dard]
+    outside: [production, Quality Control department, company QA team]
+    signer: rd_head
+    starts_when: [{ step_done: 24a }]
+    outputs: [Transfer forms, Master set, Signed handover checklist, Training]
+    assumptions: [W6, W18]
+
+  - key: '25'
+    name: Product launch
+    stage: 6
+    doers: [rd_head, rd_ops]
+    signer: vp
+    starts_when: [{ step_approved: 24b }]
+    outputs: [Launch sets sent to the market]

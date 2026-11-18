@@ -50,6 +50,7 @@ Node 22 and pnpm 10 (see `.nvmrc` and `packageManager`). Docker runs the local s
 ## Where things go
 
 - **An endpoint:** its contract (schemas, permission, AI tier) in `shared/src/schemas/` and the list in `shared/src/api/endpoints.ts`; its rule in `backend/src/modules/permissions/rules.ts` and its row in `permissions.test.ts`; its handler in the module's `routes.ts`. Steps: [docs/api.md § Adding an endpoint](docs/api.md#adding-an-endpoint).
+- **A route or its rules:** the YAML in `shared/src/process/` (a loaded version is never edited: add a new version file), its tests in `engine.test.ts`, and `docs/workflow.md`, together. The engine is pure (`shared/src/process/engine.ts`); what an action does to tasks, events and the audit trail is in `backend/src/modules/rnd/actions.ts`.
 - **A table:** in the owning module's `tables.ts`, then `db:generate`. Changes go through `change()` in `backend/src/core/db/change.ts`, so the audit entry and events are written in the same transaction.
 - **Website text:** in `web/messages/en.json`, never in a component. Lint fails on text written straight into JSX.
 - **Lint rules that keep the parts apart:** `eslint-plugin-coal.mjs` (`coal/part-boundaries`, `coal/module-tables`).

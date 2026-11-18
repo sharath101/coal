@@ -1,10 +1,11 @@
 import { checkUpload, type StoredFile } from '@coal/shared';
 import { and, eq } from 'drizzle-orm';
 import { change } from '../../core/db/change';
+import type { Executor } from '../../core/db/client';
 import { newId } from '../../core/db/columns';
 import type { AppDeps } from '../../core/deps';
 import type { Actor, RequestContext } from '../../core/http/context';
-import { AppError, notFound } from '../../core/http/errors';
+import { AppError, notFound, validationFailed } from '../../core/http/errors';
 import { assertCanAccess } from '../permissions';
 import { isChangedSinceInspected } from './storage';
 import { files } from './tables';
@@ -167,4 +168,25 @@ export async function fileLink(deps: AppDeps, ctx: RequestContext, actor: Actor,
     url: await deps.storage.downloadUrl(row.storageKey, row.name, seconds),
     expiresAt: new Date(Date.now() + seconds * 1000).toISOString(),
   };
+}
+
+/**
+ * Evidence attached to a record must be a finished upload that the person may use. Until
+ * attachments widen who may use a file, that is the uploader (docs/api.md#documents-templates-files-and-sources).
+ */
+export async function assertUsableEvidence(
+  ex: Executor,
+  orgId: string,
+  actor: Actor,
+  id: string,
+  path: string,
+): Promise<void> {
+  const [row] = await ex
+    .select()
+    .from(files)
+    .where(and(eq(files.orgId, orgId), eq(files.id, id)));
+  if (!row || row.status !== 'uploaded') {
+    throw validationFailed('The file has not been uploaded.', path);
+  }
+  assertCanAccess('files.read', actor, { uploadedBy: row.uploadedBy });
 }

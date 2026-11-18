@@ -36,6 +36,9 @@
 | W15 | Does "BP" mean boilerplate? | Yes | R&D Head |
 | W16 | What form does the trial set planning document take (step 19)? | An upload until defined | R&D Head |
 | W17 | What codes do the product lines use in project codes? The examples show SPN (Spine) and TRM (Trauma); Arthroscopy's isn't known | ART | R&D Head |
+| W18 | Steps 12, 24a and 24b are done by "the project team". Does every team member get a task at those steps, or only the Lead and DARD? | Every team member who has no other task at the step gets one | R&D Head |
+| W19 | Step 16: who raises the corrective actions, who closes them, and who may decide that one is no longer needed? | The Lead raises them, and they go to the Lead unless the Lead names someone; the person they are assigned to closes them | R&D Head |
+| W20 | When several people hold a role that the route needs (for example two DARD users, or two R&D Heads), who gets the task? | The role's queue, unless exactly one of them is on the project team; the Lead or Head can assign it | R&D Head |
 
 ## People and access
 
