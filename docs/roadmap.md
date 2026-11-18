@@ -29,7 +29,9 @@ This roadmap gives an **order, not dates**. Madhav's effort estimates and costs 
 
 Each block depends on the ones before it. Within a block, the work can run side by side.
 
-1. **Foundations**
+**Progress:** block 1 (Foundations) is done, except virus scanning of uploads, which comes with block 3. Block 2 (the route) is next.
+
+1. **Foundations** ✅
    - The monorepo (pnpm workspaces): `backend/`, `web/` and `shared/`; `app/` waits for its phase.
    - Linting, type checks and tests on every change.
    - Docker Compose for local work.

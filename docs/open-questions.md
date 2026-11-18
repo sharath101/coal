@@ -35,6 +35,7 @@
 | W14 | What is the typical duration of each step (for dates before the Action Plan)? | Placeholder durations in the route definition | R&D Head |
 | W15 | Does "BP" mean boilerplate? | Yes | R&D Head |
 | W16 | What form does the trial set planning document take (step 19)? | An upload until defined | R&D Head |
+| W17 | What codes do the product lines use in project codes? The examples show SPN (Spine) and TRM (Trauma); Arthroscopy's isn't known | ART | R&D Head |
 
 ## People and access
 
@@ -100,6 +101,7 @@ These matter when the [regulatory notes](./regulatory-notes.md) are taken up.
 | I6 | COAL's web domain. Decided at the end (D13). Until then, passkeys work on `localhost`, and passkeys made on a demo host are registered again once the domain is set. The mobile app needs it too | Founders |
 | I7 | Who in Jayon's IT will look after COAL day to day? | Jayon |
 | I8 | Which simple host for showing COAL to employees? The plan suggests one small server running the same setup as local, behind a shared password | Founders |
+| I9 | Which file types must COAL accept, and how large can they be (for example CAD files, scans, videos of tests)? Assumption in use: PDF, Word, Excel, PowerPoint, CSV, text, PNG, JPEG, WebP, HEIC and STEP, up to 100 MB (`shared/src/rules/files.ts`) | Jayon IT, R&D Head |
 
 ## Business
 

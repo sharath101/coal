@@ -146,11 +146,11 @@ When a step opens, the engine creates one task for each doer role on the step, p
 
 ## How access is enforced
 
-- **One permission module** in the backend decides every "can this person see or do this?" question. Screens, APIs, lists, search, Dashboard widgets, notifications and the AI's tools all use it, so they can't drift apart.
+- **One permission module** in the backend (`backend/src/modules/permissions/`) decides every "can this person see or do this?" question. Screens, APIs, lists, search, Dashboard widgets, notifications and the AI's tools all use it, so they can't drift apart.
 - **Lists are filtered, not just checked.** Lists and searches only return what the person may see.
 - **Files** are only served through short-lived links issued after the permission check.
 - **Refusals.** When content is restricted, the response says so and names who can see it. It never hints at the content itself.
-- **Tests.** A table of role × action × expected result (allowed or denied) runs as tests on every change. A new endpoint without a rule fails the build.
+- **Tests.** A table of role × action × expected result (allowed or denied) runs as tests on every change (`permissions.test.ts`). A new endpoint without a rule fails the build.
 - **The AI** acts as the person, with the same checks, plus extra limits ([workstation-and-ai.md](./workstation-and-ai.md#what-the-ai-may-do)).
 
 ## Later

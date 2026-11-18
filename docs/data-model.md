@@ -9,15 +9,16 @@ This is the **first-release core** only: about 40 tables. Step-specific and regu
 
 ## Conventions
 
-- **Keys and timestamps.** Every table has an `id` (UUIDv7), `created_at` and `updated_at`, and `created_by` where a person creates rows.
+- **Keys and timestamps.** Every table has an `id` (UUIDv7), `created_at` and `updated_at`, and `created_by` where a person creates rows. Insert-only tables have no `updated_at`.
+- **Where tables are defined.** Each backend module defines its own tables in its `tables.ts` (Drizzle). Migrations in `backend/migrations/` are generated from them; triggers and other SQL Drizzle can't express go in hand-written migrations there.
 - **`org_id`.** Every table carries an `org_id`, with one value for now. It keeps the door open to serving other companies without a painful migration later. The permission module adds it to every query.
 - **Platform and department tables.** COAL will grow from R&D to all of Jayon ([architecture.md](./architecture.md#growing-to-all-of-jayon)).
   - *Platform tables* serve every department: people, processes, tasks, documents, templates, signatures, AI, notifications and audit.
   - *Department tables* hold one department's own records. R&D's are `product_lines`, `projects` and `project_members`.
-  - Department tables may point at platform tables, never the other way round.
+  - Department tables may point at platform tables, never the other way round. The one exception is `users.product_line_id`, a Lead's product line, until the org chart replaces it ([A4](./open-questions.md#people-and-access)).
 - **Processes in general.** A **process run** is one run of a process's route. For R&D, each project has exactly one run. Steps, tasks, decisions, milestones and documents point at the run, so other departments' processes reuse them unchanged.
 - **Times.** Stored in UTC, shown in Indian time.
-- **Nothing important is overwritten.** Documents, signatures, decisions and deviations are versioned or insert-only. A correction is a new row pointing at the old one. Tables marked *insert-only* can't be changed or deleted by the backend's database account.
+- **Nothing important is overwritten.** Documents, signatures, decisions and deviations are versioned or insert-only. A correction is a new row pointing at the old one. Tables marked *insert-only* can't be changed or deleted: a trigger (`coal_refuse_change`) refuses every `UPDATE`, `DELETE` and `TRUNCATE`, and in production the backend's database account will also lack those privileges.
 - **Audit and events in the same transaction.** Every change writes its audit entry and its events in the same transaction as the change itself ([architecture.md](./architecture.md#events-and-live-updates)).
 - **JSON for variable content.** Document content (fields and written sections), route definitions, template specifications, and proposal actions and previews are JSON columns, checked against zod schemas in `shared/`.
 - **Two kinds of step reference.** `step_key` (for example `"13"` or `"24a"`) points at a step in the route definition. `run_step_id` points at one iteration of that step in one run.
@@ -62,10 +63,12 @@ In words:
 
 | Table | Holds | Key columns |
 |---|---|---|
-| `departments` | Jayon's departments: R&D first, and the ones R&D works with (Quality Assurance, Quality Control, Production, Marketing) | code, name |
-| `roles` | Every role ([roles-and-access.md](./roles-and-access.md#roles)) | key, name, department_id (empty for the Board and the VP, who sit above departments) |
-| `users` | Everyone with an account | name (unique, case-insensitive), role_key, product_line_id (Leads), status |
-| `sessions` | Sign-in sessions | user_id, token_hash, device, expires_at, revoked_at |
+| `departments` | Jayon's departments: R&D first, and the ones R&D works with (Quality Assurance, Quality Control, Production, Marketing) | code, name, sort_order |
+| `roles` | Every role ([roles-and-access.md](./roles-and-access.md#roles)) | key, name, department_id (empty for the Board and the VP, who sit above departments), reports_to_key (the role ladder until there's an org chart), needs_product_line (the R&D Lead), sort_order |
+| `users` | Everyone with an account | name (unique, case-insensitive), role_key (must be a role), product_line_id (Leads), status |
+| `sessions` | Sign-in sessions | user_id, token_hash (SHA-256 of the token), device, expires_at, revoked_at |
+
+Departments, roles and product lines are reference data. Their rows are listed in `backend/src/modules/org/catalogue.ts` and `backend/src/modules/rnd/catalogue.ts`, and loaded into the tables by `db:migrate` on every deploy.
 | `passkeys` | Devices registered for signing | user_id, credential_id, public_key, sign_count, transports, device_name, backed_up, last_used_at, revoked_at |
 
 ### Processes and the calendar
@@ -108,7 +111,7 @@ In words:
 | `document_versions` | Each draft and approved revision | document_id, run_step_id, version_no, rev_label, status (draft, in review, returned, approved, superseded), content (JSON), content_sha256, pdf_file_id, pdf_sha256, search_text (full-text), created_by, via_ai, ai_request_id |
 | `signature_requests` | Every signature needed | subject_type (document version, decision), subject_id, subject_version, meaning (prepared, reviewed, approved, received, decision), assignee_id, order_index, status, requested_at, due_at |
 | `signatures` *(insert-only)* | Each signature | request_id, subject_type, subject_id, subject_version, content_sha256, pdf_sha256, user_id, printed_name, role_snapshot, meaning, decision, reason, intent (JSON), intent_sha256, passkey_id, authenticator_data, client_data_json, assertion_signature, signed_at |
-| `files` | Every stored file | storage_key, name, mime_type, size, sha256, uploaded_by, scan_status, origin (internal, outside) |
+| `files` | Every stored file | storage_key, name, mime_type (from the file extension), size, sha256 (recorded when the upload completes), status (pending, uploaded), uploaded_by, scan_status (not scanned, clean, infected), origin (internal, outside) |
 | `attachments` | Files and pictures on any record | target_type, target_id, file_id, caption |
 | `sources` | Sources added to a step or document | target_type, target_id, kind (link, file, citation), title, url, file_id, note, added_by |
 
@@ -131,9 +134,9 @@ The step sign-off record is a document of type `STEP_SIGNOFF`, so it needs no ta
 |---|---|---|
 | `notifications` | Work messages and alerts | user_id, kind, event_type, title, body, link, channels, sent_at, read_at |
 | `alerts` | Reminders and escalations raised, so none is sent twice | subject_type, subject_id, level, raised_at |
-| `audit_events` *(insert-only)* | Every change, signature, decision and sign-in | seq, at, actor_type (user, user via AI, system), actor_id, action, record_type, record_id, before, after, reason, request_id, prev_hash, hash |
-| `outbox_events` | Events waiting to be delivered | type, payload, created_at, delivered_at |
-| `idempotency_keys` | Safe retries | key, user_id, request_hash, response, created_at |
+| `audit_events` *(insert-only)* | Every change, signature, decision and sign-in | seq, at, actor_type (user, user via AI, system), actor_id, action, record_type, record_id, before, after, reason, request_id, prev_hash, hash. `hash` is the SHA-256 of the entry's fields, including `prev_hash` |
+| `outbox_events` | Events waiting to be delivered | type, actor_type, actor_id, project_id, step_key, payload, created_at, available_at, attempts, last_error, delivered_at |
+| `idempotency_keys` | Safe retries | key, user_id, request_hash, response_status (empty while the first request is still running), response, created_at |
 
 ## Not modelled yet, on purpose
 

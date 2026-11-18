@@ -1,0 +1,46 @@
+# Local services for COAL. Made-up data only.
+# Start: pnpm db:up   Stop: pnpm db:down
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_USER: coal
+      POSTGRES_PASSWORD: coal
+      POSTGRES_DB: coal
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U coal -d coal']
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  # MinIO no longer publishes images on Docker Hub; pgsty/minio is a maintained community build.
+  # The backend creates its bucket on start when S3_CREATE_BUCKET=true.
+  minio:
+    image: pgsty/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: coal
+      MINIO_ROOT_PASSWORD: coal-local-only
+    ports:
+      - '9000:9000'
+      - '9001:9001'
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -fs http://localhost:9000/minio/health/live || exit 1']
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  gotenberg:
+    image: gotenberg/gotenberg:8
+    ports:
+      - '3100:3000'
+
+volumes:
+  postgres-data:
+  minio-data:

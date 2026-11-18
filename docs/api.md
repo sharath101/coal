@@ -11,8 +11,9 @@ This is the first-release endpoint list. The generated OpenAPI spec is the exact
 
 - **Base path.** REST and JSON under `/api/v1`. Times are in UTC (ISO 8601) and shown in Indian time by the clients.
 - **Auth.** Every request carries the user's session token: a cookie on the website (later, a bearer token in the app). Calls made by the AI also carry a "via AI" mark, set by the backend.
-- **The contract.** The OpenAPI spec is generated from the zod schemas in `shared/`.
-- **Permission and AI tier.** Every endpoint declares both, in its schema:
+- **The contract.** Each endpoint is defined with `defineEndpoint` in `shared/src/schemas/`, and listed in `shared/src/api/endpoints.ts`. The OpenAPI spec is generated from these definitions and served at `/api/v1/openapi.json`; outside production, `/api/v1/docs` shows it.
+- **Public endpoints.** Only sign-up, sign-in and the two lists the sign-up form needs (`GET /roles`, `GET /product-lines`) work without a session. Everything else returns `NOT_SIGNED_IN` first.
+- **Permission and AI tier.** Every endpoint declares both, in its schema. The OpenAPI spec shows them as `x-permission` and `x-ai-tier`:
 
   | Tier | What the AI may do |
   |---|---|
@@ -20,15 +21,21 @@ This is the first-release endpoint list. The generated OpenAPI spec is the exact
   | `auto` | Use it directly, for the user's own things |
   | `confirm` | Only through a proposal the user confirms |
   | `never` | Not at all |
-  | `—` | Not available as an AI tool at all |
+  | `—` | Not available as an AI tool at all (`none` in the code) |
 
   The tiers are explained in [workstation-and-ai.md](./workstation-and-ai.md#what-the-ai-may-do).
 - **Lists** use cursor paging (`?cursor=`, `?limit=`), filters (`?filter[project]=`) and sorting. They only return what the user may see.
 - **Writes.**
-  - `POST` requests take an `Idempotency-Key` header, so a retry doesn't repeat the action.
-  - Edits take an `If-Match` header with the version the user saw, so two people, or a person and the AI, can't overwrite each other.
+  - `POST` requests take an optional `Idempotency-Key` header (8 to 200 letters, digits or `-_.:`), so a retry doesn't repeat the action. The key is claimed before the action runs:
+    - a repeat with the same key and request gets the first response back, marked `Idempotent-Replayed: true`;
+    - a repeat that arrives while the first is still running gets `409 IDEMPOTENCY_IN_PROGRESS`;
+    - the same key with a different request gets `422 IDEMPOTENCY_CONFLICT`;
+    - a request that fails releases its key, so a corrected retry can use it.
+
+    Successful responses are kept for a day.
+  - Edits take an `If-Match` header with the version the user saw, so two people, or a person and the AI, can't overwrite each other. A stale version gets `412 VERSION_CONFLICT`. For `PATCH /me`, the version is the profile's `updatedAt`.
 - **Preview.** Workflow actions accept `?preview=true`. It returns what would happen (steps opened or reset, tasks with their assignees, signatures requested, people notified, warnings) without saving anything.
-- **Errors** use the standard problem format (`application/problem+json`) with a code, such as `NOT_ALLOWED`, `NOT_FOUND`, `STEP_NOT_READY`, `SIGNATURE_REQUIRED`, `VERSION_CONFLICT` or `PREVIEW_CHANGED`. "Not allowed" names who can do it; it never reveals content.
+- **Errors** use the standard problem format (`application/problem+json`) with a code. The codes are listed in `shared/src/api/problem.ts`; for example `NOT_SIGNED_IN`, `NOT_ALLOWED`, `AI_NOT_ALLOWED`, `NOT_FOUND`, `VALIDATION_FAILED` (with the fields), `NAME_TAKEN`, `VERSION_CONFLICT`, `RATE_LIMITED`, `STEP_NOT_READY`, `SIGNATURE_REQUIRED` and `PREVIEW_CHANGED`. "Not allowed" names who can do it (`whoCan`); it never reveals content.
 
 ## Endpoints
 
@@ -37,12 +44,13 @@ This is the first-release endpoint list. The generated OpenAPI spec is the exact
 | Endpoint | Purpose | Tier |
 |---|---|---|
 | `POST /auth/sign-up` | Create an account: name, role, and product line for a Lead. Returns a session. **Placeholder** ([roles-and-access.md](./roles-and-access.md#accounts-for-now)) | — |
-| `POST /auth/sign-in` | Sign in by name. **Placeholder** | — |
+| `POST /auth/sign-in` | Sign in by name, in any case. **Placeholder** | — |
 | `POST /auth/sign-out` | End the session | — |
 | `GET /me` | My profile, role and product line | read |
 | `PATCH /me` | Change my name, role or product line (only until there is an admin) | — |
 | `GET /users`, `GET /users/{id}` | The people directory | read |
-| `GET /roles` | Departments and their roles, for the sign-up form | read |
+| `GET /roles` | Departments and their roles, for the sign-up form. Public | read |
+| `GET /product-lines` | R&D's product lines, for the sign-up form. Public | read |
 
 ### Passkeys and signing
 
@@ -121,7 +129,10 @@ This is the first-release endpoint list. The generated OpenAPI spec is the exact
 | `GET /documents/{id}/versions/{n}`, `…/pdf` | A version's content and PDF | read |
 | `GET /documents/{id}/compare?from=&to=` | Compare two versions | read |
 | `POST /documents/{id}/submit` (preview) | Start the signature rows | confirm |
-| `POST /files/upload-url`, `POST /attachments`, `GET /attachments` | Upload files and pictures; attach them to a step, task or document | auto / read |
+| `POST /files/upload-url` | Start an upload: checks the type and size, and returns a short-lived link to upload the file to a staging area in storage. The link accepts only the declared size | auto |
+| `POST /files/{id}/complete` | Finish an upload: COAL reads the staged file once, checks its size and records its SHA-256 hash, then moves exactly those bytes to where they're served from, which no upload link can write to | auto |
+| `GET /files/{id}/link` | A short-lived download link, after the permission check. Until attachments exist, only the uploader may use a file | read |
+| `POST /attachments`, `GET /attachments` | Attach files and pictures to a step, task or document | auto / read |
 | `POST /sources`, `GET /sources` | Add or list sources | auto / read |
 | `GET /history/{recordType}/{id}` | A record's history | read |
 
@@ -180,8 +191,8 @@ Events are written in the same transaction as the change ([architecture.md](./ar
 
 ## Adding an endpoint
 
-1. Define the request and response schemas in `shared/src/schemas/`.
-2. Declare the permission and the AI tier.
-3. Add the permission rule, and allowed and denied tests for each role ([roles-and-access.md](./roles-and-access.md#how-access-is-enforced)).
-4. If it changes state, write audit entries and events in the same transaction, and support `?preview=true` if it's a workflow action.
-5. Update the tables in this doc.
+1. **Define it** with `defineEndpoint` in `shared/src/schemas/<area>.ts`: the path, the request and response schemas, `auth`, the permission and the AI tier. Add it to `ENDPOINTS` in `shared/src/api/endpoints.ts`.
+2. **Add the permission rule** in `backend/src/modules/permissions/rules.ts`; the type check fails until you do. Add its row to the test table in `permissions.test.ts`, which tests every role, allowed and denied ([roles-and-access.md](./roles-and-access.md#how-access-is-enforced)). Record-level rules get their own cases there.
+3. **Implement it** with `implement()` in the module's `routes.ts`, and list the module's routes in `backend/src/modules/index.ts`. The backend won't start while an endpoint has no implementation.
+4. **If it changes state,** run it through `change()` (`backend/src/core/db/change.ts`) so its audit entries and events are written in the same transaction, and support `?preview=true` if it's a workflow action.
+5. **Update the tables in this doc.**

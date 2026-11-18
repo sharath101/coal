@@ -1,0 +1,79 @@
+{
+  "app": {
+    "name": "COAL",
+    "tagline": "R&D at Jayon, from idea to launch",
+    "madeUpData": "Made-up data only. Sign-in is a placeholder, so nothing here is an official record.",
+    "loading": "Loading…"
+  },
+  "nav": {
+    "pages": "Pages",
+    "dashboard": "Dashboard",
+    "workstation": "Workstation",
+    "profile": "Profile",
+    "signOut": "Sign out",
+    "account": "Your account"
+  },
+  "signIn": {
+    "title": "Sign in",
+    "intro": "Enter your name to sign in.",
+    "name": "Your name",
+    "submit": "Sign in",
+    "noAccount": "New to COAL?",
+    "createAccount": "Create an account"
+  },
+  "signUp": {
+    "title": "Create an account",
+    "intro": "Enter your name and choose your role. A Lead also chooses their product line.",
+    "name": "Your name",
+    "nameHint": "Names must be unique. Add an initial or a surname if someone shares your name.",
+    "role": "Your role",
+    "chooseRole": "Choose your role",
+    "aboveDepartments": "Board and VP",
+    "productLine": "Product line",
+    "chooseProductLine": "Choose a product line",
+    "submit": "Create account",
+    "haveAccount": "Already have an account?",
+    "signIn": "Sign in"
+  },
+  "profile": {
+    "title": "Your profile",
+    "intro": "Until there's an admin, you can change your own name, role and product line.",
+    "save": "Save changes",
+    "saved": "Saved."
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "greeting": "Hello, {name}",
+    "role": "{role}",
+    "roleWithLine": "{role} · {productLine}",
+    "needsMe": "What needs me now?",
+    "coming": "What's coming?",
+    "howWeAreDoing": "How are we doing?",
+    "empty": "Your widgets appear here once projects are running."
+  },
+  "workstation": {
+    "title": "Workstation",
+    "myTasks": "My tasks",
+    "noTasks": "No tasks yet.",
+    "projects": "Projects",
+    "noProjects": "No projects yet.",
+    "generalChats": "General chats",
+    "newChat": "New chat",
+    "conversationEmpty": "Ask a question, draft a document or assign work. The assistant only acts when you ask.",
+    "inputPlaceholder": "Ask, or type / for commands",
+    "send": "Send",
+    "notYet": "The AI assistant isn't switched on yet.",
+    "preview": "Preview",
+    "previewEmpty": "Drafts, tables and routes you work on appear here."
+  },
+  "problems": {
+    "NOT_SIGNED_IN": "Your session has ended. Sign in again.",
+    "NOT_FOUND": "There's no account with that name. Check the spelling, or create one.",
+    "NAME_TAKEN": "Someone already has that name. Add an initial or a surname.",
+    "PRODUCT_LINE_REQUIRED": "Choose your product line.",
+    "VERSION_CONFLICT": "Your profile changed since you opened it. Reload and try again.",
+    "VALIDATION_FAILED": "Some of the values aren't valid. Check them and try again.",
+    "RATE_LIMITED": "Too many tries. Wait a minute and try again.",
+    "generic": "Something went wrong. Try again."
+  }
+}

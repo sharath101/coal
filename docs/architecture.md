@@ -68,6 +68,9 @@ flowchart TB
 | Files | S3-compatible storage (MinIO for local development) | Cheap and durable |
 | Live updates | Server-Sent Events | Simple one-way updates, and AI streaming |
 | Push | Later, with the app: Expo push notifications | Covers iOS and Android |
+| Tests | Vitest, against a real PostgreSQL: each test file gets its own copy of a migrated template database | Fast, and tests see the real triggers and constraints |
+| Lint and format | ESLint with typescript-eslint (type-aware), COAL's own rules in `eslint-plugin-coal.mjs`, Prettier | Catches bugs and keeps the parts apart |
+| CI | GitHub Actions: lint, type checks, formatting, tests and the website build on every push and pull request | Every change is checked |
 | Hosting | Local for now; simple hosting for demos; production decided later (AWS Mumbai proposed) | Simple while testing; AWS Mumbai keeps data in India |
 
 **Sized for all of Jayon.** This stack comfortably serves about 800 employees with one backend service (several copies when needed) and one PostgreSQL database. See the next section.
@@ -77,7 +80,7 @@ flowchart TB
 COAL starts with R&D (about 60 people) and will grow to the whole company (about 800 employees). No microservices, Kubernetes, Kafka or Redis are needed for that. What matters is that adding a department doesn't mean rebuilding the base:
 
 - **Departments, roles and processes are data.** Departments and roles are tables ([data-model.md](./data-model.md#people-and-sessions)). Each department's processes are route files run by the same engine; the R&D route is the first.
-- **Platform and department modules.** The platform modules serve everyone: people, processes, tasks, documents, templates, signing, notifications, AI, audit and files. Each department gets its own module for its own records and rules. R&D's holds projects, project teams and its task routing. A lint rule stops modules reaching into each other's tables.
+- **Platform and department modules.** The platform modules serve everyone: people, processes, tasks, documents, templates, signing, notifications, AI, audit and files. Each department gets its own module for its own records and rules. R&D's holds projects, project teams and its task routing. A lint rule (`coal/module-tables`) stops modules reaching into each other's tables: only a module's own files, other `tables.ts` files (for foreign keys) and tests may import its `tables.ts`.
 - **Departments plug in.** A department's module adds its own widgets, AI tools, templates and notification rules. The platform doesn't change.
 - **Ready for translation.** All website text lives in message files from the start. English first.
 - **Several backend copies** share live updates through the database ([below](#events-and-live-updates)).
@@ -101,24 +104,37 @@ COAL starts with R&D (about 60 people) and will grow to the whole company (about
 coal/
   backend/
     src/
-      modules/        Platform modules: auth, users, org (departments and roles), process,
-                      tasks, documents, templates, signatures, dashboard, notifications,
-                      files, audit, ai
-                      Department modules: rnd (projects, teams, task routing); others later
-      jobs/           Background jobs
-    prompts/          The AI's instructions, versioned
-    migrations/       Database migrations
-  web/                The website
+      core/           Plumbing every module uses: config, the database client, change() (one
+                      transaction with its audit entries and events), the endpoint layer
+                      (session, AI tier and permission checks, problem responses, Idempotency-Key)
+      modules/        Platform modules: auth, users, org (departments and roles), permissions,
+                      audit, events (the outbox), files; later process, tasks, documents,
+                      templates, signatures, dashboard, notifications, ai
+                      Department modules: rnd (product lines; later projects, teams, task
+                      routing); others later
+                      Each module has tables.ts, service.ts and routes.ts
+      jobs/           Background jobs (pg-boss) and the worker
+      server.ts       The API. worker.ts: the worker. dev.ts: both, for local work
+    test/             Integration tests and their helpers
+    prompts/          The AI's instructions, versioned (with the AI module)
+    migrations/       Database migrations, generated from the tables.ts files
+  web/
+    messages/         All website text, one file per language (en.json first)
+    src/app/          Pages: sign-in and sign-up; Dashboard, Workstation and profile
+    src/components/   Shared pieces; ui/ holds the shadcn/ui components
   app/                The mobile app (a later phase)
   shared/
     src/
-      schemas/        zod schemas: API requests and responses, shared types
-      process/        Route definitions (YAML, one per process and version) and the pure engine, with tests
-      widgets/        Dashboard widget definitions
-      rules/          Small rules both clients and the backend use
+      api/            The endpoint contract, the list of every endpoint, problem codes, the typed client
+      schemas/        zod schemas and endpoint contracts, by area
+      process/        Route definitions (YAML, one per process and version) and the pure engine, with tests (block 2)
+      widgets/        Dashboard widget definitions (block 4)
+      rules/          Small rules both clients and the backend use (names, upload limits)
   docs/               This plan
   private/            Jayon's files on this computer, such as templates. Git-ignored: never committed
-  AGENTS.md           Rules for AI coding agents (CLAUDE.md imports it)
+  docker-compose.yml  The local services
+  eslint-plugin-coal.mjs  COAL's lint rules: part boundaries and module tables
+  AGENTS.md           Rules and commands for AI coding agents (CLAUDE.md imports it)
 ```
 
 Each backend module owns its tables, its services and its routes. Modules call each other through their services, not each other's tables.
@@ -174,20 +190,21 @@ The full step list is in [workflow.md](./workflow.md). When the route changes, u
 
 REST and JSON under `/api/v1`. The details and the endpoint list are in [api.md](./api.md). In short:
 
-- **The contract.** The OpenAPI spec is generated from the zod schemas in `shared/`. The website, and later the app, use typed clients built from the same schemas.
-- **AI tier.** Every endpoint declares its permission and its AI tier ([workstation-and-ai.md](./workstation-and-ai.md#what-the-ai-may-do)).
-- **Sessions.** The website sends the user's session token in a cookie. Later, the app sends it as a bearer token.
+- **The contract.** Each endpoint is defined once in `shared/` with `defineEndpoint`: its path, schemas, whether it needs a session, its permission and its AI tier. The backend implements it, the website calls it through the typed client built from the same definition, and the OpenAPI spec is generated from it (`/api/v1/openapi.json`, with `x-permission` and `x-ai-tier` on each operation).
+- **AI tier.** Every endpoint declares its permission and its AI tier ([workstation-and-ai.md](./workstation-and-ai.md#what-the-ai-may-do)). Before validating the input, the backend checks, in order: the session, the AI tier for "via AI" calls, then the permission.
+- **Kept complete.** The backend refuses to start if an endpoint in `shared/` has no implementation, and the type check fails if a permission has no rule.
+- **Sessions.** The website sends the user's session token in a cookie. The backend already accepts it as a bearer token too, for the app later.
 
 ## Events and live updates
 
 - **The outbox.** Every change writes **events** (for example `step.ready`, `task.assigned`, `signature.requested`) to an outbox table, in the same transaction.
-- **Delivery.** A worker reads the outbox and passes each event to:
+- **Delivery.** A worker reads the outbox and passes each event to its subscribers (`backend/src/modules/events/subscriptions.ts`), in the same transaction that marks it delivered. A failed delivery is retried later, with growing gaps. Subscribers come with their blocks:
   - the notification sender;
   - live updates to open clients;
   - recalculating the forecast;
   - updating search.
 - **Live updates.** Each signed-in client keeps one Server-Sent Events stream (`GET /api/v1/stream`). It carries "this widget changed" hints and new notifications. The mobile app, when it comes, uses the stream while open and push notifications otherwise.
-- **Several backend copies.** When more than one copy of the backend runs, events reach every copy through PostgreSQL's LISTEN/NOTIFY, so no extra server is needed.
+- **Several backend copies.** A trigger sends `NOTIFY coal_outbox` when events are written, so the workers wake at once, and each also polls as a fallback. Workers claim events with `SKIP LOCKED`, so each event is delivered once. Live updates, which every copy needs, will be passed on to all copies through PostgreSQL's LISTEN/NOTIFY too, so no extra server is needed.
 - **The event list** is in [api.md](./api.md#events).
 
 ## AI module
@@ -207,9 +224,9 @@ The AI lives inside the backend (`backend/src/modules/ai/`) for now. It can be s
 
 ## Sign-in and sessions
 
-- **Name-only sign-in, for now.** A placeholder module ([roles-and-access.md](./roles-and-access.md#accounts-for-now)) creates accounts and signs people in by name. It issues an opaque session token stored in the database:
-  - the website keeps it in an HTTP-only cookie;
-  - later, the app keeps it in the device's secure storage.
+- **Name-only sign-in, for now.** A placeholder module ([roles-and-access.md](./roles-and-access.md#accounts-for-now)) creates accounts and signs people in by name. It issues an opaque session token; the database keeps only its SHA-256 hash. Sessions last 14 days (a setting), and sign-up and sign-in are rate-limited.
+  - the website keeps it in an HTTP-only, SameSite=Lax cookie (`coal_session`);
+  - later, the app keeps it in the device's secure storage and sends it as a bearer token.
 
   Replacing this module with real sign-in later doesn't change the rest of the backend.
 - **Passkeys** are registered and used only for signing ([documents-and-signing.md](./documents-and-signing.md#signing-with-face-id-or-fingerprint)). They're tied to COAL's web address. They work on `localhost` while testing, and passkeys made on a demo host are registered again once the final domain is set; the domain is decided at the end. When the mobile app comes, it must be linked to that domain (Associated Domains on iOS, Digital Asset Links on Android) to use the same passkeys.
@@ -223,7 +240,10 @@ pg-boss runs:
 - document rendering;
 - virus scanning of uploads;
 - sending notifications;
-- the daily audit-chain check.
+- the daily audit-chain check (02:30 Indian time);
+- removing stored Idempotency-Key responses after a day.
+
+The audit-chain check and the clean-up run now; the others come with their blocks.
 
 Jobs are written so that running one twice does no harm.
 
@@ -232,15 +252,15 @@ Jobs are written so that running one twice does no harm.
 - **Encryption.** TLS everywhere, and storage and database encryption.
 - **Secrets** live in a secrets manager, never in the code.
 - **Database accounts.** The backend's database account can't change or delete audit entries or signatures.
-- **Uploads** are virus-scanned and limited by type and size. Files are served only through short-lived links.
-- **Rate limits** on sign-in and the AI endpoints.
+- **Uploads** are virus-scanned and limited by type and size. Clients upload to a staging area; COAL checks the bytes and copies them to where they're served from, so a file's recorded hash always matches what's served. Files are served only through short-lived links. In production, a storage rule removes staged uploads left unfinished after a day.
+- **Rate limits** on sign-in and the AI endpoints, counted per address. The backend believes `X-Forwarded-For` only from the reverse proxies named in `TRUST_PROXY`, and only a proxy that overwrites that header with the connecting address may be named. The website's own rewrite passes a browser's header through, so it's never trusted: locally, and until demo hosting puts such a proxy in front of `/api/v1`, everyone shares one counter.
 - **Logs** never contain document content, prompts or AI results. Error reports are scrubbed before they're stored.
 
 ## Environments and hosting
 
 | Environment | What | Data |
 |---|---|---|
-| Local | Docker Compose: PostgreSQL, Gotenberg, MinIO | Made-up |
+| Local | Docker Compose: PostgreSQL 18, Gotenberg, and MinIO (the `pgsty/minio` community build, since MinIO stopped publishing images); the backend creates its bucket | Made-up |
 | Demo, when needed | Simple hosting to show COAL to employees: for example, one small server running the same Docker Compose setup, behind a shared password ⚠ | Made-up |
 | Production | Decided at the end (AWS Mumbai proposed), with daily backups and point-in-time restore | Real Jayon data, **only once real sign-in exists** |
 

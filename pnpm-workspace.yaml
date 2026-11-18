@@ -1,0 +1,12 @@
+# app/ joins when the mobile app phase starts (D12).
+packages:
+  - backend
+  - web
+  - shared
+
+onlyBuiltDependencies:
+  - esbuild
+  - sharp
+  - unrs-resolver
+  - '@parcel/watcher'
+  - '@swc/core'

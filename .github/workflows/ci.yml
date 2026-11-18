@@ -1,0 +1,47 @@
+# Linting, type checks, formatting and tests on every change (docs/roadmap.md, build order 1).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: coal
+          POSTGRES_PASSWORD: coal
+          POSTGRES_DB: coal
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U coal -d coal"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Start file storage
+        run: >
+          docker run -d --name minio -p 9000:9000
+          -e MINIO_ROOT_USER=coal -e MINIO_ROOT_PASSWORD=coal-local-only
+          pgsty/minio:latest server /data
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm format:check
+      - name: Wait for file storage
+        run: timeout 60 sh -c 'until curl -fs http://localhost:9000/minio/health/live; do sleep 1; done'
+      - run: pnpm test
+      - run: pnpm --filter @coal/web build
+        env:
+          NEXT_TELEMETRY_DISABLED: '1'

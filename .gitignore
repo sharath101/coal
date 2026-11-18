@@ -9,5 +9,12 @@
 # Dependencies
 node_modules/
 
+# Build output
+.next/
+dist/
+*.tsbuildinfo
+next-env.d.ts
+backend/openapi.json
+
 # macOS
 .DS_Store

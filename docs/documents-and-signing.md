@@ -168,7 +168,8 @@ Signatures use **passkeys**, the standard behind Face ID, fingerprint and Window
 ## Files, pictures and sources
 
 - **Storage.** Files are kept in private object storage. They are reached only through short-lived links issued after a permission check.
-- **Uploads.** Uploads are scanned for viruses before anyone can open them, and there's a list of allowed file types and a size limit. Outside documents are marked "outside" ([workstation-and-ai.md](./workstation-and-ai.md#safety-basics)).
+- **Uploads.** Uploads are scanned for viruses before anyone can open them, and there's a list of allowed file types and a size limit ⚠ ([I9](./open-questions.md#it-and-data)). Outside documents are marked "outside" ([workstation-and-ai.md](./workstation-and-ai.md#safety-basics)).
+  - *For now,* the scanning job doesn't exist yet, so uploads stay "not scanned" and can be opened. That's acceptable only while COAL holds made-up data; the scanner comes with the documents block.
 - **Pictures** can be attached to any step, task or document, including straight from a phone camera.
 - **Sources** (a link, a file or a citation, with a note) can be added to any document or step. They show in a Sources section.
 

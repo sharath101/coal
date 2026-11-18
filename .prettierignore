@@ -1,0 +1,7 @@
+pnpm-lock.yaml
+docs/
+private/
+backend/migrations/meta/
+*.md
+.next/
+next-env.d.ts
