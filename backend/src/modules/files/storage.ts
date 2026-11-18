@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import type { Readable } from 'node:stream';
 import {
+  BucketAlreadyOwnedByYou,
   CopyObjectCommand,
   CreateBucketCommand,
   DeleteObjectCommand,
@@ -63,7 +64,12 @@ export class S3FileStorage implements FileStorage {
       await this.client.send(new HeadBucketCommand({ Bucket: this.bucket }));
     } catch (error) {
       if (statusOf(error) !== 404) throw error;
-      await this.client.send(new CreateBucketCommand({ Bucket: this.bucket }));
+      try {
+        await this.client.send(new CreateBucketCommand({ Bucket: this.bucket }));
+      } catch (createError) {
+        // Another process created it at the same moment.
+        if (!(createError instanceof BucketAlreadyOwnedByYou)) throw createError;
+      }
     }
   }
 

@@ -10,7 +10,7 @@ beforeAll(async () => {
   person = await signUp(t.app, { name: 'Http Person', roleKey: 'rd_ops' });
 });
 afterAll(async () => {
-  await t.close();
+  await t?.close();
 });
 
 const SOME_ID = '01936b2e-7c3a-7cc0-8000-000000000001';

@@ -9,7 +9,7 @@ beforeAll(async () => {
   t = await createTestApp();
 });
 afterAll(async () => {
-  await t.close();
+  await t?.close();
 });
 
 const inject = (options: InjectOptions) => t.app.inject(options);

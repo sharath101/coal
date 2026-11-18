@@ -12,7 +12,7 @@ beforeAll(async () => {
   other = await signUp(t.app, { name: 'File Other', roleKey: 'rd_head' });
 });
 afterAll(async () => {
-  await t.close();
+  await t?.close();
 });
 
 const content = new TextEncoder().encode('%PDF-1.4 made-up test report');

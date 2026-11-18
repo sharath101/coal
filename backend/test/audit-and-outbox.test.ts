@@ -19,7 +19,7 @@ beforeAll(async () => {
   database = await createTestDatabase();
 });
 afterAll(async () => {
-  await database.drop();
+  await database?.drop();
 });
 
 const ctx: RequestContext = {
