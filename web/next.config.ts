@@ -7,6 +7,8 @@ const apiUrl = process.env.COAL_API_URL ?? 'http://127.0.0.1:4000';
 
 const config: NextConfig = {
   transpilePackages: ['@coal/shared'],
+  // The assistant's replies stream for up to a few minutes while a long document is written.
+  experimental: { proxyTimeout: 10 * 60_000 },
   async rewrites() {
     return [{ source: '/api/v1/:path*', destination: `${apiUrl}/api/v1/:path*` }];
   },

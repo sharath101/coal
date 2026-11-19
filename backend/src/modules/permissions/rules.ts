@@ -26,6 +26,11 @@ export interface RoleScope extends Scope {
   roles: string[];
 }
 
+/** Something that belongs to one person: their chats with the assistant, its drafts and cards. */
+export interface OwnedResource {
+  ownerId: string;
+}
+
 export interface TaskResource {
   assigneeId: string | null;
   queueRole: string | null;
@@ -89,6 +94,9 @@ const inRoles = (actor: Actor, scope: RoleScope): Decision => {
   return inScope(actor, scope) ? allow : deny('Members of this project');
 };
 
+const ownerOnly = (actor: Actor, owned: OwnedResource): Decision =>
+  actor.userId === owned.ownerId ? allow : deny('The person it belongs to');
+
 const ownTask = (actor: Actor, task: TaskResource): Decision =>
   task.assigneeId === actor.userId ? allow : deny('The person it is assigned to');
 
@@ -150,9 +158,21 @@ export const RULES = {
   'tasks.update': { endpoint: signedIn, resource: ownTask },
   'tasks.claim': { endpoint: signedIn, resource: claimable },
   'tasks.reassign': { endpoint: onlyRoles('vp', 'rd_head', 'rd_lead'), resource: inRoles },
+  // ⚠ Anyone may ask anyone for now; the ladder decides assignment versus request later (AI9).
+  'tasks.create': { endpoint: signedIn },
+  'ai.models.read': { endpoint: signedIn },
+  'ai.chats.read': { endpoint: signedIn, resource: ownerOnly },
+  'ai.chats.write': { endpoint: signedIn, resource: ownerOnly },
+  'ai.proposals.decide': { endpoint: signedIn, resource: ownerOnly },
+  'ai.drafts.read': { endpoint: signedIn, resource: ownerOnly },
 } satisfies Record<
   PermissionKey,
-  Rule<never> | Rule<FileResource> | Rule<RoleScope> | Rule<TaskResource> | Rule<ClaimResource>
+  | Rule<never>
+  | Rule<FileResource>
+  | Rule<RoleScope>
+  | Rule<TaskResource>
+  | Rule<ClaimResource>
+  | Rule<OwnedResource>
 >;
 
 type Rules = typeof RULES;

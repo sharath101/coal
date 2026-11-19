@@ -22,6 +22,9 @@ export const ERROR_CODES = [
   'SIGNATURE_REQUIRED',
   'PREVIEW_CHANGED',
   'RATE_LIMITED',
+  'AI_OFF',
+  'AI_DECLINED',
+  'AI_FAILED',
   'INTERNAL',
 ] as const;
 export type ErrorCode = (typeof ERROR_CODES)[number];

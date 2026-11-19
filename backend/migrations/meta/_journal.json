@@ -29,6 +29,13 @@
       "when": 1795032378699,
       "tag": "0003_insert_only_process_tables",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1795071903259,
+      "tag": "0004_assistant",
+      "breakpoints": true
     }
   ]
 }

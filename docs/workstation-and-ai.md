@@ -112,6 +112,8 @@ The same flow works without the AI: New idea is also a plain form.
 7. **Save.** Saving creates a new draft version owned by the user (`auto` tier). Submitting it for signatures goes through an action card. Signing is always the user's own act.
 8. **Record.** Each draft records the template version, model, instructions and sources that produced it. AI-written sections are marked as such until a person edits or approves them.
 
+**Until the template library exists** (block 3), drafting reads the step's folder in the git-ignored `private/templates/` (one folder per step, named by its number) fresh every time (P46). The drafting model reads the chosen file; a Word template is filled on its own file, so its letterhead, header and footer stay. **If the step has no template,** the model writes one in the same style as Jayon's other forms, on Jayon's letterhead (`private/templates/_letterhead.docx`), and says so. Gaps are written `[[to fill: …]]`, highlighted in the Word file and listed beside the preview.
+
 **Which templates:** every step's documents, as their templates are added to the library, starting with stages 1 and 2. For steps whose data COAL doesn't hold yet, most fields come from the person. The AI can still help with any document as a chat.
 
 ### Assigning work
@@ -138,14 +140,32 @@ The chat is built **channel-neutral**. A channel passes in a person's message; t
 
 COAL works with both **Claude (Anthropic)** and **OpenAI**. Which one to use is decided later ⚠.
 
-- **One gateway.** All AI calls go through one small gateway in the backend, built on the Vercel AI SDK, which supports both providers.
-- **Configuration, not code.** Switching the provider or model is a configuration change. Each purpose can have its own model:
-  - chat and drafting use a strong model;
-  - short tasks, such as titles, classification and extraction, use a cheaper one.
-- **Both stay working.** The evaluation tests run against both providers, so either can be switched on at any time.
+- **One gateway.** All AI calls go through one small gateway in the backend (`backend/src/modules/ai/gateway.ts`). It calls Claude through Anthropic's own SDK (P44); an OpenAI adapter can sit behind the same gateway when it's needed ⚠.
+- **Configuration, not code.** Each kind of work has its own row in the **model table** below. `AI_MODEL_<ROW>=<model id>` in `.env` changes a row without a code release.
+- **Both stay working** ⚠. Once the OpenAI adapter exists, the evaluation tests run against both providers, so either can be switched on at any time.
 - **Data settings.** Chats are kept in COAL's own database, and storage is turned off at the provider where the API allows it. Provider APIs don't train on our data by default. Apply for zero data retention before real data is used.
 - **Budgets.** Each person has a daily budget and each request has a limit. Every call's tokens and cost are logged.
 - **Data rules.** Which data may be sent to which provider, and whether it must be processed in India, is decided before real data arrives ([open-questions.md](./open-questions.md#ai)). Until then COAL holds made-up data only.
+
+### The model table
+
+Cheap and fast where the work is simple, the strongest model where quality matters most (P43). The cheapest model reads every message first and picks the row; the person can also pick a row by hand in the Workstation, to compare models. The table lives in `backend/src/modules/ai/models.ts`, and the Workstation shows it with prices.
+
+| Row | What it does | Model | Effort | Why |
+|---|---|---|---|---|
+| `route` | Reads each message and picks the row | Haiku 5.5 | low | Runs on every message; sorting a message into one of seven kinds is easy |
+| `chat` | Small talk, help, how COAL works | Haiku 5.5 | low | Short answers with no records to weigh |
+| `lookup` | My tasks, a project's status, who is on a team | Haiku 5.5 | medium | One or two tool calls; the facts come from records, not the model |
+| `analysis` | Reasoning across records ("which Spine projects are late, and why?") | Sonnet 5.5 | medium | Several lookups and a judgment, at half the price of Opus |
+| `idea` | Idea to project: the concept, then the Go preview | Sonnet 5.5 | medium | Pulling the details out of free text and asking for what's missing |
+| `assign` | Assigning work and requests, as action cards | Sonnet 5.5 | medium | People, projects and steps must be resolved right |
+| `draft` | Gathers what a document needs, then hands it to the writer | Sonnet 5.5 | medium | Finds the project, step and template |
+| `draft_write` | Writes the document from the template or on the letterhead | Opus 5.5 | high | Signed, regulated documents: follow the form exactly, never invent a number |
+| `template_pick` | Picks the template when a step has several | Haiku 5.5 | low | Choosing one file name from a short list |
+| `explain` | Explains or checks a document before someone signs | Opus 5.5 | high | A missed gap gets signed |
+| `deep` | Questions the router marks as complex | Opus 5.5 | high | Escalation for judgment Sonnet might get wrong |
+
+Opus and Sonnet calls carry Anthropic's server-side fallback, so a safety decline is retried on a fallback model inside the same call. Saved thinking is tied to the tool list it was made with, and the tools grow with every new endpoint, so calls set `drop_block`: an older chat carries on without that thinking instead of failing. Keys that aren't scoped to one workspace (`sk-ant-usr-…`) need `ANTHROPIC_WORKSPACE_ID` as well. Every call's model, tokens, cost and time are logged, and shown under each reply.
 
 ## How the AI is told what to do
 

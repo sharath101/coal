@@ -110,7 +110,9 @@ Every action returns `{ saved, preview }`: what changed (steps, tasks made with 
 | `POST /tasks/{id}/claim` | Claim a task from my role's queue. I join the project team if I'm not on it. A Lead may claim only for their own product line's projects | confirm |
 | `POST /tasks/{id}/reassign` | Give a task to someone who holds its role (the VP or the Head; the Lead only within the project team) | confirm |
 
-*Later:* `POST /tasks` (own tasks, assignments and requests), `accept`, `decline` and comments.
+| `POST /tasks` | Ask someone to do something: a request in their tasks, optionally about a project and step. Previewable. Implemented in the R&D module, since its subject is a project | confirm |
+
+*Later:* own tasks, assignments by the ladder ⚠ (AI9), `accept`, `decline` and comments.
 
 ### Deviations
 
@@ -156,14 +158,19 @@ Every action returns `{ saved, preview }`: what changed (steps, tasks made with 
 
 | Endpoint | Purpose | Tier |
 |---|---|---|
-| `POST /ai/chats`, `GET /ai/chats`, `GET /ai/chats/{id}` | Start a chat (optionally with a project, step, document, task or widget as context); list and read my chats | — |
-| `POST /ai/chats/{id}/messages` | Send a message. The reply streams back | — |
-| `POST /ai/chats/{id}/stop` | Stop the current reply | — |
-| `POST /ai/feedback` | Thumbs up or down on a reply | — |
+| `GET /ai/models` | The model table, whether the assistant is on, and what I've spent today | — |
+| `POST /ai/chats`, `GET /ai/chats`, `GET /ai/chats/{id}` | Start a chat (optionally pinned to a project); list and read my chats | — |
+| `POST /ai/chats/{id}/messages` | Send a message. The reply streams back as Server-Sent Events: `route`, `activity`, `text`, `card`, `draft`, then `done` (or `error`) | — |
+| `POST /ai/proposals/{id}/confirm`, `POST /ai/proposals/{id}/reject` | Carry out or discard an action card (below) | never |
+| `GET /ai/drafts/{id}/file?format=pdf\|docx` | A draft the assistant made for me | — |
+
+*Later:* stopping a reply on the server (closing the stream stops it showing), feedback.
 
 ## Proposals and action cards
 
 A proposal is a set of actions with their preview, waiting for the user to confirm it. Action cards in the Workstation are proposals. The website also uses them for bulk actions.
+
+**Built so far:** the assistant makes cards itself (its `propose_…` tools) and they're confirmed or discarded with `POST /ai/proposals/{id}/confirm|reject`. Confirming previews again; if the effect changed, the card is updated and stays pending. Editing a card, the general `/proposals` endpoints, expiry and running several actions in one transaction come later. A Go card is a link: it opens the Go form filled in, and the VP presses Go.
 
 | Endpoint | Purpose | Tier |
 |---|---|---|

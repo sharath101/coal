@@ -120,6 +120,8 @@ The step sign-off record is a document of type `STEP_SIGNOFF`, so it needs no ta
 
 ### AI and proposals
 
+**Built so far** (migration `0004_assistant`, P47): `ai_chats` (user, title, project); `ai_messages` *(insert-only)*: each message exactly as sent to and received from the model, with a `display` copy for channels; `ai_calls` *(insert-only)*: each model call with purpose, model, tokens, cost and time; `ai_proposals`: action cards with their endpoint calls, lines, warnings, status and result; `ai_drafts`: drafted documents with the template, model, content, gaps, and the Word and PDF files. The plan below is still the target.
+
 | Table | Holds | Key columns |
 |---|---|---|
 | `ai_chats` | Each chat in someone's Workstation | user_id, run_id, channel (website; later WhatsApp and the app), context (JSON: step, document, task or widget), title |

@@ -217,9 +217,9 @@ REST and JSON under `/api/v1`. The details and the endpoint list are in [api.md]
 
 The AI lives inside the backend (`backend/src/modules/ai/`) for now. It can be split out later without changing the API.
 
-- **Gateway.** One function picks the provider and model for each purpose from configuration, and calls it through the Vercel AI SDK. Anthropic and OpenAI are both wired up ([workstation-and-ai.md](./workstation-and-ai.md#ai-providers)).
-- **Tools** are thin wrappers over the backend's own services.
-  - Each call carries the user's identity and a "via AI" mark, and goes through the same permission module.
+- **Gateway.** One function picks the model for each purpose from the model table, and calls Claude through Anthropic's SDK (P44). An OpenAI adapter can be added behind it ([workstation-and-ai.md](./workstation-and-ai.md#the-model-table)).
+- **Tools** are made from the endpoint contracts (P45): every `read` and `auto` endpoint is a tool, every `confirm` endpoint a `propose_…` tool that makes an action card, and `never` endpoints are not tools.
+  - A tool call is a call to the endpoint itself, in-process (Fastify `inject`), with the person's session and a "via AI" mark only the backend can set (a secret made at start-up). So it goes through exactly the same session, AI-tier and permission checks as any other call.
   - `confirm`-tier services accept "via AI" calls only to create proposals.
   - `never`-tier services refuse them outright.
 - **Chats** are kept in the database. Replies stream to the client over Server-Sent Events.

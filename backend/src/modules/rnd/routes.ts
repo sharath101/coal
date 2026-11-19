@@ -2,6 +2,7 @@ import {
   approveStep,
   claimTask,
   createCorrectiveAction,
+  createTask,
   createProject,
   decideStep,
   dropProject,
@@ -34,7 +35,7 @@ import { implement } from '../../core/http/endpoint';
 import { AppError, notFound, validationFailed } from '../../core/http/errors';
 import { assertUsableEvidence } from '../files/service';
 import { assertCanAccess } from '../permissions';
-import { assignTask, findTask, presentTask } from '../tasks/service';
+import { assignTask, createTasks, findTask, presentTask } from '../tasks/service';
 import { findActiveUsersByRole, findUser } from '../users/service';
 import { goProject, performAction, raiseCorrectiveAction, toPreview, type Env } from './actions';
 import { assertMay, loadEnv, type ScopedPermission } from './env';
@@ -120,7 +121,52 @@ async function runAction(
 
 const OPEN_TASK = ['open', 'in_progress', 'waiting'];
 
+/**
+ * Asks someone to do something: a request in their tasks, linked to an R&D project if given
+ * (docs/workstation-and-ai.md#assigning-work). It lives here because its subject is a project.
+ */
+const createRequest = implement(createTask, ({ deps, ctx, actor, body, query }) =>
+  previewable(deps.db, ctx, query.preview, async (tx, log) => {
+    const assignee = await findUser(tx, ctx.orgId, body.assigneeId);
+    if (!assignee || assignee.status !== 'active') {
+      throw validationFailed('Choose someone with an active account.', 'assigneeId');
+    }
+    const project = body.projectId ? await findProject(tx, ctx.orgId, body.projectId) : null;
+    if (body.projectId && !project) throw notFound('project');
+    const [row] = await createTasks(tx, ctx.orgId, [
+      {
+        kind: 'request',
+        title: body.title,
+        body: body.body,
+        assigneeId: assignee.id,
+        assignedBy: actor.userId,
+        viaAi: ctx.viaAi,
+        stepKey: body.stepKey ?? null,
+        ...(project && {
+          subjectType: 'project',
+          subjectId: project.id,
+          subjectLabel: `${project.code} · ${project.name}`,
+        }),
+      },
+    ]);
+    log.audit({
+      action: 'task.created',
+      recordType: 'task',
+      recordId: row!.id,
+      after: { kind: 'request', assigneeId: assignee.id, title: body.title },
+    });
+    log.event({
+      type: 'task.created',
+      projectId: project?.id ?? null,
+      stepKey: body.stepKey ?? null,
+      payload: { taskId: row!.id, assigneeId: assignee.id },
+    });
+    return { saved: !query.preview, task: await presentTask(tx, ctx.orgId, row!) };
+  }),
+);
+
 export const rndRoutes = [
+  createRequest,
   implement(listProductLinesEndpoint, async ({ deps, ctx }) => ({
     items: await listProductLines(deps.db, ctx.orgId),
   })),

@@ -29,7 +29,7 @@ This roadmap gives an **order, not dates**. Madhav's effort estimates and costs 
 
 Each block depends on the ones before it. Within a block, the work can run side by side.
 
-**Progress:** blocks 1 (Foundations) and 2 (the route) are done. Virus scanning of uploads comes with block 3. Block 3 (Documents and signing) is next.
+**Progress:** blocks 1 (Foundations) and 2 (the route) are done. Virus scanning of uploads comes with block 3. Block 3 (Documents and signing) is next. A first cut of block 5's assistant was built early, to try the model table and drafting on Jayon's forms: the chat, routing, tools, action cards and drafting from `private/templates/` (P43 to P47).
 
 1. **Foundations** ✅
    - The monorepo (pnpm workspaces): `backend/`, `web/` and `shared/`; `app/` waits for its phase.

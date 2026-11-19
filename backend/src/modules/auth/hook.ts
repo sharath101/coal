@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import type { AppDeps } from '../../core/deps';
+import { VIA_AI_HEADER, isViaAi } from '../../core/http/internal';
 import { readSessionToken, resolveSession } from './service';
 
 /** Builds each request's context from its session, before any route runs. */
@@ -11,7 +12,7 @@ export function registerSessionHook(app: FastifyInstance, deps: AppDeps): void {
       requestId: request.id,
       actor: null,
       sessionId: null,
-      viaAi: false,
+      viaAi: isViaAi(request.headers[VIA_AI_HEADER]),
     };
     const token = readSessionToken(request);
     if (!token) return;

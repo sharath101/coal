@@ -48,6 +48,12 @@ const ENDPOINT_TABLE: Record<PermissionKey, Who[]> = {
   'tasks.update': SIGNED_IN,
   'tasks.claim': SIGNED_IN,
   'tasks.reassign': ['vp', 'rd_head', 'rd_lead'],
+  'tasks.create': SIGNED_IN,
+  'ai.models.read': SIGNED_IN,
+  'ai.chats.read': SIGNED_IN,
+  'ai.chats.write': SIGNED_IN,
+  'ai.proposals.decide': SIGNED_IN,
+  'ai.drafts.read': SIGNED_IN,
 };
 
 /** Rules that need a project and the roles the route allows right now. */
@@ -115,6 +121,30 @@ describe('permission table', () => {
       code: 'NOT_ALLOWED',
       whoCan: ['The person who uploaded it'],
     });
+  });
+});
+
+describe('the assistant: only your own chats, cards and drafts', () => {
+  const OWNED = [
+    'ai.chats.read',
+    'ai.chats.write',
+    'ai.proposals.decide',
+    'ai.drafts.read',
+  ] as const;
+  const cases = OWNED.flatMap((permission) =>
+    ROLE_KEYS.flatMap(
+      (who) =>
+        [
+          [permission, who, 'own', true],
+          [permission, who, "someone else's", false],
+        ] as const,
+    ),
+  );
+
+  it.each(cases)('%s by %s on %s → allowed: %s', (permission, who, whose, expected) => {
+    const actor = actorFor(who) as Actor;
+    const ownerId = whose === 'own' ? actor.userId : 'someone-else';
+    expect(canAccess(permission, actor, { ownerId }).allowed).toBe(expected);
   });
 });
 

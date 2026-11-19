@@ -23,7 +23,24 @@ import {
   startStep,
   submitStep,
 } from '../schemas/projects';
-import { claimTask, getTask, listTasks, reassignTask, updateTask } from '../schemas/tasks';
+import {
+  claimTask,
+  createTask,
+  getTask,
+  listTasks,
+  reassignTask,
+  updateTask,
+} from '../schemas/tasks';
+import {
+  confirmProposal,
+  createChat,
+  getAiModels,
+  getChat,
+  getDraftFile,
+  listChats,
+  rejectProposal,
+  sendChatMessage,
+} from '../schemas/ai';
 import { listProductLines } from '../schemas/rnd';
 import { getMe, getUser, listUsers, signIn, signOut, signUp, updateMe } from '../schemas/users';
 
@@ -71,6 +88,15 @@ export const ENDPOINTS = [
   updateTask,
   claimTask,
   reassignTask,
+  createTask,
+  getAiModels,
+  listChats,
+  createChat,
+  getChat,
+  sendChatMessage,
+  confirmProposal,
+  rejectProposal,
+  getDraftFile,
 ] as const satisfies readonly EndpointSpec[];
 
 export type Endpoint = (typeof ENDPOINTS)[number];

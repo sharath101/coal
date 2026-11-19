@@ -3,6 +3,8 @@ import { defineEndpoint } from '../api/contract';
 import { Id, IdParams, PageQuery, Timestamp, pageOf } from './common';
 import { Person, RoleRef } from './projects';
 
+const PreviewQuery = z.object({ preview: z.stringbool().default(false) });
+
 export const TASK_KINDS = [
   'work',
   'review',
@@ -103,4 +105,30 @@ export const reassignTask = defineEndpoint({
   params: IdParams,
   body: z.object({ assigneeId: Id }),
   response: Task,
+});
+
+export const CreateTaskBody = z.object({
+  assigneeId: Id,
+  title: z.string().trim().min(1).max(200),
+  body: z.string().trim().max(4000).default(''),
+  /** The project it belongs to, if any. */
+  projectId: Id.optional(),
+  stepKey: z.string().max(8).optional(),
+});
+
+export const CreatedTask = z.object({ saved: z.boolean(), task: Task });
+
+/** Asks someone to do something: a request task (docs/workstation-and-ai.md#assigning-work). */
+export const createTask = defineEndpoint({
+  id: 'tasks.create',
+  method: 'POST',
+  path: '/tasks',
+  summary: 'Ask someone to do something. It becomes a request in their tasks',
+  auth: 'session',
+  permission: 'tasks.create',
+  aiTier: 'confirm',
+  query: PreviewQuery,
+  body: CreateTaskBody,
+  response: CreatedTask,
+  status: 201,
 });

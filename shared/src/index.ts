@@ -10,6 +10,7 @@ export * from './schemas/files';
 export * from './schemas/process';
 export * from './schemas/projects';
 export * from './schemas/tasks';
+export * from './schemas/ai';
 export * from './rules/names';
 export * from './rules/files';
 export * from './process';

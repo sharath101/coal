@@ -77,6 +77,8 @@
 | AI5 | Is Malayalam needed in the chat and screens, or only for meetings later? | English screens; the AI may answer in Malayalam if asked | Jayon |
 | AI6 | WhatsApp: Meta's own Cloud API, or a provider such as Twilio or Gupshup? | Not needed until the WhatsApp phase | Founders |
 | AI7 | What may be shown in WhatsApp? Messages pass through Meta's servers | Nothing confidential until Jayon decides | Jayon |
+| AI9 | Who may ask whom for work: when is it an assignment (down the ladder) and when a request? | Anyone may send anyone a request; the person still confirms each card | Founders |
+| AI10 | Which Jayon documents may be sent to the AI provider as templates? | The founders use the files in `private/templates/` for their own testing | Founders, Jayon |
 | AI8 | How is a phone number linked to an employee's account, and unlinked when they change phones or leave? | Not needed until the WhatsApp phase | Founders, Jayon IT |
 
 ## Regulatory

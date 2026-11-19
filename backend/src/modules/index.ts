@@ -1,4 +1,5 @@
 import type { Implementation } from '../core/http/endpoint';
+import { aiRoutes } from './ai/routes';
 import { authRoutes } from './auth/routes';
 import { filesRoutes } from './files/routes';
 import { orgRoutes } from './org/routes';
@@ -18,5 +19,6 @@ export const IMPLEMENTATIONS = [
   ...filesRoutes,
   ...processRoutes,
   ...tasksRoutes,
+  ...aiRoutes,
   ...rndRoutes,
 ] as unknown as Implementation[];

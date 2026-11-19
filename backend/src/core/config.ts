@@ -36,7 +36,22 @@ const Env = z.object({
   S3_CREATE_BUCKET: flag.default(false),
   FILE_LINK_SECONDS: z.coerce.number().int().positive().default(300),
   OUTBOX_POLL_MS: z.coerce.number().int().positive().default(5000),
+  /** The assistant (docs/workstation-and-ai.md#ai-providers). Without a key it says it's off. */
+  ANTHROPIC_API_KEY: z.string().default(''),
+  /** Only for a key not scoped to a workspace (`sk-ant-usr-…`): the workspace to use. */
+  ANTHROPIC_WORKSPACE_ID: z.string().default(''),
+  AI_DAILY_BUDGET_USD: z.coerce.number().positive().default(5),
 });
+
+/** `AI_MODEL_<PURPOSE>=<model id>` overrides one row of the model table (backend/src/modules/ai/models.ts). */
+function modelOverrides(env: NodeJS.ProcessEnv): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [name, value] of Object.entries(env)) {
+    const m = /^AI_MODEL_([A-Z_]+)$/.exec(name);
+    if (m && value) out[m[1]!.toLowerCase()] = value.trim();
+  }
+  return out;
+}
 
 export type AppConfig = ReturnType<typeof loadConfig>;
 
@@ -69,5 +84,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
       linkSeconds: e.FILE_LINK_SECONDS,
     },
     outboxPollMs: e.OUTBOX_POLL_MS,
+    ai: {
+      apiKey: e.ANTHROPIC_API_KEY.trim(),
+      workspaceId: e.ANTHROPIC_WORKSPACE_ID.trim(),
+      dailyBudgetUsd: e.AI_DAILY_BUDGET_USD,
+      modelOverrides: modelOverrides(env),
+    },
   };
 }

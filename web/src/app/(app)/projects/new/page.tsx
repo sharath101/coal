@@ -2,9 +2,9 @@
 
 import { createProject, type EndpointOutput } from '@coal/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import { PreviewPanel } from '@/components/preview-panel';
 import { ProblemMessage } from '@/components/problem-message';
 import { selectClass } from '@/components/role-fields';
@@ -19,16 +19,26 @@ type GoResult = EndpointOutput<typeof createProject>;
 
 /** Go: the VP turns a concept into a project. Preview first, then create (docs/workflow.md#decisions-recorded-at-steps). */
 export default function NewProjectPage() {
+  return (
+    <Suspense>
+      <NewProjectForm />
+    </Suspense>
+  );
+}
+
+/** The assistant's Go card opens this form filled in (`?name=&concept=&productLine=&team=`). */
+function NewProjectForm() {
+  const params = useSearchParams();
   const t = useTranslations('newProject');
   const router = useRouter();
   const queryClient = useQueryClient();
   const { data: me } = useMe();
   const productLines = useProductLines();
   const people = usePeople();
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [productLineId, setProductLineId] = useState('');
-  const [team, setTeam] = useState<string[]>([]);
+  const [name, setName] = useState(params.get('name') ?? '');
+  const [description, setDescription] = useState(params.get('concept') ?? '');
+  const [productLineId, setProductLineId] = useState(params.get('productLine') ?? '');
+  const [team, setTeam] = useState<string[]>((params.get('team') ?? '').split(',').filter(Boolean));
   const [preview, setPreview] = useState<GoResult | null>(null);
 
   const body = { name, description, productLineId, teamUserIds: team };
