@@ -12,4 +12,6 @@ export interface AppDeps {
   pdf: PdfRenderer;
   /** Null where no virus scanner is set up (docs/documents-and-signing.md#files-pictures-and-sources). */
   scanner: VirusScanner | null;
+  /** The time, in one place so tests can move it forward (due dates and reminders depend on today). */
+  now: () => Date;
 }

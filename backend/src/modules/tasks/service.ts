@@ -1,8 +1,10 @@
-import type { Task } from '@coal/shared';
+import { dateOfInstant, workingDaysBetween, type Task } from '@coal/shared';
 import { and, desc, eq, inArray, isNull, sql, type SQL } from 'drizzle-orm';
 import type { Executor, Tx } from '../../core/db/client';
+import { msOf } from '../../core/db/columns';
 import { notFound, validationFailed } from '../../core/http/errors';
 import { listRoles } from '../org/service';
+import { loadCalendar } from '../schedule/calendar';
 import { findUsersByIds } from '../users/service';
 import { tasks } from './tables';
 
@@ -72,6 +74,8 @@ export async function closeTasks(
     /** Only this person's tasks, such as one Board member's sign-off task. */
     assigneeId?: string;
     keepOnReset?: boolean;
+    /** When it happened, for the clock (tests move it). */
+    now?: Date;
   },
 ): Promise<TaskRow[]> {
   const conditions: SQL[] = [eq(tasks.runId, runId), inArray(tasks.status, ACTIVE)];
@@ -83,8 +87,8 @@ export async function closeTasks(
     .update(tasks)
     .set({
       status: options.status,
-      doneAt: options.status === 'done' ? new Date() : null,
-      updatedAt: new Date(),
+      doneAt: options.status === 'done' ? (options.now ?? new Date()) : null,
+      updatedAt: options.now ?? new Date(),
     })
     .where(and(...conditions))
     .returning();
@@ -108,13 +112,89 @@ export async function setTaskStatus(
   tx: Tx,
   task: TaskRow,
   status: 'open' | 'in_progress' | 'done',
+  now: Date = new Date(),
 ): Promise<TaskRow> {
   const [row] = await tx
     .update(tasks)
-    .set({ status, doneAt: status === 'done' ? new Date() : null, updatedAt: new Date() })
+    .set({ status, doneAt: status === 'done' ? now : null, updatedAt: now })
     .where(eq(tasks.id, task.id))
     .returning();
   return row as TaskRow;
+}
+
+/** While a step is with its signer, the doers' tasks wait; when it is returned they are open again. */
+export async function setStepTasksWaiting(
+  tx: Tx,
+  runId: string,
+  stepKey: string,
+  waiting: boolean,
+  now: Date = new Date(),
+): Promise<number> {
+  const rows = await tx
+    .update(tasks)
+    .set({
+      status: waiting ? 'waiting' : 'open',
+      handedInAt: waiting ? now : null,
+      updatedAt: now,
+    })
+    .where(
+      and(
+        eq(tasks.runId, runId),
+        eq(tasks.stepKey, stepKey),
+        eq(tasks.kind, 'work'),
+        inArray(tasks.status, waiting ? ['open', 'in_progress'] : ['waiting']),
+      ),
+    )
+    .returning({ id: tasks.id });
+  return rows.length;
+}
+
+/**
+ * Where a person's new date has moved the open work of a step past its first due date, for each
+ * step: the forecast uses the latest of them. Done and waiting tasks no longer hold it back.
+ */
+export async function movedDueDates(ex: Executor, runId: string): Promise<Map<string, string>> {
+  const rows = await ex
+    .select({ runStepId: tasks.runStepId, dueOn: sql<string>`max(${tasks.dueOn})` })
+    .from(tasks)
+    .where(
+      and(
+        eq(tasks.runId, runId),
+        eq(tasks.kind, 'work'),
+        inArray(tasks.status, ['open', 'in_progress']),
+        sql`${tasks.dueOn} > ${tasks.firstDueOn}`,
+      ),
+    )
+    .groupBy(tasks.runStepId);
+  return new Map(rows.flatMap((r) => (r.runStepId ? [[r.runStepId, r.dueOn] as const] : [])));
+}
+
+/** Moves the due date of a step's open tasks, for one role or all (a changed plan). The first due date stays. */
+export async function moveDueDates(
+  tx: Tx,
+  runId: string,
+  stepKey: string,
+  roleKey: string | null,
+  dueOn: string,
+): Promise<number> {
+  const conditions: SQL[] = [
+    eq(tasks.runId, runId),
+    eq(tasks.stepKey, stepKey),
+    inArray(tasks.status, ACTIVE),
+    inArray(tasks.kind, ['work', 'review', 'decision']),
+  ];
+  if (roleKey) conditions.push(eq(tasks.roleKey, roleKey));
+  const rows = await tx
+    .update(tasks)
+    .set({ dueOn, updatedAt: new Date() })
+    .where(and(...conditions))
+    .returning({ id: tasks.id });
+  return rows.length;
+}
+
+/** A person's new expected date for a task, from a deviation. The first due date stays. */
+export async function setTaskDueDate(tx: Tx, taskId: string, dueOn: string): Promise<void> {
+  await tx.update(tasks).set({ dueOn, updatedAt: new Date() }).where(eq(tasks.id, taskId));
 }
 
 /** Gives a task to a person. The queue no longer holds it. */
@@ -158,6 +238,7 @@ export async function listTasks(
     scope: 'mine' | 'queue';
     'filter[status]': 'active' | 'closed';
   },
+  now: Date = new Date(),
 ): Promise<{ items: Task[]; nextCursor: string | null }> {
   const conditions: SQL[] = [
     eq(tasks.orgId, orgId),
@@ -167,34 +248,103 @@ export async function listTasks(
   else conditions.push(isNull(tasks.assigneeId), eq(tasks.queueRole, actor.roleKey));
   if (query.cursor) {
     const [at, id] = decodeCursor(query.cursor);
-    conditions.push(sql`(${tasks.createdAt}, ${tasks.id}) < (${at}::timestamptz, ${id}::uuid)`);
+    conditions.push(
+      sql`(${msOf(tasks.createdAt)}, ${tasks.id}) < (${at}::timestamptz, ${id}::uuid)`,
+    );
   }
   const rows = await ex
     .select()
     .from(tasks)
     .where(and(...conditions))
-    .orderBy(desc(tasks.createdAt), desc(tasks.id))
+    .orderBy(desc(msOf(tasks.createdAt)), desc(tasks.id))
     .limit(query.limit + 1);
   const page = rows.slice(0, query.limit);
   const last = page.at(-1);
   return {
-    items: await presentTasks(ex, orgId, page),
+    items: await presentTasks(ex, orgId, page, now),
     nextCursor: rows.length > query.limit && last ? encodeCursor(last) : null,
   };
 }
 
-export async function presentTasks(ex: Executor, orgId: string, rows: TaskRow[]): Promise<Task[]> {
+export async function tasksByIds(ex: Executor, ids: string[]): Promise<Map<string, TaskRow>> {
+  if (ids.length === 0) return new Map();
+  const rows = await ex.select().from(tasks).where(inArray(tasks.id, ids));
+  return new Map(rows.map((r) => [r.id, r]));
+}
+
+/** Open tasks of these people (or of everyone, when `userIds` is omitted): the Dashboard's task and workload widgets. */
+export async function activeTasksOf(
+  ex: Executor,
+  orgId: string,
+  userIds?: string[],
+): Promise<TaskRow[]> {
+  const conditions: SQL[] = [eq(tasks.orgId, orgId), inArray(tasks.status, ACTIVE)];
+  if (userIds) {
+    if (userIds.length === 0) return [];
+    conditions.push(inArray(tasks.assigneeId, userIds));
+  }
+  return ex
+    .select()
+    .from(tasks)
+    .where(and(...conditions))
+    .orderBy(tasks.dueOn, tasks.createdAt, tasks.id);
+}
+
+/** Tasks closed since a date, for the measures. */
+export async function closedTasksSince(
+  ex: Executor,
+  orgId: string,
+  userIds: string[],
+  since: Date,
+): Promise<TaskRow[]> {
+  if (userIds.length === 0) return [];
+  return ex
+    .select()
+    .from(tasks)
+    .where(
+      and(
+        eq(tasks.orgId, orgId),
+        eq(tasks.status, 'done'),
+        inArray(tasks.assigneeId, userIds),
+        sql`${tasks.doneAt} >= ${since.toISOString()}::timestamptz`,
+      ),
+    );
+}
+
+/** The tasks of one person closed lately, newest first (the Done tab). */
+export async function recentDoneTasks(
+  ex: Executor,
+  orgId: string,
+  userId: string,
+  limit: number,
+): Promise<TaskRow[]> {
+  return ex
+    .select()
+    .from(tasks)
+    .where(and(eq(tasks.orgId, orgId), eq(tasks.assigneeId, userId), eq(tasks.status, 'done')))
+    .orderBy(desc(tasks.doneAt), desc(tasks.id))
+    .limit(limit);
+}
+
+export async function presentTasks(
+  ex: Executor,
+  orgId: string,
+  rows: TaskRow[],
+  now: Date = new Date(),
+): Promise<Task[]> {
   if (rows.length === 0) return [];
-  const [people, roleList] = await Promise.all([
+  const [people, roleList, cal] = await Promise.all([
     findUsersByIds(
       ex,
       orgId,
       rows.flatMap((r) => (r.assigneeId ? [r.assigneeId] : [])),
     ),
     listRoles(ex, orgId),
+    loadCalendar(ex, orgId),
   ]);
   const nameOf = new Map(people.map((p) => [p.id, p.name]));
   const roleName = new Map(roleList.map((r) => [r.key, r.name]));
+  const today = dateOfInstant(now);
   return rows.map((row) => ({
     id: row.id,
     kind: row.kind,
@@ -208,6 +358,12 @@ export async function presentTasks(ex: Executor, orgId: string, rows: TaskRow[])
     queueRole: row.queueRole
       ? { key: row.queueRole, name: roleName.get(row.queueRole) ?? row.queueRole }
       : null,
+    dueOn: row.dueOn,
+    // A task waiting for the signer isn't late: the signature has its own due date.
+    daysLate:
+      row.dueOn && ACTIVE.includes(row.status) && row.status !== 'waiting' && today > row.dueOn
+        ? workingDaysBetween(cal, row.dueOn, today)
+        : 0,
     subject:
       row.subjectType && row.subjectId
         ? { type: row.subjectType, id: row.subjectId, label: row.subjectLabel ?? '' }
@@ -216,8 +372,13 @@ export async function presentTasks(ex: Executor, orgId: string, rows: TaskRow[])
   }));
 }
 
-export async function presentTask(ex: Executor, orgId: string, row: TaskRow): Promise<Task> {
-  const [task] = await presentTasks(ex, orgId, [row]);
+export async function presentTask(
+  ex: Executor,
+  orgId: string,
+  row: TaskRow,
+  now: Date = new Date(),
+): Promise<Task> {
+  const [task] = await presentTasks(ex, orgId, [row], now);
   if (!task) throw notFound('task');
   return task;
 }

@@ -1,0 +1,142 @@
+'use client';
+
+import type { WidgetKey } from '@coal/shared';
+import { Maximize2, Sparkles } from 'lucide-react';
+import Link from 'next/link';
+import { useTranslations } from 'next-intl';
+import { HealthDot, type Health } from '@/components/health-badge';
+import { ProblemMessage } from '@/components/problem-message';
+import { useCellText } from '@/components/widgets/cells';
+import { useWidgetText, CountStats } from '@/components/widgets/count-stats';
+import { RowBadges, StageStrip, toneBar } from '@/components/widgets/widget-parts';
+import { Button } from '@/components/ui/button';
+import { useWidget, type WidgetInfo } from '@/lib/queries';
+import { cn } from '@/lib/utils';
+
+/** The cells shown under a row on the compact card: the date or number that matters most. */
+const COMPACT_CELLS: Record<WidgetKey, string[]> = {
+  'my-tasks': ['due'],
+  'waiting-signature': ['row', 'waiting'],
+  'coming-up': ['starts'],
+  'upcoming-checkpoints': ['date'],
+  'my-projects': ['next'],
+  pipeline: ['launch'],
+  'delays-risks': ['forecast'],
+  'team-workload': ['open', 'overdue'],
+  'how-its-going': ['onTime'],
+  messages: ['when'],
+};
+
+const isHealth = (value: unknown): value is Health =>
+  value === 'green' || value === 'amber' || value === 'red';
+
+/** "Ask AI" arrives with the Workstation; until then the button is shown, and disabled. */
+export function AskAiButton() {
+  const t = useTranslations('widgets');
+  return (
+    <span title={t('askSoon')} className="inline-flex">
+      <Button size="xs" variant="outline" disabled>
+        <Sparkles aria-hidden />
+        {t('ask')}
+      </Button>
+    </span>
+  );
+}
+
+/** A widget as a compact card: its counts, its top rows, and a way into the expanded view. */
+export function WidgetCard({ info, onOpen }: { info: WidgetInfo; onOpen: () => void }) {
+  const t = useTranslations('widgets');
+  const { name } = useWidgetText(info.key);
+  const cellText = useCellText(info.key);
+  const widget = useWidget(info.key, { view: 'compact' });
+  const data = widget.data;
+  const headingId = `widget-${info.key}`;
+
+  return (
+    <section
+      aria-labelledby={headingId}
+      className="flex cursor-pointer flex-col gap-3 rounded-xl border bg-card p-4 transition-colors hover:border-foreground/30"
+      onClick={(e) => {
+        if (!(e.target as HTMLElement).closest('a,button')) onOpen();
+      }}
+    >
+      <header className="flex items-start justify-between gap-2">
+        <h3 id={headingId} className="font-medium">
+          {name}
+        </h3>
+        <div className="flex shrink-0 gap-1">
+          <AskAiButton />
+          <Button
+            size="xs"
+            variant="ghost"
+            onClick={onOpen}
+            aria-label={t('openWidget', { title: name })}
+          >
+            <Maximize2 aria-hidden />
+            {t('open')}
+          </Button>
+        </div>
+      </header>
+
+      <ProblemMessage error={widget.error} />
+      {!data && !widget.error && <p className="text-sm text-muted-foreground">{t('loading')}</p>}
+      {data && (
+        <>
+          <CountStats widget={info.key} counts={data.counts} />
+          {data.rows.length === 0 ? (
+            <p className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">
+              {t(`empty.${info.key}`)}
+            </p>
+          ) : (
+            <ul className="grid gap-2">
+              {data.rows.map((row) => {
+                const stage = row.cells.stage;
+                const health = row.cells.health;
+                return (
+                  <li key={row.id} className={cn('flex items-start gap-2 pl-2', toneBar(row.tone))}>
+                    <div className="grid min-w-0 flex-1 gap-0.5 text-sm">
+                      {row.link ? (
+                        <Link
+                          href={row.link}
+                          className="font-medium underline-offset-2 hover:underline"
+                        >
+                          {row.title}
+                        </Link>
+                      ) : (
+                        <span className="font-medium">{row.title}</span>
+                      )}
+                      {row.subtitle && (
+                        <span className="line-clamp-2 text-xs text-muted-foreground">
+                          {row.subtitle}
+                        </span>
+                      )}
+                      {(typeof stage === 'number' || isHealth(health)) && (
+                        <span className="flex items-center gap-2 py-0.5">
+                          {typeof stage === 'number' && <StageStrip stage={stage} />}
+                          {isHealth(health) && <HealthDot health={health} />}
+                        </span>
+                      )}
+                      <span className="flex flex-wrap gap-x-3 text-xs text-muted-foreground">
+                        {COMPACT_CELLS[info.key].map((column) => (
+                          <span key={column}>
+                            {t(`columns.${column}` as never)} {cellText(column, row.cells[column])}
+                          </span>
+                        ))}
+                      </span>
+                    </div>
+                    <RowBadges badges={row.badges} />
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          {data.total > data.rows.length && (
+            <p className="text-xs text-muted-foreground">
+              {t('moreRows', { count: data.total - data.rows.length })}
+            </p>
+          )}
+        </>
+      )}
+    </section>
+  );
+}

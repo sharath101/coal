@@ -221,6 +221,84 @@ const mayReachRequest = (actor: Actor, r: SignatureResource): Decision => {
     : deny(...roleNames(r.roleKeys));
 };
 
+/** The role one step up the reporting line (the ladder in docs/roles-and-access.md), if any. */
+export const roleAbove = (roleKey: string): string | null =>
+  ROLES.find((r) => r.key === roleKey)?.reportsTo ?? null;
+
+/** Is `roleKey` anywhere above `belowKey` on the ladder? */
+export function isAboveOnLadder(roleKey: string, belowKey: string): boolean {
+  for (let up = roleAbove(belowKey); up; up = roleAbove(up)) {
+    if (up === roleKey) return true;
+  }
+  return false;
+}
+
+/** A task being explained: its assignee, and the project's scope. */
+export interface DeviationRecordResource extends Scope {
+  assigneeId: string | null;
+}
+
+const mayRecordDeviation = (actor: Actor, r: DeviationRecordResource): Decision => {
+  if (r.assigneeId === actor.userId) return allow;
+  if (['rd_lead', 'rd_head'].includes(actor.roleKey) && inScope(actor, r)) return allow;
+  return deny('The person the task is assigned to', 'R&D Lead', 'R&D Head');
+};
+
+/** A deviation waiting to be confirmed: the role of the person who recorded it, and the project's scope. */
+export interface DeviationReviewResource extends Scope {
+  recordedByRoleKey: string;
+  recordedById: string;
+}
+
+/** The next role up, or anyone above, in the project's scope; never the person who recorded it. */
+const mayReviewDeviation = (actor: Actor, r: DeviationReviewResource): Decision => {
+  const up = roleAbove(r.recordedByRoleKey);
+  const ok =
+    actor.userId !== r.recordedById &&
+    isAboveOnLadder(actor.roleKey, r.recordedByRoleKey) &&
+    inScope(actor, r);
+  return ok ? allow : deny(...(up ? roleNames([up]) : ['Nobody: it is at the top of the line']));
+};
+
+/** A deviation's named cause, and the project's scope. */
+export interface DeviationCauseResource extends Scope {
+  causeUserId: string | null;
+  causeRole: string | null;
+}
+
+const mayCommentOnDeviation = (actor: Actor, r: DeviationCauseResource): Decision => {
+  const named =
+    r.causeUserId === actor.userId ||
+    (r.causeRole !== null &&
+      r.causeUserId === null &&
+      actor.roleKey === r.causeRole &&
+      inScope(actor, r));
+  return named ? allow : deny('The person or role named as the cause');
+};
+
+/**
+ * Who sees a deviation's cause by name (docs/roles-and-access.md#content-is-need-to-know): the VP
+ * and the Head see everyone; a Lead sees the people below them; a person sees themselves.
+ */
+export function causeNameVisible(
+  actor: Actor,
+  cause: { userId: string | null; userRoleKey: string | null } & Scope,
+): boolean {
+  if (['vp', 'rd_head'].includes(actor.roleKey)) return true;
+  if (cause.userId === null) return inScope(actor, cause);
+  if (cause.userId === actor.userId) return true;
+  return (
+    actor.roleKey === 'rd_lead' &&
+    inScope(actor, cause) &&
+    cause.userRoleKey !== null &&
+    isAboveOnLadder('rd_lead', cause.userRoleKey)
+  );
+}
+
+/** A notification belongs to the person it was sent to. */
+const ownNotification = (actor: Actor, n: { userId: string }): Decision =>
+  n.userId === actor.userId ? allow : deny('The person it was sent to');
+
 export const RULES = {
   'auth.signUp': { endpoint: anyone },
   'auth.signIn': { endpoint: anyone },
@@ -278,6 +356,18 @@ export const RULES = {
   'attachments.write': { endpoint: signedIn, resource: inRoles },
   'sources.read': { endpoint: signedIn },
   'sources.write': { endpoint: signedIn, resource: inRoles },
+  'timeline.read': { endpoint: signedIn },
+  'timeline.plan': { endpoint: signedIn, resource: inRoles },
+  // ⚠ The Head changes dates; the VP too, and only the VP, if the launch moves (W13).
+  'timeline.change': { endpoint: onlyRoles('rd_head', 'vp'), resource: inRoles },
+  'deviations.read': { endpoint: signedIn },
+  'deviations.record': { endpoint: signedIn, resource: mayRecordDeviation },
+  'deviations.review': { endpoint: signedIn, resource: mayReviewDeviation },
+  'deviations.comment': { endpoint: signedIn, resource: mayCommentOnDeviation },
+  'notifications.read': { endpoint: signedIn },
+  'notifications.markRead': { endpoint: signedIn, resource: ownNotification },
+  'notifications.markAllRead': { endpoint: signedIn },
+  'widgets.read': { endpoint: signedIn },
 } satisfies Record<
   PermissionKey,
   | Rule<never>
@@ -288,6 +378,10 @@ export const RULES = {
   | Rule<TemplateResource>
   | Rule<DocumentResource>
   | Rule<SignatureResource>
+  | Rule<DeviationRecordResource>
+  | Rule<DeviationReviewResource>
+  | Rule<DeviationCauseResource>
+  | Rule<{ userId: string }>
 >;
 
 type Rules = typeof RULES;

@@ -2,7 +2,17 @@ import { z } from 'zod';
 import { defineEndpoint } from '../api/contract';
 import { Condition, StepKey } from '../process/definition';
 import { RUN_STATUSES, STEP_STATUSES } from '../process/engine';
-import { Id, IdParams, PageQuery, Timestamp, pageOf } from './common';
+import {
+  DateOnly,
+  HealthEnum,
+  HealthReason,
+  StepHealthEnum,
+  Id,
+  IdParams,
+  PageQuery,
+  Timestamp,
+  pageOf,
+} from './common';
 import { ProductLine } from './rnd';
 import { User } from './users';
 
@@ -22,6 +32,11 @@ export const ProjectSummary = z.object({
   productLine: ProductLine,
   status: ProjectStatus,
   stage: z.number().int(),
+  /** Null once the project is dropped or finished. */
+  health: HealthEnum.nullable(),
+  healthReasons: z.array(HealthReason),
+  plannedLaunch: DateOnly.nullable(),
+  forecastLaunch: DateOnly.nullable(),
   createdAt: Timestamp,
   createdBy: z.string(),
 });
@@ -150,6 +165,7 @@ export const StepTask = z.object({
   title: z.string(),
   kind: z.string(),
   status: z.string(),
+  dueOn: DateOnly.nullable(),
   assignee: Person.nullable(),
   queueRole: RoleRef.nullable(),
 });
@@ -193,6 +209,14 @@ export const StepView = z.object({
   approvedBy: z.array(Person),
   decisions: z.array(DecisionView),
   tasks: z.array(StepTask),
+  /** Dates and health (docs/dashboard.md). Null until the step has dates. */
+  plannedStart: DateOnly.nullable(),
+  plannedEnd: DateOnly.nullable(),
+  forecastEnd: DateOnly.nullable(),
+  health: StepHealthEnum.nullable(),
+  daysLate: z.number().int(),
+  /** Late, and no deviation is recorded yet: the doers must record one before they submit. */
+  needsDeviation: z.boolean(),
   /** What the signed-in person may do now. */
   actions: StepActionsView,
 });

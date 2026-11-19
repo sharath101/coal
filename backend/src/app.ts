@@ -4,7 +4,7 @@ import rateLimit from '@fastify/rate-limit';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
 import { API_BASE_PATH } from '@coal/shared';
-import Fastify, { type FastifyServerOptions } from 'fastify';
+import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify';
 import {
   jsonSchemaTransform,
   serializerCompiler,
@@ -12,12 +12,15 @@ import {
 } from 'fastify-type-provider-zod';
 import { sql } from 'drizzle-orm';
 import type { AppDeps } from './core/deps';
+import type { Actor } from './core/http/context';
 import { registerEndpoints } from './core/http/endpoint';
 import { registerIdempotency } from './core/http/idempotency';
 import { annotateOpenApi } from './core/http/openapi';
 import { registerProblemHandlers } from './core/http/problems';
 import { registerSessionHook } from './modules/auth/hook';
 import { IMPLEMENTATIONS } from './modules';
+import { LiveHub } from './modules/notifications/stream';
+import { assertCanUse } from './modules/permissions';
 
 export function loggerOptions(level: string): FastifyServerOptions['logger'] {
   return {
@@ -72,6 +75,39 @@ export async function buildApp(
   );
 
   registerEndpoints(app, IMPLEMENTATIONS, deps);
+  registerStream(app, deps);
   await app.ready();
   return app;
+}
+
+/**
+ * The live stream (docs/architecture.md#events-and-live-updates): hints that something changed,
+ * never content. The client fetches what it needs through the normal, permission-checked API.
+ */
+function registerStream(app: FastifyInstance, deps: AppDeps) {
+  const hub = new LiveHub(deps.config.databaseUrl);
+  app.addHook('onClose', async () => hub.close());
+  app.get(`${API_BASE_PATH}/stream`, { schema: { hide: true } }, (request, reply) => {
+    assertCanUse('widgets.read', request.ctx.actor);
+    const actor = request.ctx.actor as Actor;
+    reply.hijack();
+    const raw = reply.raw;
+    raw.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache, no-transform',
+      Connection: 'keep-alive',
+      'X-Accel-Buffering': 'no',
+    });
+    raw.write(': connected\n\n');
+    const remove = hub.add({
+      userId: actor.userId,
+      send: (hint) => raw.write(`data: ${JSON.stringify(hint)}\n\n`),
+      close: () => raw.end(),
+    });
+    const ping = setInterval(() => raw.write(': ping\n\n'), 25_000);
+    request.raw.on('close', () => {
+      clearInterval(ping);
+      remove();
+    });
+  });
 }

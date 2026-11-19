@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useEffect, type ReactNode } from 'react';
 import { ProblemMessage } from '@/components/problem-message';
+import { LiveUpdates } from '@/components/live-updates';
 import { TopBar } from '@/components/top-bar';
 import { useMe } from '@/lib/queries';
 
@@ -21,6 +22,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   if (me.data) {
     return (
       <div className="flex min-h-[calc(100vh-2rem)] flex-col">
+        <LiveUpdates />
         <TopBar me={me.data} />
         <main className="flex flex-1 flex-col">{children}</main>
       </div>

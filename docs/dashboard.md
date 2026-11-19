@@ -17,7 +17,7 @@ The Dashboard answers three questions, in this order:
 
 Every number comes from the database, never from the AI. Every widget only counts what the viewer may see.
 
-**Until the widgets exist,** the Dashboard shows empty sections, plus a **Templates** link for the VP and the R&D Head, who manage the template library ([documents-and-signing.md](./documents-and-signing.md#adding-a-template)). Signatures waiting for me are on the My tasks page for now ("Waiting for my signature"); the "What needs me now?" widget takes them over.
+**Where it stands.** The widgets, the project page's dates and health, deviations, reminders, notifications and the live stream are built (block 4). The Dashboard also keeps the **Templates** link for the VP and the R&D Head, who manage the template library ([documents-and-signing.md](./documents-and-signing.md#adding-a-template)). "Ask AI" on each widget is shown but waits for the Workstation (block 5).
 
 ## Widgets
 
@@ -33,18 +33,24 @@ The Dashboard is a grid of **widgets**.
 - **Live.** When something relevant changes, the widget refreshes itself ([architecture.md](./architecture.md#events-and-live-updates)).
 - **Layouts.** Each role has a default layout (below). Personal layouts come later.
 
-**Every widget is defined in `shared/`**, so the website, and later the mobile app, render the same thing. Each department's module adds its own widgets the same way:
+**Every widget is defined in `shared/`** (`widgets/definitions.ts`), so the website, and later the mobile app, render the same thing. Each department's module adds its own widgets the same way:
 
 ```ts
 interface WidgetDefinition {
-  key: string;                     // 'my-tasks'
+  key: WidgetKey;                  // 'my-tasks'
+  no: string;                      // 'W1'
   title: string;
-  defaultFor: RoleKey[];           // roles that see it by default
-  compact:  { endpoint: string };  // e.g. GET /api/v1/widgets/my-tasks?view=compact
-  expanded: { endpoint: string; tabs: TabDef[]; filters: FilterDef[]; actions: ActionKey[] };
-  refreshOn: EventType[];          // events that make it refresh
+  question: 'needs_me' | 'coming' | 'how';
+  availableTo?: string[];          // roles that may use it; absent: everyone
+  tabs: string[];                  // 'todo', 'in_progress', …
+  filters: string[];               // 'project', 'step', 'kind', 'due', …
+  columns: string[];               // the expanded table's columns, as keys of each row's cells
+  actions: WidgetAction[];         // what a row may offer: start, done, more_time, sign, …
+  refreshOn: string[];             // events that make it refresh
 }
 ```
+
+**One shape for every widget.** `GET /widgets/{key}` returns `counts` (the headline numbers, each with a tone), `rows` and `tabs`. A row has a title, a subtitle, a link, a tone, badges, `cells` (the values of the columns) and the `actions` this person may take, plus references (task, request, project, step) for those actions. The top few rows fill the compact card; the whole tab fills the expanded view. A client needs no widget-specific code to show a new widget, only labels for its columns.
 
 ## First-release widgets
 
@@ -60,6 +66,18 @@ interface WidgetDefinition {
 | W8 | **Team workload** | How are we doing | Open and overdue tasks for each person below me | Person by week; reassign (where allowed) |
 | W9 | **How it's going** | How are we doing | My on-time rate, and my team's | The measures below, for me and for each person below me |
 | W10 | **Messages and activity** | Needs me now | My latest 5 work messages and notifications | The full feed, filters, mark as read |
+
+### What each widget counts, as built
+
+- **W1** my assigned tasks (signatures are on W2). "This week" runs to the coming Sunday. Tabs: To do, In progress, Waiting (the step is with its signer: not late, [P69](./decisions.md)), Done (the last 50). Filters: project, step, kind, due (overdue, this week, later, none). A late task can't be marked done until its deviation is recorded.
+- **W2** the document rows waiting for me, and the step sign-offs assigned to me, oldest first.
+- **W3** the steps of mine that are still locked, in projects I'm on (or lead): the step's doers include my role, or "the project team" and I'm on it. "Waits for" names the unfinished steps it depends on, with the expected date.
+- **W4** the next unfinished checkpoint of each running project, with whether its inputs are finished, and who signs. Open to everyone: it is status.
+- **W5** the projects I'm on, or lead. **W6** every project, with its stage, the steps open now, the Lead, days in stage, health and forecast launch; filters: product line, stage, health. Both are status, so open to everyone.
+- **W7** every running project's overdue and at-risk steps, with the owner (the people holding the step's work tasks), the planned and forecast dates, days late, and the reason and cause of the latest deviation. The cause shows by name only to those allowed; the sentence of explanation appears on the Deviations tab only for people in the project's scope ([roles-and-access.md](./roles-and-access.md#content-is-need-to-know)).
+- **W8** (VP, R&D Head, R&D Lead only) the open tasks of each person below me, by when they fall due. A Lead's people are those on their product line's projects.
+- **W9** my measures, then each person below me. The Board sees department totals, not people.
+- **W10** my notifications, newest first.
 
 ### Default layouts
 
@@ -89,16 +107,16 @@ Content inside the page follows the access rules ([roles-and-access.md](./roles-
 
 They measure the flow of work, not activity: no keystrokes, no screen time. Each person sees their own. Managers see the people below them ([roles-and-access.md](./roles-and-access.md#assigning-work-and-making-requests)), with the reasons for any delay attached. A late task caused by a vendor shows that cause, and the person named can comment.
 
-| Measure | Definition |
-|---|---|
-| On-time rate | Tasks finished by their **first** due date ÷ tasks finished, over the last 90 days. Moving a date doesn't improve it |
-| Days per task against plan | Days from when a task opens to when it's done, compared with its planned duration |
-| Sign-off turnaround | Time from a signature request to the signature |
-| Rework rate | Share of this person's submitted work that was returned or sent back |
-| Open load | Open tasks now, and how many are overdue |
-| Overdue steps | Project steps past their planned end and not yet approved |
-| Schedule slip | Forecast launch minus planned launch, in days, per project |
-| Days per stage | Actual days spent in each stage, against plan |
+| Measure | Definition | Where it shows |
+|---|---|---|
+| On-time rate | Finished tasks done by their **first** due date ÷ finished tasks, over the last 90 days. A task counts as done when the doers handed the step in, not when the signer signed. Moving a date doesn't improve it. Signatures are measured below, not here | W9 |
+| Days per task against plan | Working days from when a task opens to when it's done, and the days planned (to its first due date), on average | W9 |
+| Sign-off turnaround | Working days from a signature request to the signature, on average | W9 |
+| Rework rate | Share of this person's submitted document versions that were returned. *Work sent back by a step reset isn't counted yet* | W9 |
+| Open load | Open tasks now, and how many are overdue | W8, W9 |
+| Overdue steps | Project steps past their planned end and not yet approved | W7, project page |
+| Schedule slip | Forecast launch minus planned launch, in days, per project | Project page, W6 |
+| Days per stage | Days since the stage's first step opened. *Against plan, and per stage, comes with the history snapshots* | W6 |
 
 They are calculated live from tasks, signatures and deviations, so they work from day one. Trend charts need daily snapshots, which come later.
 
@@ -123,44 +141,49 @@ All thresholds are settings.
 
 **Where dates come from**
 
-1. **Before the Action Plan.** Each step uses the default duration in the route definition, counted in working days from when it opens.
-2. **The baseline.** The VP-signed Action Plan (step 5) gives each role on each remaining step its own planned start and end. These are entered as structured dates, not only written in the document, and become the **baseline** and everyone's due dates.
-3. **Changes.** Every later change to a date is recorded. The baseline is kept, because the on-time rate is measured against it.
-4. **The forecast.** Each open step's expected end is worked out from its planned duration and its inputs' expected ends. The project's forecast launch is the expected end of step 25. It's recalculated on every change and every night.
+1. **Before the Action Plan.** Each step uses the default duration in the route definition (`default_days`, placeholders until W14 is answered), counted in working days from when it opens. A task is due on that date. A signature is due 3 working days after it is asked for.
+2. **The baseline.** While step 5 is open, its doers (the Lead and the Head) write each role's planned start and end for the remaining steps as structured dates (`PUT /projects/{id}/timeline/plan`, on the project page's Timeline). The VP's sign-off at step 5 turns them into the **baseline**, which becomes everyone's due dates and the planned launch. If step 5 is submitted with no dates, the preview warns and the default lengths stay.
+3. **Changes.** After the baseline, the Head changes a date with a reason; only the VP changes the launch step (25). Each change is a new row beside the baseline, which is kept, because the on-time rate is measured against first due dates. The Lead proposes a change by recording a deviation with a new date, which moves the forecast ([W13](./open-questions.md#workflow)).
+4. **The forecast.** An open step's expected end is its start plus its length, moved later by a doer's new date from a deviation, and never into the past. A waiting step starts when its inputs are expected to end. The project's forecast launch is the expected end of step 25. It's recalculated on every action, change and deviation, and every night at 00:10.
 
-**The working calendar.** Jayon's holidays and working Saturdays. Dates are shown in Indian time.
+**The working calendar.** Monday to Friday, except the holidays and worked Saturdays in `work_calendar` (Jayon's calendar, [W22](./open-questions.md#workflow); a few made-up holidays until it arrives). Dates are calendar days in Indian time.
 
-**Reminders and escalation.** These timings are settings, not code.
+**Reminders and escalation.** These timings are settings (`settings`, key `schedule`; defaults in `shared/`), not code. They run each working day at 08:30 Indian time, once per person.
 
 | When | What happens |
 |---|---|
 | 2 working days before the due date | A reminder to the assignee |
 | On the due date | A reminder to the assignee and to the step's signer. The task turns red. The assignee is asked for a new expected date and the reason |
 | 2 working days late | Tell the next role up the ladder ([roles-and-access.md](./roles-and-access.md#assigning-work-and-making-requests)) |
-| 5 working days late | The task joins the weekly exception list of the R&D Head and the VP |
-| A signature waiting | Reminders when due and every 2 working days after. An overdue VP or Board signature isn't escalated above them; the person who asked for it is told instead |
+| 5 working days late | The task joins the exception list: one notification to the R&D Head and the VP, and a row in the Delays widget ([W24](./open-questions.md#workflow)) |
+| A signature waiting | Reminders when due and every 2 working days after. An overdue VP or Board signature isn't escalated above them; the people who asked for it (those still holding the step's tasks) are told instead |
 
-**Deviations.** When a task finishes late, or its forecast moves past its due date, the assignee records:
+Reminders aren't sent for a project on hold, or for a task nobody holds yet (one waiting in a queue).
+
+**Deviations.** When a task will be late, or is, the assignee (or the Lead of the line, or the Head) records, from the task:
 
 - **the reason**, picked from: waiting for another step, vendor delay, test lab delay, rework, person unavailable, scope change, other. Plus a sentence of explanation.
 - **the cause:** a person, a role or department, or an outside party (vendor, lab, surgeon).
 - **the new expected date.**
 
-The next role up confirms or corrects it. A correction is a new record pointing at the old one. A late task can't be closed until its deviation is recorded. The person named as the cause can add a comment. Who sees the named cause is in [roles-and-access.md](./roles-and-access.md#content-is-need-to-know).
+The new date becomes the task's due date (its *first* due date stays) and, while that work is open, holds the step's forecast. **A late step can't be submitted, and a late task can't be closed, until a deviation explains the miss** (`DEVIATION_REQUIRED`): for a step, a person's new date that hasn't passed yet; for a task, a deviation made for the due date it missed. When the new date is missed too, the doer says why again. The project page and My tasks offer the form at that moment. The next role up the ladder, or anyone above in the project's scope (never the person who recorded it), confirms or corrects it: a correction is a new record pointing at the old one. The person or role named as the cause can add a comment. Who sees the named cause is in [roles-and-access.md](./roles-and-access.md#content-is-need-to-know).
 
 ## Notifications and work messages
 
 | Event | Who is told |
 |---|---|
-| A task or request is assigned to me; my part of a step opens | The assignee, with a work message |
+| A task is made for me; my part of a step opens | The assignee, or everyone who can claim it from a queue, with a work message |
+| A task is claimed or given to me by someone else | Me |
 | A signature is requested | The signer |
-| Work is returned for rework | The authors and doers |
+| Work is returned for rework | The people still holding the step's tasks |
 | Reminders and escalations | As in the table above |
-| A checkpoint is decided; a project is put on hold or dropped | The project team |
-| I'm mentioned in a comment | Me |
+| A checkpoint is decided; a project is put on hold, resumed or dropped | The project team |
+| A deviation is recorded | The next role up, to confirm it; and the person named as the cause |
+| I'm mentioned in a comment | Me *(later, with comments on steps)* |
 
-- **Channels:** in-app on the website for now. Email follows once accounts have email addresses. WhatsApp alerts come later, and push notifications come with the mobile app.
-- **Work messages** are written from templates in the route definition. For example: *"Your part on SPN-26-004: step 1, the Project Initiation Document, with the Spine Lead. The VP signs. Due 27 Nov. Input: the concept."*
+- **Channels:** in-app on the website for now (the bell, and the Messages widget). Email follows once accounts have email addresses. WhatsApp alerts come later, and push notifications come with the mobile app.
+- **Work messages** are written from templates in the route definition (`messages` in the route file). For example: *"Your part on SPN-26-004: step 1, Project inception, with the Spine Lead. The VP signs. Due 27 Nov. Input: Product concept."* A message never carries a comment, a reason or a document's content.
+- **Live.** Open pages hear hints over the live stream and fetch what changed ([architecture.md](./architecture.md#events-and-live-updates)).
 - **Privacy.** Messages sent outside COAL (email, and later WhatsApp and push) show no project details, for example "You have 1 new task in COAL". Opening COAL shows the details.
 
 ## Later

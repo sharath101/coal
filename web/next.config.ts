@@ -7,6 +7,8 @@ const apiUrl = process.env.COAL_API_URL ?? 'http://127.0.0.1:4000';
 
 const config: NextConfig = {
   transpilePackages: ['@coal/shared'],
+  // So the site also works when opened as 127.0.0.1 in local work (otherwise the page doesn't hydrate).
+  allowedDevOrigins: ['127.0.0.1'],
   async rewrites() {
     return [{ source: '/api/v1/:path*', destination: `${apiUrl}/api/v1/:path*` }];
   },

@@ -167,7 +167,7 @@ export const rndRoutes = [
   ),
 
   implement(getProjectRoute, async ({ deps, ctx, actor, params }) =>
-    presentRoute(deps.db, await loadEnv(deps.db, ctx.orgId, actor, params.id)),
+    presentRoute(deps.db, await loadEnv(deps.db, ctx.orgId, actor, params.id), deps.now()),
   ),
 
   implement(getTeam, async ({ deps, ctx, actor, params }) => ({
@@ -224,7 +224,7 @@ export const rndRoutes = [
   implement(getStep, async ({ deps, ctx, actor, params }) => {
     const env = await loadEnv(deps.db, ctx.orgId, actor, params.id);
     if (!env.loaded.route.steps.some((s) => s.key === params.key)) throw notFound('step');
-    return presentStep(deps.db, env, params.key) as never;
+    return presentStep(deps.db, env, params.key, deps.now()) as never;
   }),
 
   implement(startStep, ({ deps, ctx, actor, params, query }) =>
@@ -358,7 +358,7 @@ export const rndRoutes = [
     previewable(deps.db, ctx, query.preview, async (tx, log) => {
       const env = await loadEnv(tx, ctx.orgId, actor, params.id, { forUpdate: true });
       assertMay(env, 'correctiveActions.create', ['rd_lead']);
-      const collected = await raiseCorrectiveAction(tx, log, env, body);
+      const collected = await raiseCorrectiveAction(tx, log, env, body, deps.now());
       return { saved: !query.preview, preview: toPreview(collected) };
     }),
   ),
@@ -411,7 +411,7 @@ export const rndRoutes = [
         stepKey: task.stepKey,
         payload: { taskId: task.id, assigneeId: actor.userId },
       });
-      return presentTask(tx, ctx.orgId, updated);
+      return presentTask(tx, ctx.orgId, updated, deps.now());
     }),
   ),
 
@@ -467,7 +467,7 @@ export const rndRoutes = [
         stepKey: task.stepKey,
         payload: { taskId: task.id, assigneeId: assignee.id },
       });
-      return presentTask(tx, ctx.orgId, updated);
+      return presentTask(tx, ctx.orgId, updated, deps.now());
     }),
   ),
 ];

@@ -17,15 +17,14 @@ A product goes from the VP's idea (step **C**) to launch (step **25**) through *
 - **Sign-offs.** 25 steps have a sign-off: the R&D Head signs 10, the R&D Lead 7, the VP 6 and the Board 2. C, 2a and 24a have none.
 - **Parallel steps.** Some steps start together (1, 2 and 2a; 6 to 9; 10 and 11; 14 and 15).
 
-**The route is data, not code.** It is stored as a versioned definition, `shared/src/process/rnd-route.v2.yaml` (see [architecture.md](./architecture.md#the-process-engine)). Each project stays on the version it started with. A version is never edited once it is loaded: to change the route, add a new version file, and update its tests and this doc together.
+**The route is data, not code.** It is stored as a versioned definition, `shared/src/process/rnd-route.v2.yaml` (see [architecture.md](./architecture.md#the-process-engine)). Each project stays on the version it started with. A version is never edited once it is loaded: to change the route, add a new version file, and update its tests and this doc together. (Version 2 was extended in place with each step's default length, the step that writes the plan, and the work-message templates, because it had not been deployed anywhere: [P55](./decisions.md).)
 
-**Where this is built.** The whole route runs in COAL: tasks, sign-offs, decisions, milestones, sending work back, hold and drop. What is not built yet, and which block adds it:
+**Where this is built.** The whole route runs in COAL: tasks, sign-offs, decisions, milestones, sending work back, hold and drop, due dates, the forecast, health, reminders, deviations and notifications. What is not built yet, and which block adds it:
 
 | Not yet | Comes with |
 |---|---|
 | Signing with Face ID or a fingerprint. Until then, a sign-off, a decision or Go is a confirmed click by the right role, recorded with who and when | Passkey signing (the last block, [D16](./decisions.md)) |
-| Due dates, reminders and recording the delay as a deviation | Dashboard |
-| Notifications. Events are written; nothing sends them yet | Dashboard |
+| The AI's help: questions, drafting, assigning work | The Workstation and AI |
 
 ## The steps
 
@@ -154,7 +153,7 @@ The case study at step 16 lists corrective actions. Each becomes a task of kind 
 4. **Clean up.** Open tasks on the reset steps are cancelled, and their new iterations create tasks again when they open.
 5. **Carry the documents forward.** The latest version of each document on a reset step becomes a new draft in the new iteration (same content and PDF, marked carried forward), so people revise rather than start again. A version that was with its signers is returned first. A step's sign-off record isn't copied: a new one is made when the step is submitted again.
 6. **Never reset the follow-up.** The step-20 patient follow-up is never reset, because patients already treated must still be followed. It is a task of its own, which a send-back never cancels, and which isn't created twice when step 20 reopens.
-7. **Record the delay.** The delay is recorded as a deviation with the reason "rework" ([dashboard.md](./dashboard.md#deadlines-alerts-and-deviations)). *Comes with the Dashboard block.*
+7. **Record the delay.** The delay is recorded as a deviation with the reason "rework" ([dashboard.md](./dashboard.md#deadlines-alerts-and-deviations)), against the step sent back to, with the send-back's reason. It is the system's record: nobody has to confirm it, and the forecast moves by itself because the reset steps start again.
 
 Sending work back is a decision of the person named in the table, with a reason and optional evidence (a file the person uploaded). The preview and the real thing run the same code; the preview rolls back at the end, so it can't differ from what happens.
 
@@ -162,7 +161,7 @@ Sending work back is a decision of the person named in the table, with a reason 
 
 - **The VP** can put a project on hold, resume it, or drop it, always with a reason.
 - **The Board** can drop it only while step 4 or 23 is open.
-- **Hold** stops all step work (submitting, signing, deciding, recording milestones, raising corrective actions, sending back) until the VP resumes. Open tasks stay. Pausing dates and alerts comes with the Dashboard block.
+- **Hold** stops all step work (submitting, signing, deciding, recording milestones, raising corrective actions, sending back) until the VP resumes. Open tasks stay. Reminders and escalations stop for a project on hold; its planned dates don't move, so a long hold shows up as a slip.
 - **Drop** cancels open steps and tasks and keeps every record. A dropped project can't be resumed.
 - **After launch.** When step 25 is approved the project is *launched*, and step 20's follow-up can still be finished. When every step is finished, the project is *closed*.
 

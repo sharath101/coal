@@ -12,7 +12,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/scripts/migrate.ts",
     "openapi": "tsx src/scripts/openapi.ts",
-    "templates:import": "tsx src/scripts/import-templates.ts"
+    "templates:import": "tsx src/scripts/import-templates.ts",
+    "seed:demo": "tsx src/scripts/seed-demo.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1171.0",

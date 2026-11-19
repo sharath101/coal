@@ -7,6 +7,32 @@ export type VersionRow = typeof documentVersions.$inferSelect;
 export type RequestRow = typeof signatureRequests.$inferSelect;
 export type SignatureRow = typeof signatures.$inferSelect;
 
+/** How much of each person's submitted document work was returned, since a date (the rework rate). */
+export async function reworkCounts(
+  ex: Executor,
+  orgId: string,
+  userIds: string[],
+  since: Date,
+): Promise<Map<string, { submitted: number; returned: number }>> {
+  if (userIds.length === 0) return new Map();
+  const rows = await ex
+    .select({
+      userId: documentVersions.createdBy,
+      submitted: sql<number>`count(*) filter (where ${documentVersions.status} <> 'draft')::int`,
+      returned: sql<number>`count(*) filter (where ${documentVersions.status} = 'returned')::int`,
+    })
+    .from(documentVersions)
+    .where(
+      and(
+        eq(documentVersions.orgId, orgId),
+        inArray(documentVersions.createdBy, userIds),
+        sql`${documentVersions.createdAt} >= ${since.toISOString()}::timestamptz`,
+      ),
+    )
+    .groupBy(documentVersions.createdBy);
+  return new Map(rows.map((r) => [r.userId, { submitted: r.submitted, returned: r.returned }]));
+}
+
 export async function findDocument(
   ex: Executor,
   orgId: string,

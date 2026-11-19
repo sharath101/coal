@@ -31,8 +31,8 @@
 | W10 | Step 6: what exactly does DARD do in the raw material test, and which audit procedure documents go with it? | DARD is a doer of step 6 | Akhil |
 | W11 | Steps 10 and 11: who approves the Material Issue Slip? | Not modelled yet | R&D Head |
 | W12 | Step 15: when no study is needed, who writes and signs the justification? | R&D Ops and DARD write it; the Lead signs | R&D Head |
-| W13 | Must the VP re-approve the dates when rework or delays move the launch date? | The Head approves date changes; the VP too if the launch moves | VP |
-| W14 | What is the typical duration of each step (for dates before the Action Plan)? | Placeholder durations in the route definition | R&D Head |
+| W13 | Must the VP re-approve the dates when rework or delays move the launch date? | The Head changes dates and the VP changes the launch step's. The Lead proposes a change by recording a deviation with a new date, which moves the forecast but not the plan (P57) | VP |
+| W14 | What is the typical duration of each step (for dates before the Action Plan)? | Placeholder lengths in working days (`default_days`) in the route file: 5 for most paperwork steps, 10 to 20 for design and prototypes, 60 for the trials. Built (P55); the real values replace them | R&D Head |
 | W15 | Does "BP" mean boilerplate? | Yes | R&D Head |
 | W16 | What form does the trial set planning document take (step 19)? | An upload until defined | R&D Head |
 | W17 | What codes do the product lines use in project codes? The examples show SPN (Spine) and TRM (Trauma); Arthroscopy's isn't known | ART | R&D Head |
@@ -40,6 +40,9 @@
 | W19 | Step 16: who raises the corrective actions, who closes them, and who may decide that one is no longer needed? | The Lead raises them, and they go to the Lead unless the Lead names someone; the person they are assigned to closes them | R&D Head |
 | W20 | When several people hold a role that the route needs (for example two DARD users, or two R&D Heads), who gets the task? | The role's queue, unless exactly one of them is on the project team; the Lead or Head can assign it | R&D Head |
 | W21 | Can the same person submit a step and sign it off? The route lets it happen where a role both does and signs a step (for example the Lead at step 14) | Yes, as the route lists it. The step's sign-off record then carries both signatures. Separation of duties applies to a document's own rows, not to step sign-offs | VP, R&D Head |
+| W22 | Which days are holidays, and which Saturdays are worked? | Monday to Friday are working days, and a few made-up holidays are loaded for local work (`SAMPLE_HOLIDAYS`). Jayon's calendar replaces them as rows of `work_calendar` | R&D Head |
+| W23 | Are the timings right? A step is at risk 2 working days before it is due and not started, or when a signature has waited more than 3; a project is red when the forecast launch is more than 30 days late or a step is more than 10 working days overdue; a signature is due 3 working days after it is asked for; reminders go 2 working days before and on the due date; a late task is escalated at 2 and 5 working days | These are the starting values in `settings` and can be changed without a release | VP, R&D Head |
+| W24 | Who confirms a deviation, and does the weekly exception list need to be a document? | The next role up the ladder, or anyone above, in the project's scope; the "list" is a notification to the Head and the VP at 5 working days late, plus the Delays widget (P63) | R&D Head |
 
 ## People and access
 
@@ -138,7 +141,7 @@ These were listed at the COAL meeting, plus what the build needs:
   - all manufacturing-related documents.
 - **Lists:** the machines, the software used, and the inspection instruments.
 - **People:** the org chart and the people in each role.
-- **The working calendar** (holidays).
+- **The working calendar** (holidays, and Saturdays that are worked). Until it arrives, a few made-up holidays are loaded in local work ([W22](#workflow)).
 
 ## Answered
 

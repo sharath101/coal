@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { defineEndpoint } from '../api/contract';
-import { Id, IdParams, PageQuery, Timestamp, pageOf } from './common';
+import { DateOnly, Id, IdParams, PageQuery, Timestamp, pageOf } from './common';
 import { Person, RoleRef } from './projects';
 
 export const TASK_KINDS = [
@@ -31,6 +31,9 @@ export const Task = z.object({
   assignee: Person.nullable(),
   /** The role whose queue holds it, until someone claims it. */
   queueRole: RoleRef.nullable(),
+  /** When it is due now (a person's new date from a deviation moves it), and whether that has passed. */
+  dueOn: DateOnly.nullable(),
+  daysLate: z.number().int(),
   /** What the task belongs to, such as a project, for linking. */
   subject: z.object({ type: z.string(), id: Id, label: z.string() }).nullable(),
   createdAt: Timestamp,

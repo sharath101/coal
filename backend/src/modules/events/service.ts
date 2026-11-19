@@ -1,5 +1,6 @@
 import { and, desc, eq, sql } from 'drizzle-orm';
 import type { Executor, Tx } from '../../core/db/client';
+import { msOf } from '../../core/db/columns';
 import { validationFailed } from '../../core/http/errors';
 import type { RequestContext } from '../../core/http/context';
 import { actorOf } from '../audit/service';
@@ -50,14 +51,14 @@ export async function listProjectEvents(
       throw validationFailed('The cursor is not valid.', 'cursor');
     }
     conditions.push(
-      sql`(${outboxEvents.createdAt}, ${outboxEvents.id}) < (${parsed[0]}::timestamptz, ${parsed[1]}::uuid)`,
+      sql`(${msOf(outboxEvents.createdAt)}, ${outboxEvents.id}) < (${parsed[0]}::timestamptz, ${parsed[1]}::uuid)`,
     );
   }
   const rows = await ex
     .select()
     .from(outboxEvents)
     .where(and(...conditions))
-    .orderBy(desc(outboxEvents.createdAt), desc(outboxEvents.id))
+    .orderBy(desc(msOf(outboxEvents.createdAt)), desc(outboxEvents.id))
     .limit(query.limit + 1);
   const page = rows.slice(0, query.limit);
   const last = page.at(-1);

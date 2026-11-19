@@ -1,5 +1,18 @@
 import type { EndpointSpec } from './contract';
 import {
+  commentDeviation,
+  listDeviations,
+  recordDeviation,
+  reviewDeviation,
+} from '../schemas/deviations';
+import {
+  listNotifications,
+  markAllNotificationsRead,
+  markNotificationRead,
+} from '../schemas/notifications';
+import { changeDates, getTimeline, putPlan } from '../schemas/schedule';
+import { getWidget, listWidgets } from '../schemas/widgets';
+import {
   createAttachment,
   listAttachments,
   createSource,
@@ -119,6 +132,18 @@ export const ENDPOINTS = [
   listAttachments,
   createSource,
   listSources,
+  getTimeline,
+  putPlan,
+  changeDates,
+  listDeviations,
+  recordDeviation,
+  reviewDeviation,
+  commentDeviation,
+  listNotifications,
+  markNotificationRead,
+  markAllNotificationsRead,
+  listWidgets,
+  getWidget,
 ] as const satisfies readonly EndpointSpec[];
 
 export type Endpoint = (typeof ENDPOINTS)[number];

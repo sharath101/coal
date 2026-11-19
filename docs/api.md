@@ -24,7 +24,7 @@ This is the first-release endpoint list. The generated OpenAPI spec is the exact
   | `—` | Not available as an AI tool at all (`none` in the code) |
 
   The tiers are explained in [workstation-and-ai.md](./workstation-and-ai.md#what-the-ai-may-do).
-- **Lists** use cursor paging (`?cursor=`, `?limit=`), filters (`?filter[project]=`) and sorting. They only return what the user may see.
+- **Lists** use cursor paging (`?cursor=`, `?limit=`), filters (`?filter[project]=`) and sorting. They only return what the user may see. A cursor holds a time cut to milliseconds, and lists order by the same cut time, so rows made in one transaction are never skipped between pages (P67).
 - **Writes.**
   - `POST` requests take an optional `Idempotency-Key` header (8 to 200 letters, digits or `-_.:`), so a retry doesn't repeat the action. The key is claimed before the action runs:
     - a repeat with the same key and request gets the first response back, marked `Idempotent-Replayed: true`;
@@ -35,7 +35,7 @@ This is the first-release endpoint list. The generated OpenAPI spec is the exact
     Successful responses are kept for a day.
   - Edits take an `If-Match` header with the version the user saw, so two people, or a person and the AI, can't overwrite each other. A stale version gets `412 VERSION_CONFLICT`. For `PATCH /me`, the version is the profile's `updatedAt`.
 - **Preview.** Every workflow action (Go, start, submit, approve, return, decisions, send back, milestones, corrective actions, hold, resume and drop) accepts `?preview=true`. An action that can't preview refuses it with `400 VALIDATION_FAILED` instead of ignoring it, so a caller that adds `preview=true` to everything never changes anything by accident. It returns what would happen (steps opened or reset, tasks with their assignees, signatures requested, people notified, warnings) without saving anything. It is the real action run inside a transaction that is rolled back, so the preview and the result can't drift apart.
-- **Errors** use the standard problem format (`application/problem+json`) with a code. The codes are listed in `shared/src/api/problem.ts`; for example `NOT_SIGNED_IN`, `NOT_ALLOWED`, `AI_NOT_ALLOWED`, `NOT_FOUND`, `VALIDATION_FAILED` (with the fields), `NAME_TAKEN`, `VERSION_CONFLICT`, `RATE_LIMITED`, `STEP_NOT_READY`, `PROJECT_NOT_ACTIVE`, `DECISION_REQUIRED`, `CORRECTIVE_ACTIONS_OPEN`, `ALREADY_DONE`, `SIGNATURE_REQUIRED`, `PREVIEW_CHANGED`, `NO_TEMPLATE`, `DOCUMENT_LOCKED` (a version with the signers, an approved one, or a step that isn't open), `SEPARATION_OF_DUTIES` (the author can't also approve), `PDF_UNAVAILABLE` (the PDF service is down) and `FILE_NOT_SCANNED`. "Not allowed" names who can do it (`whoCan`); it never reveals content.
+- **Errors** use the standard problem format (`application/problem+json`) with a code. The codes are listed in `shared/src/api/problem.ts`; for example `NOT_SIGNED_IN`, `NOT_ALLOWED`, `AI_NOT_ALLOWED`, `NOT_FOUND`, `VALIDATION_FAILED` (with the fields), `NAME_TAKEN`, `VERSION_CONFLICT`, `RATE_LIMITED`, `STEP_NOT_READY`, `PROJECT_NOT_ACTIVE`, `DECISION_REQUIRED`, `CORRECTIVE_ACTIONS_OPEN`, `ALREADY_DONE`, `SIGNATURE_REQUIRED`, `PREVIEW_CHANGED`, `NO_TEMPLATE`, `DOCUMENT_LOCKED` (a version with the signers, an approved one, or a step that isn't open), `SEPARATION_OF_DUTIES` (the author can't also approve), `PDF_UNAVAILABLE` (the PDF service is down) and `FILE_NOT_SCANNED`, and `DEVIATION_REQUIRED` (a late step can't be submitted, and a late task can't be closed, until a deviation says why). "Not allowed" names who can do it (`whoCan`); it never reveals content.
 
 ## Endpoints
 
@@ -117,12 +117,7 @@ Every action returns `{ saved, preview }`: what changed (steps, tasks made with 
 
 ### Deviations
 
-| Endpoint | Purpose | Tier |
-|---|---|---|
-| `GET /deviations` | Deviations, filtered by who may see the named cause | read |
-| `POST /deviations` | Record the reason, cause and new date | confirm |
-| `POST /deviations/{id}/review` | The next role up confirms or corrects it | confirm |
-| `POST /deviations/{id}/comments` | The person named as the cause comments | confirm |
+*Moved: deviations are under [Dates, deviations and the plan](#dates-deviations-and-the-plan), below.*
 
 ### Documents, templates, files and sources
 
@@ -147,15 +142,27 @@ Every action returns `{ saved, preview }`: what changed (steps, tasks made with 
 | `POST /projects/{id}/sources`, `GET /projects/{id}/sources?step=&document=&task=` | Add or list sources (link, file or citation) | auto / read |
 | `GET /history/{recordType}/{id}` | A record's history | read |
 
+### Dates, deviations and the plan
+
+| Endpoint | Purpose | Tier |
+|---|---|---|
+| `GET /projects/{id}/timeline` | Planned and forecast dates and health for every step, the baseline and its changes, the plan being written, and what I may do | read |
+| `PUT /projects/{id}/timeline/plan` | Write each role's dates for the remaining steps, while the Action Plan step is open (its doers). The VP's sign-off makes them the baseline | confirm |
+| `POST /projects/{id}/timeline/changes` | Change a planned date after the baseline, with a reason (the Head; only the VP for the launch step). The baseline is kept | confirm |
+| `GET /deviations` | Deviations (`filter[project]`, `filter[state]=review`). The named cause shows only to those allowed; the sentence of explanation and the comments only to people in the project's scope | read |
+| `POST /deviations` | Record why a task is late or will be: the reason, the cause and the new expected date (the task's assignee, the Lead of the line or the Head) | confirm |
+| `POST /deviations/{id}/review` | The next role up, or anyone above in the project's scope, confirms it or corrects it (a new deviation that points at the old one) | confirm |
+| `POST /deviations/{id}/comments` | The person, or role, named as the cause comments | confirm |
+
 ### Dashboard and notifications
 
 | Endpoint | Purpose | Tier |
 |---|---|---|
-| `GET /widgets` | The widgets I can use and my layout | read |
-| `GET /widgets/{key}?view=compact\|expanded&tab=&filter[...]=` | One widget's data | read |
-| `GET /notifications`, `POST /notifications/{id}/read` | My notifications | read / auto |
-| `GET /stream` | Server-Sent Events: live widget refreshes and notifications | — |
-| `GET /search?q=` | Projects, documents, tasks and people, filtered by permission | read |
+| `GET /widgets` | The widgets I can use, with their tabs, filters and columns, and my layout (the keys in order) | read |
+| `GET /widgets/{key}?view=compact\|expanded&tab=&filter[...]=` | One widget's data: counts, and rows with a title, a subtitle, badges, the table's cells, actions and references. Counts only what I may see | read |
+| `GET /notifications`, `POST /notifications/{id}/read`, `POST /notifications/read-all` | My notifications and work messages, and the unread count | read / auto |
+| `GET /stream` | Server-Sent Events. Hints only, never content: `{"type":"widgets","keys":[…]}` (fetch these widgets again) and `{"type":"notification"}`. Needs a session. *Not in the endpoint list or the OpenAPI file, because it isn't a request and response* | — |
+| `GET /search?q=` | Projects, documents, tasks and people, filtered by permission *(later)* | read |
 
 ### AI
 
@@ -193,10 +200,10 @@ Events are written in the same transaction as the change ([architecture.md](./ar
 |---|---|
 | Project | `project.created`, `project.held`, `project.resumed`, `project.dropped`, `project.launched`, `project.team_changed`, `project.closed` |
 | Step | `step.ready`, `step.started`, `step.submitted`, `step.signed` (one of several required approvals), `step.returned`, `step.approved`, `step.done`, `step.reset`, `step.cancelled`, `decision.recorded`, `milestone.recorded` |
-| Task | `task.created`, `task.assigned`, `task.updated`, `task.done`, `task.cancelled`, `task.due_soon`, `task.overdue`, `request.declined` |
+| Task | `task.created`, `task.assigned`, `task.updated`, `task.done`, `task.cancelled` |
 | Document | `document.created`, `document.version_saved`, `document.submitted`, `document.approved`, `document.returned`, `document.carried_forward`, `template.added`, `template.activated` |
 | Signature | `signature.requested` (a row has opened), `signature.signed` |
-| Timeline | `deviation.required`, `deviation.recorded`, `timeline.changed`, `forecast.changed` |
+| Timeline | `timeline.changed` (a baseline or a date change), `forecast.changed`, `project.health_changed`, `deviation.recorded`, `deviation.reviewed` |
 | Collaboration | `comment.added`, `mention.created`, `attachment.added`, `source.added` |
 | Proposals | `proposal.created`, `proposal.confirmed`, `proposal.rejected` |
 

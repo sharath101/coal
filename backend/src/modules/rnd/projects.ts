@@ -1,5 +1,6 @@
 import { and, asc, desc, eq, inArray, isNull, sql, type SQL } from 'drizzle-orm';
 import type { Executor, Tx } from '../../core/db/client';
+import { msOf } from '../../core/db/columns';
 import { validationFailed } from '../../core/http/errors';
 import { runsByStatus } from '../process/service';
 import { findActiveUsersByRole, findUsersByIds, type UserRow } from '../users/service';
@@ -32,6 +33,44 @@ export async function findProjectByRun(
     .from(projects)
     .where(and(eq(projects.orgId, orgId), eq(projects.processRunId, runId)));
   return row ?? null;
+}
+
+/** Projects of several runs at once, keyed by run. */
+export async function projectsByRuns(
+  ex: Executor,
+  orgId: string,
+  runIds: string[],
+): Promise<Map<string, ProjectRow>> {
+  if (runIds.length === 0) return new Map();
+  const rows = await ex
+    .select()
+    .from(projects)
+    .where(and(eq(projects.orgId, orgId), inArray(projects.processRunId, runIds)));
+  return new Map(rows.map((r) => [r.processRunId, r]));
+}
+
+/** Every project, oldest first: the Dashboard's portfolio views. */
+export async function allProjects(ex: Executor, orgId: string): Promise<ProjectRow[]> {
+  return ex
+    .select()
+    .from(projects)
+    .where(eq(projects.orgId, orgId))
+    .orderBy(asc(projects.createdAt), asc(projects.id));
+}
+
+/** The active team of each project, as user ids. */
+export async function memberIdsOf(
+  ex: Executor,
+  projectIds: string[],
+): Promise<Map<string, string[]>> {
+  const result = new Map<string, string[]>(projectIds.map((id) => [id, []]));
+  if (projectIds.length === 0) return result;
+  const rows = await ex
+    .select({ projectId: projectMembers.projectId, userId: projectMembers.userId })
+    .from(projectMembers)
+    .where(and(inArray(projectMembers.projectId, projectIds), isNull(projectMembers.removedAt)));
+  for (const row of rows) result.get(row.projectId)?.push(row.userId);
+  return result;
 }
 
 const encodeCursor = (row: ProjectRow) =>
@@ -70,14 +109,14 @@ export async function listProjectRows(
   if (query.cursor) {
     const [at, id] = decodeCursor(query.cursor);
     conditions.push(
-      sql`(${projects.createdAt}, ${projects.id}) < (${at}::timestamptz, ${id}::uuid)`,
+      sql`(${msOf(projects.createdAt)}, ${projects.id}) < (${at}::timestamptz, ${id}::uuid)`,
     );
   }
   const rows = await ex
     .select()
     .from(projects)
     .where(and(...conditions))
-    .orderBy(desc(projects.createdAt), desc(projects.id))
+    .orderBy(desc(msOf(projects.createdAt)), desc(projects.id))
     .limit(query.limit + 1);
   const page = rows.slice(0, query.limit);
   const last = page.at(-1);

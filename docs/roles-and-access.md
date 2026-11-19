@@ -96,7 +96,8 @@ Everyone with an account can see the **status** of every project. For now, that 
 - **A document with only drafts** isn't listed for anyone except the people who work on the project (the VP, the Head, the Lead of the line, the team). Others see it once it is submitted.
 - **Attachments and sources** follow what they are attached to: a document's, or the step's. The Board sees a step's only at checkpoints.
 - **"People below"** follows the role ladder in the next section.
-- **Delays.** Anyone who can't see the named cause sees only its category and the department or role.
+- **Delays.** Anyone who can't see the named cause sees only its category and the department or role. The VP and the Head see every name; a Lead sees the people below them in their line; a person sees themselves; and whoever recorded a deviation sees the cause they named. An outside party's name shows to people in the project's scope. The sentence of explanation, a review's note, the comments, the reason for a date change and the title of a corrective action's task are content, shown only to people in the project's scope ([P61](./decisions.md)).
+- **The Dashboard counts only what its viewer may see.** Status (health, stage, dates, owners, the category of a delay) is open to everyone, so the pipeline and the checkpoints list every project. Tasks, signatures, "coming up" and "my projects" are the person's own. Team workload and the measures of other people follow the ladder: the VP and the Head see everyone below them, a Lead the people on their line's projects, the Board department totals only.
 - **History follows the record.** Anyone who can see a record can see its history: who changed or signed it, and when. The project's activity feed follows the same rule for documents: an event about a document is shown only to people who may read it (a team member never sees events about the budget annex, nor the return comment on a Board paper), and drafts only to the people who work on the project.
 - **The sign-off record leaves out the budget annex.** Everyone on the team reads a step's sign-off record, so it lists the step's other outputs but not need-to-know documents. The annex is signed on its own.
 - **Anything not listed is denied.**
@@ -116,8 +117,11 @@ Everyone with an account can see the **status** of every project. For now, that 
 | Change the team | Lead (of the product line) or Head |
 | Raise a corrective action | The Lead, while the case study is open ⚠ |
 | Claim a queued task; give a task to someone | Anyone with the role; the VP or Head; the Lead within the project team |
-| Record a deviation | The task's assignee, the Lead, the Head |
-| Change dates after the Action Plan is signed | The Lead or the Head proposes; the Head approves; the VP also approves if the launch date moves ⚠ |
+| Record a deviation | The task's assignee, the Lead of the line, the Head |
+| Confirm or correct a deviation | The next role up the ladder, or anyone above, within the project's scope; never the person who recorded it |
+| Comment on a deviation | The person, or anyone holding the role, named as its cause |
+| Write the plan's dates (step 5) | The doers of the Action Plan step: the Lead and the Head, while it is open and not under review |
+| Change dates after the Action Plan is signed | The Head, with a reason. Only the VP changes the launch step (25). The Lead proposes by recording a deviation with a new date ⚠ ([W13](./open-questions.md#workflow)) |
 | Add pictures, files and sources | The people who do or sign the step, and the project team |
 | Add comments | Anyone who can see the record |
 | Change the R&D route | Not in COAL yet. Developers change it in the repository, with review |

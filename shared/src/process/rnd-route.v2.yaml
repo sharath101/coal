@@ -6,6 +6,10 @@
 # (rnd-route.v3.yaml), and update its tests and docs/workflow.md in the same change.
 # `assumptions` lists the open questions (docs/open-questions.md) a step relies on: marked ⚠ there.
 #
+# `default_days` is each step's length in working days until the Action Plan sets dates. These are
+# placeholders until the R&D Head answers W14. They were added to v2 in place, because v2 has not
+# been deployed anywhere (decision D17).
+#
 # Role keys are those in backend/src/modules/org/catalogue.ts. `team` means the project team.
 # Conditions are named rules, explained in shared/src/process/definition.ts.
 
@@ -14,6 +18,23 @@ version: 2
 name: R&D route
 department: RND
 source: Jayon's workflow page, revision 2 with the COAL meeting points (16 November 2026)
+
+# Work messages (docs/dashboard.md#notifications-and-work-messages). The words in braces are filled
+# in by COAL: project, project_name, step, step_name, team, signer, due, inputs, person, days, decision.
+messages:
+  task_assigned: 'Your part on {project}: step {step}, {step_name}, with {team}. {signer} signs. Due {due}. Input: {inputs}.'
+  signature_requested: 'Your signature is needed on {project}: step {step}, {step_name}. Please sign by {due}.'
+  work_returned: '{project}: step {step}, {step_name}, was returned for rework. Open the step to see why.'
+  checkpoint_decided: '{project}: the decision at step {step}, {step_name}, is recorded: {decision}.'
+  project_held: '{project} is on hold.'
+  project_resumed: '{project} is running again.'
+  project_dropped: '{project} has been dropped.'
+  reminder_due_soon: 'Reminder: step {step}, {step_name}, on {project} is due {due}.'
+  reminder_due_today: 'Step {step}, {step_name}, on {project} is due today. If it will be late, give a new date and the reason.'
+  escalation_late: '{person} is {days} working days late on step {step}, {step_name}, of {project}.'
+  signature_waiting: 'A signature on {project}, step {step}, {step_name}, has waited {days} working days.'
+  deviation_to_review: '{person} gave a new date, {due}, for step {step}, {step_name}, on {project}. Please confirm or correct it.'
+  named_as_cause: '{person} recorded a delay on step {step}, {step_name}, of {project}, and named you as the cause. You can add a comment.'
 
 stages:
   - { no: 1, name: Idea and go-ahead }
@@ -71,6 +92,7 @@ steps:
   # Stage 1: idea and go-ahead
   - key: C
     name: The idea
+    default_days: 0
     stage: 1
     doers: [vp]
     signer: null
@@ -80,6 +102,7 @@ steps:
 
   - key: '1'
     name: Project inception
+    default_days: 5
     stage: 1
     doers: [rd_head, rd_lead]
     signer: vp
@@ -88,6 +111,7 @@ steps:
 
   - key: '2'
     name: Market study
+    default_days: 10
     stage: 1
     doers: [rd_ops]
     signer: vp
@@ -96,6 +120,7 @@ steps:
 
   - key: 2a
     name: Regulatory planning
+    default_days: 5
     stage: 1
     new: true
     doers: [rd_lead, dard]
@@ -106,6 +131,7 @@ steps:
 
   - key: '3'
     name: Project proposal
+    default_days: 5
     stage: 1
     doers: [rd_head]
     signer: vp
@@ -114,6 +140,7 @@ steps:
 
   - key: '4'
     name: Board approval
+    default_days: 5
     stage: 1
     checkpoint: true
     doers: [vp]
@@ -126,6 +153,8 @@ steps:
   # Stage 2: plan, design and source
   - key: '5'
     name: Action plan
+    default_days: 5
+    baseline: true
     stage: 2
     doers: [rd_lead, rd_head]
     signer: vp
@@ -135,6 +164,7 @@ steps:
 
   - key: '6'
     name: Raw material
+    default_days: 15
     stage: 2
     doers: [rd_lead, rd_ops, dard]
     outside: [vendors]
@@ -145,6 +175,7 @@ steps:
 
   - key: '7'
     name: Implant design
+    default_days: 15
     stage: 2
     doers: [design_engineer, aems]
     signer: rd_lead
@@ -153,6 +184,7 @@ steps:
 
   - key: '8'
     name: Instrument design
+    default_days: 10
     stage: 2
     doers: [design_engineer, aems]
     signer: rd_lead
@@ -161,6 +193,7 @@ steps:
 
   - key: '9'
     name: Outsourcing
+    default_days: 10
     stage: 2
     doers: [rd_lead, rd_ops, dard]
     outside: [outside makers]
@@ -171,6 +204,7 @@ steps:
   # Stage 3: make the prototype
   - key: '10'
     name: Implant prototype
+    default_days: 20
     stage: 3
     doers: [pme, qc_inspector]
     signer: rd_lead
@@ -186,6 +220,7 @@ steps:
 
   - key: '11'
     name: Instrument prototype
+    default_days: 15
     stage: 3
     doers: [pme, qc_inspector]
     signer: rd_lead
@@ -201,6 +236,7 @@ steps:
 
   - key: '12'
     name: Review meeting
+    default_days: 3
     stage: 3
     checkpoint: true
     doers: [rd_lead, team]
@@ -230,6 +266,7 @@ steps:
   # Stage 4: test and gather feedback
   - key: '13'
     name: Testing and validation
+    default_days: 20
     stage: 4
     doers: [rd_ops, dard, pme, design_engineer]
     outside: [test lab]
@@ -247,6 +284,7 @@ steps:
 
   - key: '14'
     name: Market feedback
+    default_days: 10
     stage: 4
     doers: [rd_ops, rd_lead]
     outside: [marketing, surgeons]
@@ -256,6 +294,7 @@ steps:
 
   - key: '15'
     name: Pre-clinical study
+    default_days: 15
     stage: 4
     doers: [rd_ops, dard]
     signer: rd_lead
@@ -270,6 +309,7 @@ steps:
 
   - key: '16'
     name: Prototype case study
+    default_days: 5
     stage: 4
     doers: [rd_lead]
     signer: rd_head
@@ -280,6 +320,7 @@ steps:
 
   - key: '17'
     name: Marketing tools
+    default_days: 10
     stage: 4
     doers: [rd_lead, rd_ops]
     signer: rd_head
@@ -288,6 +329,7 @@ steps:
 
   - key: '18'
     name: Prototype approval
+    default_days: 3
     stage: 4
     checkpoint: true
     doers: [rd_lead]
@@ -302,6 +344,7 @@ steps:
   # Stage 5: clinical trials
   - key: '19'
     name: Trial set planning
+    default_days: 10
     stage: 5
     doers: [rd_head, rd_lead, rd_ops, pme]
     signer: vp
@@ -311,6 +354,7 @@ steps:
 
   - key: '20'
     name: Clinical trials
+    default_days: 60
     stage: 5
     doers: [rd_lead, rd_ops, dard]
     outside: [surgeons]
@@ -330,6 +374,7 @@ steps:
   # Stage 6: release and launch
   - key: '21'
     name: Design revision and master set
+    default_days: 15
     stage: 6
     doers: [rd_lead, rd_ops, pme]
     signer: rd_head
@@ -347,6 +392,7 @@ steps:
 
   - key: '22'
     name: Regulatory approval
+    default_days: 30
     stage: 6
     doers: [rd_lead, dard]
     outside: [company QA team]
@@ -357,6 +403,7 @@ steps:
 
   - key: '23'
     name: Release approval
+    default_days: 5
     stage: 6
     checkpoint: true
     doers: [vp, rd_head]
@@ -368,6 +415,7 @@ steps:
 
   - key: 24a
     name: Pre-transfer
+    default_days: 10
     stage: 6
     new: true
     doers: [rd_lead, team, dard]
@@ -379,6 +427,7 @@ steps:
 
   - key: 24b
     name: Final transfer and training
+    default_days: 10
     stage: 6
     new: true
     doers: [rd_lead, team, dard]
@@ -390,6 +439,7 @@ steps:
 
   - key: '25'
     name: Product launch
+    default_days: 5
     stage: 6
     doers: [rd_head, rd_ops]
     signer: vp

@@ -4,11 +4,13 @@ import { RUN_STATUSES } from '@coal/shared';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
+import { HealthBadge } from '@/components/health-badge';
 import { ProblemMessage } from '@/components/problem-message';
 import { selectClass } from '@/components/role-fields';
 import { ProjectStatusBadge } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { formatDate } from '@/lib/format';
 import { flatten, useMe, useProjects } from '@/lib/queries';
 
 /** Every project's status is open to everyone signed in (docs/roles-and-access.md#what-people-can-see). */
@@ -73,9 +75,15 @@ export default function ProjectsPage() {
                 <span className="text-xs text-muted-foreground">
                   {p.productLine.name} · {t('stage', { stage: p.stage })} ·{' '}
                   {t('by', { name: p.createdBy })}
+                  {p.forecastLaunch && (
+                    <> · {t('launch', { date: formatDate(p.forecastLaunch) })}</>
+                  )}
                 </span>
               </div>
-              <ProjectStatusBadge status={p.status} />
+              <span className="flex items-center gap-2">
+                <HealthBadge health={p.health} />
+                <ProjectStatusBadge status={p.status} />
+              </span>
             </Link>
           </li>
         ))}

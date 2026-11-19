@@ -2,6 +2,8 @@ import { createHash } from 'node:crypto';
 import { eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { DEFAULT_ORG_ID } from '../src/core/config';
+import { OutboxDispatcher } from '../src/modules/events/dispatcher';
+import { SUBSCRIPTIONS } from '../src/modules/events/subscriptions';
 import { systemContext } from '../src/core/http/context';
 import { decisions } from '../src/modules/process/tables';
 import { documentVersions, signatures } from '../src/modules/documents/tables';
@@ -517,6 +519,25 @@ describe('signing a document', () => {
       [2, 'superseded', 'A'],
       [1, 'draft', null],
     ]);
+  });
+
+  it('asks the reviewer to sign, by a work message, when a version is submitted', async () => {
+    const id = await w.go('Plate notify');
+    const sent = await submittedPid(id);
+    await new OutboxDispatcher(t.deps.db, SUBSCRIPTIONS).drain();
+    const dard = (await ok(call('GET', '/notifications?limit=100', 'dard'))).items.filter(
+      (n: any) => n.projectId === id,
+    );
+    const message = dard.find((n: any) => n.title === `Sign ${sent.number}`);
+    expect(message.body).toMatch(
+      /^Your signature is needed on SPN-\d\d-\d+: step 1, Project inception\./,
+    );
+    expect(message.link).toBe(`/projects/${id}/documents/${sent.id}`);
+    // The step's own sign-off is asked through its task, not through a second message.
+    const vp = (await ok(call('GET', '/notifications?limit=100', 'vp'))).items.filter(
+      (n: any) => n.projectId === id && n.title.startsWith('Sign '),
+    );
+    expect(vp).toHaveLength(0);
   });
 
   it('refuses everything while the project is on hold', async () => {

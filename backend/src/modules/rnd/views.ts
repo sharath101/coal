@@ -1,10 +1,12 @@
 import {
+  dateOfInstant,
   decisionValue,
   milestoneOpen,
   milestoneReached,
   runActionRoles,
   stepActions,
   waitsFor,
+  workingDaysBetween,
   type ActivityItem,
   type ProjectDetail,
   type ProjectSummary,
@@ -13,8 +15,10 @@ import {
   type StepView,
 } from '@coal/shared';
 import type { Executor } from '../../core/db/client';
+import { explainedSteps } from '../deviations/store';
 import { listProjectEvents } from '../events/service';
-import { getRuns, stepHistory } from '../process/service';
+import { currentSteps, getRuns, stepHistory } from '../process/service';
+import { loadCalendar } from '../schedule/calendar';
 import { activeTasksOfRun, presentTasks } from '../tasks/service';
 import { findUsersByIds, present } from '../users/service';
 import type { Env } from './actions';
@@ -57,6 +61,10 @@ export async function presentProjects(
       productLine: lineById.get(row.productLineId) as ProjectSummary['productLine'],
       status: run?.status ?? 'active',
       stage: run?.stage ?? 1,
+      health: run?.health ?? null,
+      healthReasons: (run?.healthReasons ?? []) as ProjectSummary['healthReasons'],
+      plannedLaunch: run?.plannedLaunch ?? null,
+      forecastLaunch: run?.forecastLaunch ?? null,
       createdAt: row.createdAt.toISOString(),
       createdBy: creatorName.get(row.createdBy) ?? 'Unknown',
     };
@@ -95,10 +103,21 @@ export async function presentProject(ex: Executor, env: Env): Promise<ProjectDet
 }
 
 /** The route view: every step's state, what is open, and what this person may do. */
-export async function presentRoute(ex: Executor, env: Env): Promise<RouteView> {
+export async function presentRoute(
+  ex: Executor,
+  env: Env,
+  now: Date = new Date(),
+): Promise<RouteView> {
   const { route, state, run, stepIds, version } = env.loaded;
   const taskRows = await activeTasksOfRun(ex, run.id);
-  const tasks = await presentTasks(ex, env.orgId, taskRows);
+  const tasks = await presentTasks(ex, env.orgId, taskRows, now);
+  const [stepRows, cal, explained] = await Promise.all([
+    currentSteps(ex, run.id),
+    loadCalendar(ex, env.orgId),
+    explainedSteps(ex, [...stepIds.values()], dateOfInstant(now)),
+  ]);
+  const rowOf = new Map(stepRows.map((r) => [r.stepKey, r]));
+  const today = dateOfInstant(now);
   const tasksByStep = new Map<string, typeof tasks>();
   taskRows.forEach((row, i) => {
     if (row.runStepId && row.runStepId === stepIds.get(row.stepKey ?? '')) {
@@ -129,7 +148,11 @@ export async function presentRoute(ex: Executor, env: Env): Promise<RouteView> {
     const sendBackTargets = step.send_back
       .filter((rule) => may(env, 'steps.sendBack', [rule.decided_by]))
       .flatMap((rule) => rule.to);
-
+    const dates = rowOf.get(step.key);
+    const unfinished = !['approved', 'done', 'cancelled'].includes(s.status);
+    const pastDue = !!dates?.plannedEnd && unfinished && today > dates.plannedEnd;
+    const stepHealth = unfinished ? (pastDue ? 'overdue' : (dates?.health ?? null)) : null;
+    const stepRowId = stepIds.get(step.key);
     return {
       key: step.key,
       name: step.name,
@@ -163,9 +186,16 @@ export async function presentRoute(ex: Executor, env: Env): Promise<RouteView> {
         title: t.kind === 'corrective_action' && !seesContent ? 'Corrective action' : t.title,
         kind: t.kind,
         status: t.status,
+        dueOn: t.dueOn,
         assignee: t.assignee,
         queueRole: t.queueRole,
       })),
+      plannedStart: dates?.plannedStart ?? null,
+      plannedEnd: dates?.plannedEnd ?? null,
+      forecastEnd: dates?.forecastEnd ?? null,
+      health: stepHealth,
+      daysLate: pastDue && dates?.plannedEnd ? workingDaysBetween(cal, dates.plannedEnd, today) : 0,
+      needsDeviation: pastDue && !!stepRowId && !explained.has(stepRowId),
       actions: {
         start: a.start && may(env, 'steps.start', step.doers),
         submit: a.submit && may(env, 'steps.submit', step.doers),
@@ -197,8 +227,8 @@ export async function presentRoute(ex: Executor, env: Env): Promise<RouteView> {
   };
 }
 
-export async function presentStep(ex: Executor, env: Env, key: StepKey) {
-  const route = await presentRoute(ex, env);
+export async function presentStep(ex: Executor, env: Env, key: StepKey, now: Date = new Date()) {
+  const route = await presentRoute(ex, env, now);
   const step = route.steps.find((s) => s.key === key);
   const history = await stepHistory(ex, env.loaded.run.id, key);
   const seesContent = canSeeProjectContent(env);

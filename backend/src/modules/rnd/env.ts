@@ -55,7 +55,9 @@ export type ScopedPermission =
   | 'documents.write'
   | 'documents.submit'
   | 'attachments.write'
-  | 'sources.write';
+  | 'sources.write'
+  | 'timeline.plan'
+  | 'timeline.change';
 
 const resourceFor = (env: Env, roles: string[]) =>
   ({ ...scopeOf(env), roles }) as ResourceOf<ScopedPermission>;

@@ -1,4 +1,4 @@
-import { boolean, index, pgTable, text, uuid } from 'drizzle-orm/pg-core';
+import { boolean, date, index, pgTable, text, uuid } from 'drizzle-orm/pg-core';
 import { idColumn, orgIdColumn, timestamps, timestamptz } from '../../core/db/columns';
 import { processRuns, runSteps } from '../process/tables';
 
@@ -36,11 +36,17 @@ export const tasks = pgTable(
     subjectId: uuid('subject_id'),
     subjectLabel: text('subject_label'),
     doneAt: timestamptz('done_at'),
+    /** When the doers handed the step in, while it waits for its signer: the measures stop the clock here. */
+    handedInAt: timestamptz('handed_in_at'),
+    /** When it is due now, and when it was first due: the on-time rate counts the first (docs/dashboard.md#measures). */
+    dueOn: date('due_on', { mode: 'string' }),
+    firstDueOn: date('first_due_on', { mode: 'string' }),
     ...timestamps(),
   },
   (t) => [
     index('tasks_assignee').on(t.orgId, t.assigneeId, t.status),
     index('tasks_queue').on(t.orgId, t.queueRole, t.status),
     index('tasks_run').on(t.runId, t.stepKey),
+    index('tasks_due').on(t.orgId, t.dueOn),
   ],
 );

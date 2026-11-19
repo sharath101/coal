@@ -15,6 +15,7 @@ import type { Tx } from '../../core/db/client';
 import type { AppDeps } from '../../core/deps';
 import type { Actor, RequestContext } from '../../core/http/context';
 import { AppError, fromEngineError, notFound, validationFailed } from '../../core/http/errors';
+import { insertDeviation } from '../deviations/store';
 import { getProductLine } from './service';
 import {
   onStepReset,
@@ -35,7 +36,13 @@ import {
   type DecisionRow,
   type LoadedRun,
 } from '../process/service';
-import { closeTasks, createTasks, findActiveKeyedTask, type NewTask } from '../tasks/service';
+import {
+  closeTasks,
+  createTasks,
+  findActiveKeyedTask,
+  setStepTasksWaiting,
+  type NewTask,
+} from '../tasks/service';
 import { findUser, findUsersByIds, type UserRow } from '../users/service';
 import {
   addMembers,
@@ -47,8 +54,20 @@ import {
 import { factsOf } from './env';
 import { roleName, routeRole } from './routing';
 import { projects } from './tables';
+import {
+  adoptBaseline,
+  assertDelayExplained,
+  dueResolver,
+  recompute,
+  splitItems,
+  timelineRows,
+  type DueResolver,
+} from '../schedule/service';
 
 export const RND_ROUTE = 'rnd-route';
+
+/** The date a task is due, and the date it was first due (the on-time rate counts the first). */
+const dueFields = (date: string) => ({ dueOn: date, firstDueOn: date });
 
 /** What an action did, as shown in previews and in the response. */
 export interface Collected {
@@ -75,6 +94,8 @@ export interface Env {
   loaded: LoadedRun;
   /** The active team, as people. */
   team: UserRow[];
+  /** The time of the action, set when it runs. */
+  now?: Date;
 }
 
 /** What an action needs beyond the database: the file and PDF services, and whether it is only a preview. */
@@ -110,7 +131,10 @@ async function closeAndLog(
   env: Env,
   options: Parameters<typeof closeTasks>[2],
 ): Promise<number> {
-  const closed = await closeTasks(tx, env.loaded.run.id, options);
+  const closed = await closeTasks(tx, env.loaded.run.id, {
+    ...options,
+    now: env.now ?? new Date(),
+  });
   for (const task of closed) {
     log.audit({
       action: `task.${options.status}`,
@@ -174,6 +198,9 @@ async function makeTasks(
       payload: {
         taskId: row.id,
         title: row.title,
+        kind: row.kind,
+        roleKey: row.roleKey,
+        dueOn: row.dueOn,
         assigneeId: row.assigneeId,
         queueRole: row.queueRole,
       },
@@ -198,6 +225,7 @@ async function openStepTasks(
   c: Collected,
   step: StepDefinition,
   runStepId: string | undefined,
+  due: DueResolver,
 ): Promise<void> {
   const inputs: (NewTask & { assigneeName?: string | null })[] = [];
   const taken = new Set<string>();
@@ -209,6 +237,7 @@ async function openStepTasks(
     if (routing.assignee) taken.add(routing.assignee.id);
     inputs.push({
       ...taskBase(env, step, runStepId),
+      ...dueFields(due(step.key, doer, 'work')),
       kind: 'work',
       title: `Work on step ${step.key}: ${step.name}`,
       roleKey: doer,
@@ -221,6 +250,7 @@ async function openStepTasks(
     for (const member of env.team.filter((m) => !taken.has(m.id))) {
       inputs.push({
         ...taskBase(env, step, runStepId),
+        ...dueFields(due(step.key, member.roleKey, 'work')),
         kind: 'work',
         title: `Take part in step ${step.key}: ${step.name}`,
         roleKey: member.roleKey,
@@ -236,6 +266,7 @@ async function openStepTasks(
     addWarning(c, routing.warning);
     inputs.push({
       ...taskBase(env, step, runStepId),
+      ...dueFields(due(step.key, extra.role, 'work')),
       kind: 'work',
       title: extra.name,
       taskKey: extra.key,
@@ -258,11 +289,13 @@ async function openSignTasks(
   step: StepDefinition,
   runStepId: string | undefined,
   signers: string[],
+  due: DueResolver,
 ): Promise<void> {
   if (!step.signer) return;
   const title = `Sign off step ${step.key}: ${step.name}`;
   const base = {
     ...taskBase(env, step, runStepId),
+    ...dueFields(due(step.key, step.signer, 'sign')),
     kind: 'sign' as const,
     title,
     roleKey: step.signer,
@@ -316,7 +349,7 @@ async function applyEffects(
   c: Collected,
   reason: string | undefined,
   h: HookContext,
-): Promise<void> {
+): Promise<{ baselineNo?: number }> {
   const { route, run } = env.loaded;
   const nameOf = (key: StepKey) => stepOf(route, key)?.name ?? key;
   /** The person who signed: the one acting, or another signer of a step several must sign. */
@@ -325,6 +358,9 @@ async function applyEffects(
     const user = await findUser(tx, env.orgId, userId);
     return user ? { userId, name: user.name, roleKey: user.roleKey } : env.actor;
   };
+  // Due dates come from the plan; the plan changes when the Action Plan step is approved.
+  let due = await dueResolver(tx, env.orgId, run.id, route, h.deps.now());
+  const outcome: { baselineNo?: number } = {};
 
   for (const effect of effects) {
     if (effect.type in STEP_CHANGE) {
@@ -349,12 +385,21 @@ async function applyEffects(
           c,
           stepOf(route, effect.step) as StepDefinition,
           newIds.get(effect.step),
+          due,
         );
         break;
       }
       case 'step.submitted': {
         const step = stepOf(route, effect.step) as StepDefinition;
-        await openSignTasks(tx, log, env, c, step, newIds.get(effect.step), effect.signers);
+        await openSignTasks(tx, log, env, c, step, newIds.get(effect.step), effect.signers, due);
+        // The doers wait for the signer.
+        if (step.signer) await setStepTasksWaiting(tx, run.id, step.key, true, env.now);
+        if (step.baseline && splitItems(await timelineRows(tx, run.id)).draft.length === 0) {
+          addWarning(
+            c,
+            'No dates are written for the remaining steps, so the default lengths stay in use.',
+          );
+        }
         const runStepId = newIds.get(effect.step) as string;
         const row = await findRunStep(tx, runStepId);
         const state = env.loaded.state;
@@ -388,14 +433,29 @@ async function applyEffects(
         });
         await onStepSigned(h, effect.step, await signerNamed(effect.by));
         break;
-      case 'step.approved':
+      case 'step.approved': {
         await closeAndLog(tx, log, env, {
           stepKey: effect.step,
           kinds: ['sign', 'work'],
           status: 'done',
         });
         await onStepSigned(h, effect.step, await signerNamed(effect.by));
+        if ((stepOf(route, effect.step) as StepDefinition).baseline) {
+          const baselineNo = run.baselineNo + 1;
+          const written = await adoptBaseline(tx, env.orgId, run.id, effect.by, baselineNo);
+          if (written > 0) {
+            outcome.baselineNo = baselineNo;
+            due = await dueResolver(tx, env.orgId, run.id, route, h.deps.now());
+            log.event({
+              type: 'timeline.changed',
+              projectId: env.project.id,
+              stepKey: effect.step,
+              payload: { baselineNo, items: written },
+            });
+          }
+        }
         break;
+      }
       case 'step.done':
         await closeAndLog(tx, log, env, { stepKey: effect.step, kinds: ['work'], status: 'done' });
         break;
@@ -405,6 +465,7 @@ async function applyEffects(
           kinds: ['sign'],
           status: 'cancelled',
         });
+        await setStepTasksWaiting(tx, run.id, effect.step, false, env.now);
         await onStepReturned(h, effect.step, effect.comment);
         break;
       case 'step.reset':
@@ -418,6 +479,40 @@ async function applyEffects(
           runStepId: newIds.get(effect.step) as string,
           iteration: effect.newIteration,
         });
+        if (effect.reopened) {
+          // The delay is recorded as a deviation with the reason "rework" (docs/workflow.md).
+          const reopened = stepOf(route, effect.step) as StepDefinition;
+          const deviation = await insertDeviation(tx, env.orgId, {
+            runId: run.id,
+            runStepId: newIds.get(effect.step) ?? null,
+            stepKey: effect.step,
+            taskId: null,
+            kind: 'rework',
+            plannedDate: null,
+            newDate: null,
+            reasonCode: 'rework',
+            reasonText: reason ?? 'Sent back for rework.',
+            causeType: 'role',
+            causeUserId: null,
+            causeRole: reopened.doers.find((d) => d !== 'team') ?? null,
+            causeParty: null,
+            recordedBy: env.actor.userId,
+            correctsId: null,
+          });
+          log.audit({
+            action: 'deviation.recorded',
+            recordType: 'deviation',
+            recordId: deviation.id,
+            after: { step: effect.step, kind: 'rework', reasonCode: 'rework' },
+            reason,
+          });
+          log.event({
+            type: 'deviation.recorded',
+            projectId: env.project.id,
+            stepKey: effect.step,
+            payload: { deviationId: deviation.id, kind: 'rework', reasonCode: 'rework' },
+          });
+        }
         break;
       case 'run.dropped':
         c.cancelledTasks += await closeAndLog(tx, log, env, { status: 'cancelled' });
@@ -495,6 +590,7 @@ async function applyEffects(
       });
     }
   }
+  return outcome;
 }
 
 /**
@@ -510,12 +606,19 @@ export async function performAction(
   services: Services,
 ): Promise<Collected> {
   const { loaded } = env;
+  const now = services.deps.now();
+  env.now = now;
   let outcome;
   try {
     outcome = apply(loaded.route, loaded.state, action);
   } catch (error) {
     if (error instanceof EngineError) throw fromEngineError(error);
     throw error;
+  }
+  // Work that is late can't be handed in until someone says why (docs/dashboard.md#deviations).
+  if (action.type === 'submit') {
+    const runStepId = loaded.stepIds.get(action.step);
+    if (runStepId) await assertDelayExplained(tx, runStepId, now);
   }
 
   const sendBackId =
@@ -535,6 +638,7 @@ export async function performAction(
     outcome.effects,
     attribution,
     sendBackId,
+    now,
   );
   const decided: DecisionRow[] = [...saved.decisions];
   if (action.type === 'hold' || action.type === 'resume' || action.type === 'drop') {
@@ -553,7 +657,7 @@ export async function performAction(
   for (const decision of decided) await signDecision(hooks, decision);
 
   const c = newCollected();
-  await applyEffects(
+  const applied = await applyEffects(
     tx,
     log,
     env,
@@ -573,6 +677,7 @@ export async function performAction(
       reason: attribution.reason,
     });
   }
+  await recompute(tx, log, now, env.orgId, env.project.id, loaded.run.id, applied);
   return c;
 }
 
@@ -619,7 +724,8 @@ export async function goProject(
   const team = [...new Map([...starting, ...extra].map((u) => [u.id, u])).values()];
 
   const start = startRun(version.route);
-  const { run, stepIds } = await createRun(tx, ctx.orgId, version, start.state);
+  const now = services.deps.now();
+  const { run, stepIds } = await createRun(tx, ctx.orgId, version, start.state, now);
   const code = await nextProjectCode(tx, ctx.orgId, line);
   const [project] = await tx
     .insert(projects)
@@ -637,7 +743,7 @@ export async function goProject(
   await addMembers(tx, ctx.orgId, row.id, team, actor.userId);
 
   const loaded: LoadedRun = { run, version, route: version.route, state: start.state, stepIds };
-  const env: Env = { orgId: ctx.orgId, actor, project: row, loaded, team };
+  const env: Env = { orgId: ctx.orgId, actor, project: row, loaded, team, now };
 
   // The VP's click is the Go decision, and it is signed (a confirmed click until passkeys).
   const hooks = await hookContext(tx, log, env, services);
@@ -664,6 +770,7 @@ export async function goProject(
 
   const collected = newCollected();
   await applyEffects(tx, log, env, start.effects, stepIds, stepIds, collected, undefined, hooks);
+  await recompute(tx, log, now, ctx.orgId, row.id, run.id);
   return { project: row, collected, team };
 }
 
@@ -673,6 +780,7 @@ export async function raiseCorrectiveAction(
   log: ChangeLog,
   env: Env,
   input: { title: string; body: string; assigneeId?: string | undefined },
+  now: Date,
 ): Promise<Collected> {
   const { route, state } = env.loaded;
   if (!['active', 'completed'].includes(state.status)) {
@@ -710,9 +818,11 @@ export async function raiseCorrectiveAction(
     assignee = routing.assignee;
     queueRole = routing.queueRole;
   }
+  const due = await dueResolver(tx, env.orgId, env.loaded.run.id, route, now);
   await makeTasks(tx, log, env, c, [
     {
       ...taskBase(env, step, env.loaded.stepIds.get(step.key)),
+      ...dueFields(due(step.key, null, 'corrective_action')),
       kind: 'corrective_action',
       title: input.title,
       body: input.body,

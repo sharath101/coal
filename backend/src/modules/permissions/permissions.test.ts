@@ -5,7 +5,14 @@ import { assertAiTier, guard } from '../../core/http/endpoint';
 import { IMPLEMENTATIONS } from '../index';
 import { ROLES } from '../org/catalogue';
 import { canAccess, canUse } from './index';
-import { RULES, canSeeDrafts, documentAccess, type DocumentResource } from './rules';
+import {
+  RULES,
+  canSeeDrafts,
+  causeNameVisible,
+  documentAccess,
+  isAboveOnLadder,
+  type DocumentResource,
+} from './rules';
 
 /**
  * The permission test table (docs/roles-and-access.md#how-access-is-enforced): for every
@@ -65,6 +72,18 @@ const ENDPOINT_TABLE: Record<PermissionKey, Who[]> = {
   'attachments.write': SIGNED_IN,
   'sources.read': SIGNED_IN,
   'sources.write': SIGNED_IN,
+  'timeline.read': SIGNED_IN,
+  'timeline.plan': SIGNED_IN,
+  // ⚠ The Head changes dates; the VP too, and only the VP, if the launch moves (W13).
+  'timeline.change': ['rd_head', 'vp'],
+  'deviations.read': SIGNED_IN,
+  'deviations.record': SIGNED_IN,
+  'deviations.review': SIGNED_IN,
+  'deviations.comment': SIGNED_IN,
+  'notifications.read': SIGNED_IN,
+  'notifications.markRead': SIGNED_IN,
+  'notifications.markAllRead': SIGNED_IN,
+  'widgets.read': SIGNED_IN,
 };
 
 /** Rules that need a project and the roles the route allows right now. */
@@ -87,6 +106,8 @@ const SCOPED = [
   'documents.submit',
   'attachments.write',
   'sources.write',
+  'timeline.plan',
+  'timeline.change',
 ] as const satisfies readonly PermissionKey[];
 /** Roles that act on any project, whoever is on its team. */
 const ANY_PROJECT: Who[] = ['board', 'vp', 'rd_head'];
@@ -498,5 +519,94 @@ describe('AI tiers', () => {
         expect.objectContaining({ code: 'AI_NOT_ALLOWED' }),
       );
     }
+  });
+});
+
+describe('deviation and notification rules', () => {
+  const LINE = 'line-spine';
+  const scope = { productLineId: LINE, memberIds: ['user-1'] };
+  const as = (roleKey: string, userId = 'user-1', line: string | null = null): Actor => ({
+    userId,
+    name: roleKey,
+    roleKey,
+    productLineId: line,
+  });
+
+  it('knows the ladder: Board → VP → Head → Lead → team', () => {
+    expect(isAboveOnLadder('rd_lead', 'design_engineer')).toBe(true);
+    expect(isAboveOnLadder('rd_head', 'design_engineer')).toBe(true);
+    expect(isAboveOnLadder('vp', 'rd_lead')).toBe(true);
+    expect(isAboveOnLadder('design_engineer', 'rd_lead')).toBe(false);
+    expect(isAboveOnLadder('rd_lead', 'rd_lead')).toBe(false);
+    expect(isAboveOnLadder('rd_lead', 'company_qa')).toBe(false);
+  });
+
+  const record = (actor: Actor, assigneeId: string | null) =>
+    canAccess('deviations.record', actor, { ...scope, assigneeId }).allowed;
+
+  it('lets the assignee, the Lead of the line and the Head record a deviation', () => {
+    expect(record(as('pme', 'user-1'), 'user-1')).toBe(true);
+    expect(record(as('pme', 'user-2'), 'user-1')).toBe(false);
+    expect(record(as('rd_lead', 'user-9', LINE), 'user-1')).toBe(true);
+    expect(record(as('rd_lead', 'user-9', 'line-trauma'), 'user-1')).toBe(false);
+    expect(record(as('rd_head', 'user-9'), 'user-1')).toBe(true);
+    expect(record(as('vp', 'user-9'), 'user-1')).toBe(false);
+    expect(record(as('company_qa', 'user-9'), 'user-1')).toBe(false);
+  });
+
+  const review = (actor: Actor, recordedByRoleKey: string, recordedById = 'user-1') =>
+    canAccess('deviations.review', actor, { ...scope, recordedByRoleKey, recordedById });
+
+  it('lets the next role up, and anyone above, confirm; never the person who recorded it', () => {
+    expect(review(as('rd_lead', 'user-9', LINE), 'pme').allowed).toBe(true);
+    expect(review(as('rd_head', 'user-9'), 'pme').allowed).toBe(true);
+    expect(review(as('vp', 'user-9'), 'rd_lead').allowed).toBe(true);
+    expect(review(as('pme', 'user-9'), 'pme').allowed).toBe(false);
+    expect(review(as('rd_lead', 'user-9', LINE), 'rd_lead').allowed).toBe(false);
+    expect(review(as('rd_head', 'user-1'), 'pme', 'user-1').allowed).toBe(false);
+    expect(review(as('rd_lead', 'user-9', 'line-trauma'), 'pme').allowed).toBe(false);
+  });
+
+  it('names the role above when a review is refused', () => {
+    expect(review(as('pme', 'user-9'), 'pme')).toEqual({
+      allowed: false,
+      code: 'NOT_ALLOWED',
+      whoCan: ['R&D Lead'],
+    });
+  });
+
+  const comment = (actor: Actor, cause: { causeUserId: string | null; causeRole: string | null }) =>
+    canAccess('deviations.comment', actor, { ...scope, ...cause }).allowed;
+
+  it('lets only the person or role named as the cause comment', () => {
+    expect(comment(as('dard', 'user-5'), { causeUserId: 'user-5', causeRole: null })).toBe(true);
+    expect(comment(as('dard', 'user-6'), { causeUserId: 'user-5', causeRole: null })).toBe(false);
+    expect(comment(as('vp', 'user-6'), { causeUserId: 'user-5', causeRole: null })).toBe(false);
+    expect(comment(as('dard', 'user-1'), { causeUserId: null, causeRole: 'dard' })).toBe(true);
+    expect(comment(as('pme', 'user-1'), { causeUserId: null, causeRole: 'dard' })).toBe(false);
+  });
+
+  const named = (actor: Actor, userId: string | null, userRoleKey: string | null) =>
+    causeNameVisible(actor, { userId, userRoleKey, ...scope });
+
+  it('shows who caused a delay only to the VP, the Head, the Lead for people below them, and the person', () => {
+    expect(named(as('vp', 'user-9'), 'user-5', 'pme')).toBe(true);
+    expect(named(as('rd_head', 'user-9'), 'user-5', 'pme')).toBe(true);
+    expect(named(as('rd_lead', 'user-9', LINE), 'user-5', 'pme')).toBe(true);
+    expect(named(as('rd_lead', 'user-9', 'line-trauma'), 'user-5', 'pme')).toBe(false);
+    expect(named(as('rd_lead', 'user-9', LINE), 'user-5', 'rd_head')).toBe(false);
+    expect(named(as('pme', 'user-5'), 'user-5', 'pme')).toBe(true);
+    expect(named(as('pme', 'user-6'), 'user-5', 'pme')).toBe(false);
+    expect(named(as('board', 'user-9'), 'user-5', 'pme')).toBe(false);
+    expect(named(as('company_qa', 'user-9'), 'user-5', 'pme')).toBe(false);
+  });
+
+  it('opens a notification only for the person it was sent to', () => {
+    expect(
+      canAccess('notifications.markRead', as('pme', 'user-1'), { userId: 'user-1' }).allowed,
+    ).toBe(true);
+    expect(
+      canAccess('notifications.markRead', as('vp', 'user-2'), { userId: 'user-1' }).allowed,
+    ).toBe(false);
   });
 });

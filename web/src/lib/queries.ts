@@ -4,11 +4,16 @@ import {
   getActivity,
   getDocument,
   getMe,
+  getProcess,
   getProject,
   getProjectRoute,
   getStep,
+  getTimeline,
+  getWidget,
   listAttachments,
+  listDeviations,
   listDocumentTypes,
+  listNotifications,
   listProductLines,
   listProjectDocuments,
   listProjects,
@@ -18,8 +23,11 @@ import {
   listTasks,
   listTemplates,
   listUsers,
+  listWidgets,
   type DocumentDetail,
+  type EndpointOutput,
   type ProjectSummary,
+  type WidgetKey,
 } from '@coal/shared';
 import {
   keepPreviousData,
@@ -49,6 +57,14 @@ export const queryKeys = {
   documentTypes: ['document-types'] as const,
   templates: ['templates'] as const,
   signatureRequests: ['signature-requests'] as const,
+  widgets: ['widgets'] as const,
+  widget: (key: string) => ['widgets', key] as const,
+  deviations: ['deviations'] as const,
+  notifications: ['notifications'] as const,
+  process: (key: string) => ['process', key] as const,
+  projectOptions: ['projects', 'options'] as const,
+  // Under the project's key, so refreshing a project also refreshes its dates.
+  timeline: (id: string) => ['project', id, 'timeline'] as const,
 };
 
 export const useMe = () => useQuery({ queryKey: queryKeys.me, queryFn: () => api(getMe) });
@@ -217,5 +233,110 @@ export function useRefreshProject(id: string) {
       // Submitting or approving a step makes and signs its sign-off record.
       queryClient.invalidateQueries({ queryKey: queryKeys.documents }),
       queryClient.invalidateQueries({ queryKey: queryKeys.signatureRequests }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.widgets }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.deviations }),
     ]);
 }
+
+/**
+ * After work or dates change anywhere (a task done, a deviation recorded, a signature given),
+ * the person's lists, the dates of every project and every widget are stale.
+ */
+export function useRefreshWork() {
+  const queryClient = useQueryClient();
+  return () =>
+    Promise.all(
+      [
+        queryKeys.tasks,
+        queryKeys.projects,
+        // Every project page, with its route, dates and documents.
+        ['project'],
+        queryKeys.documents,
+        queryKeys.signatureRequests,
+        queryKeys.widgets,
+        queryKeys.deviations,
+        queryKeys.notifications,
+      ].map((queryKey) => queryClient.invalidateQueries({ queryKey })),
+    );
+}
+
+/** What picks a widget's data: the card (compact) or the panel (expanded), a tab and filters. */
+export type WidgetInfo = EndpointOutput<typeof listWidgets>['widgets'][number];
+
+export interface WidgetParams {
+  view: 'compact' | 'expanded';
+  tab?: string | null;
+  filters?: Partial<Record<WidgetFilter, string>>;
+}
+
+export const WIDGET_FILTERS = [
+  'project',
+  'step',
+  'kind',
+  'due',
+  'line',
+  'stage',
+  'health',
+] as const;
+export type WidgetFilter = (typeof WIDGET_FILTERS)[number];
+
+/** The widgets I may use, in my layout's order. Changes only with my role. */
+export const useWidgetLayout = () =>
+  useQuery({ queryKey: [...queryKeys.widgets, 'layout'], queryFn: () => api(listWidgets) });
+
+export function useWidget(key: WidgetKey, params: WidgetParams, enabled = true) {
+  const filters = Object.entries(params.filters ?? {}).filter(([, v]) => v) as [
+    WidgetFilter,
+    string,
+  ][];
+  return useQuery({
+    queryKey: [...queryKeys.widget(key), params.view, params.tab ?? '', filters],
+    queryFn: () =>
+      api(getWidget, {
+        params: { key },
+        query: {
+          view: params.view,
+          ...(params.tab && { tab: params.tab }),
+          ...Object.fromEntries(filters.map(([name, value]) => [`filter[${name}]`, value])),
+        },
+      }),
+    enabled,
+    // Keeps the table on screen while another tab or filter loads.
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** Every project, for a project filter. Up to 100 until the list has search. */
+export const useProjectOptions = () =>
+  useQuery({
+    queryKey: queryKeys.projectOptions,
+    queryFn: async () => (await api(listProjects, { query: { limit: 100 } })).items,
+  });
+
+export const useTimeline = (id: string) =>
+  useQuery({
+    queryKey: queryKeys.timeline(id),
+    queryFn: () => api(getTimeline, { params: { id } }),
+  });
+
+export const useDeviations = (projectId: string) =>
+  useQuery({
+    queryKey: [...queryKeys.deviations, projectId],
+    queryFn: async () =>
+      (await api(listDeviations, { query: { 'filter[project]': projectId, limit: 100 } })).items,
+  });
+
+/** My latest notifications, and how many are unread. */
+export const useNotifications = () =>
+  useQuery({
+    queryKey: [...queryKeys.notifications, 'latest'],
+    queryFn: () => api(listNotifications, { query: { limit: 10 } }),
+  });
+
+/** A process's definition: who the launch step is, for instance. Changes only with a new version. */
+export const useProcess = (key: string) =>
+  useQuery({
+    queryKey: queryKeys.process(key),
+    queryFn: () => api(getProcess, { params: { key } }),
+    staleTime: Infinity,
+  });

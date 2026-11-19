@@ -10,7 +10,7 @@
 |---|---|
 | **Action card** | How a proposal appears in the Workstation: what will happen, with Confirm, Edit and Cancel |
 | **AI tier** | What the AI may do with an endpoint: `read`, `auto`, `confirm` or `never` ([workstation-and-ai.md](./workstation-and-ai.md#what-the-ai-may-do)) |
-| **Baseline** | The planned dates from the signed Action Plan (step 5). The on-time rate is measured against it |
+| **Baseline** | The planned dates from the signed Action Plan (step 5), written there for each role and step; the VP's sign-off makes them permanent. The on-time rate is measured against first due dates, and later changes are recorded beside the baseline |
 | **Boilerplate (BP)** | A company template that new documents start from, such as the Action Plan or the FEA report. In COAL, a template in the template library |
 | **Channel** | Where a person uses the AI chat: the website now; WhatsApp and the mobile app later |
 | **Checkpoint** | A go or no-go step: 4, 12, 18 and 23. Nothing after it starts until it is signed |
@@ -18,14 +18,14 @@
 | **Decision** | A signed choice recorded at a step: Go, a checkpoint outcome, "prototypes OK", "pre-clinical study needed", hold, drop |
 | **Department module** | The part of the backend that holds one department's own records and rules. R&D's is the first |
 | **Corrective action** | A fix listed in the prototype case study (step 16). Each is a task, and step 18 can't be submitted while any is open |
-| **Deviation** | A record explaining late work: the reason, the cause and the new date |
+| **Deviation** | A record explaining late work: the reason, the cause and the new date. A late step can't be submitted, nor a late task closed, until one is recorded; the next role up confirms or corrects it |
 | **Doer** | A role or person who does the work of a step (as opposed to its signer) |
 | **Document type** | A kind of document (PID, Action Plan, Budget annex…) with its numbering, signature rows and sensitivity ([documents-and-signing.md](./documents-and-signing.md#document-types)) |
 | **Draft, version, revision** | Each save makes a new numbered draft version, and nothing is overwritten. A revision letter (A, B, C) is given when a version is approved |
 | **Fields and written sections** | The two kinds of part in a template. Fields are filled by code, from records or from the person's answers; written sections are written by a person or the AI |
 | **Carried forward** | A document version copied unchanged into a step's new iteration when work is sent back, so people revise rather than start again |
 | **Confirmed click** | How every signature is made until passkeys exist: the right person confirms, and COAL records who, when and the hashes |
-| **Forecast** | The expected end of each open step, and the expected launch, worked out from planned durations and progress |
+| **Forecast** | The expected end of each open step, and the expected launch (the expected end of step 25), worked out from each step's length, a doer's new dates and its inputs |
 | **Go** | The VP's signed decision that creates a project and opens steps 1, 2 and 2a |
 | **Health** | Green, amber or red, for a step or project, from its dates ([dashboard.md](./dashboard.md#health)) |
 | **Iteration** | One pass through a step. Sending work back opens a new iteration; earlier ones stay on record |
@@ -52,7 +52,9 @@
 | **Task** | One person's piece of work. Kinds: work, review, sign, decision, corrective action, request, own |
 | **Template library** | Where COAL keeps the template for each document type, with its versions (draft, active, retired). One version per type is active, and the AI uses it every time |
 | **Via AI** | The mark on every request the AI makes on a user's behalf. The backend uses it to apply the AI tiers |
-| **Widget** | A Dashboard card that expands into a full view |
+| **Widget** | A Dashboard card that expands into a full view. Defined in `shared/`; every widget returns counts and rows in one shape |
+| **Work message** | A notification written from the route's template for the event, for example "Your part on SPN-26-004: step 1…". Never carries comments or reasons |
+| **Working day** | Monday to Friday, except the holidays and worked Saturdays in the working calendar |
 | **Workstation** | Each person's chat page, organised by project, where they work with the AI |
 
 ## Abbreviations

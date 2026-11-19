@@ -112,8 +112,11 @@ coal/
                       (route versions, runs and their steps, decisions, milestones, send-backs),
                       tasks, templates (document types, the template library, Word files),
                       documents (documents, versions, PDFs, signature rows, step sign-off
-                      records), attachments (attachments and sources); later dashboard,
-                      notifications, ai
+                      records), attachments (attachments and sources), schedule (the working
+                      calendar, settings, the plan and baseline, forecast and health),
+                      deviations (late work, its reviews and comments), notifications (work
+                      messages, reminders, the live stream), widgets (the Dashboard's data);
+                      later ai
                       Department modules: rnd (product lines, projects, teams, task routing,
                       and the actions that turn the engine's effects into tasks); others later
                       Each module has tables.ts, service.ts and routes.ts
@@ -134,8 +137,9 @@ coal/
       process/        Route definitions (YAML, one per process and version), their schema and
                       validation, and the pure engine, with tests. files.ts reads the YAML (Node
                       only; imported as @coal/shared/process-files by the backend and the tests)
-      widgets/        Dashboard widget definitions (block 4)
-      rules/          Small rules both clients and the backend use (names, upload limits)
+      widgets/        Dashboard widget definitions and their shapes
+      rules/          Small rules both clients and the backend use: names, upload limits, templates and
+                      documents, the working calendar, schedule and health, and the measures
   docs/               This plan
   private/            Jayon's files on this computer, such as templates. Git-ignored: never committed
   docker-compose.yml  The local services
@@ -151,7 +155,7 @@ Each backend module owns its tables, its services and its routes. Modules call e
 
 COAL runs its processes, starting with the R&D route, on its own small engine, not a workflow product. The route is paced by people over months, its rules are specific (milestones, conditional steps, rework that resets only dependent steps), and the engine's state and the audit trail must be written together.
 
-- **Routes are files.** Each process's route lives in `shared/src/process/` as a YAML file per version (`rnd-route.v2.yaml`), checked against a strict schema (`definition.ts`) and by `validateRoute`: every step, milestone, decision and role it names exists, there are no cycles, and every send-back goes to a step the sender depends on. On deploy (`db:migrate`) the files are loaded into `process_versions`, with a hash. A loaded version never changes: a changed file is refused until it is a new version. Each run (for R&D, each project) stays on the version it started with.
+- **Routes are files.** Each process's route lives in `shared/src/process/` as a YAML file per version (`rnd-route.v2.yaml`), checked against a strict schema (`definition.ts`) and by `validateRoute`: every step, milestone, decision and role it names exists, there are no cycles, and every send-back goes to a step the sender depends on. On deploy (`db:migrate`) the files are loaded into `process_versions`, with a hash. A loaded version never changes: a changed file is refused until it is a new version. Each run (for R&D, each project) stays on the version it started with. Besides who does what and when a step opens, a step carries its default length in working days (`default_days`) and may mark itself as the step that writes the plan (`baseline`), and the file holds the work-message templates (`messages`) with the words COAL fills in.
 - **A pure engine.** `apply(route, state, action)` takes a run's state and an action (start, submit, approve, return, decide, record a milestone, send back, hold, resume, drop) and returns the new state and a list of **effects**: steps becoming ready, started, submitted, approved, done, returned, reset or cancelled; decisions and milestones recorded; the run held, resumed, dropped, completed or closed. `startRun` does the same for Go. It touches nothing else, and refuses with an `EngineError` that carries the API's problem code. It also answers questions the screens need: what a step waits for, what it can do now (`stepActions`), and who may hold or drop (`runActionRoles`).
 - **Opening steps.** After every action the engine opens each step whose conditions hold, until nothing changes. A send-back closes the iterations of the step and of everything that depends on it, and reopens the target at once.
 - **One transaction per action.** Each action runs in one database transaction, in `backend/src/modules/rnd/actions.ts`:
@@ -209,13 +213,13 @@ REST and JSON under `/api/v1`. The details and the endpoint list are in [api.md]
 ## Events and live updates
 
 - **The outbox.** Every change writes **events** (for example `step.ready`, `task.assigned`, `signature.requested`) to an outbox table, in the same transaction.
-- **Delivery.** A worker reads the outbox and passes each event to its subscribers (`backend/src/modules/events/subscriptions.ts`), in the same transaction that marks it delivered. A failed delivery is retried later, with growing gaps. Subscribers come with their blocks:
-  - the notification sender;
-  - live updates to open clients;
-  - recalculating the forecast;
-  - updating search.
-- **Live updates.** Each signed-in client keeps one Server-Sent Events stream (`GET /api/v1/stream`). It carries "this widget changed" hints and new notifications. The mobile app, when it comes, uses the stream while open and push notifications otherwise.
-- **Several backend copies.** A trigger sends `NOTIFY coal_outbox` when events are written, so the workers wake at once, and each also polls as a fallback. Workers claim events with `SKIP LOCKED`, so each event is delivered once. Live updates, which every copy needs, will be passed on to all copies through PostgreSQL's LISTEN/NOTIFY too, so no extra server is needed.
+- **Delivery.** A worker reads the outbox and passes each event to its subscribers (`backend/src/modules/events/subscriptions.ts`), in the same transaction that marks it delivered. A failed delivery is retried later, with growing gaps. The subscribers so far:
+  - the notification sender (work messages written from the route's templates, one per person and event);
+  - live updates to open clients (below).
+
+  Recalculating the forecast doesn't wait for an event: it happens in the same transaction as the change that moves it (and nightly). Search joins later.
+- **Live updates.** Each signed-in client keeps one Server-Sent Events stream (`GET /api/v1/stream`). It carries hints only: "these widgets changed" and "you have a new notification", never content, and the website fetches the data through the normal API. The mobile app, when it comes, uses the stream while open and push notifications otherwise.
+- **Several backend copies.** A trigger sends `NOTIFY coal_outbox` when events are written, so the workers wake at once, and each also polls as a fallback. Workers claim events with `SKIP LOCKED`, so each event is delivered once. The live hints go through PostgreSQL's LISTEN/NOTIFY too (`coal_live`): the subscriber sends one when it delivers an event, and every API copy that has a client connected listens and passes it on, so no extra server is needed.
 - **The event list** is in [api.md](./api.md#events).
 
 ## AI module
@@ -246,15 +250,17 @@ The AI lives inside the backend (`backend/src/modules/ai/`) for now. It can be s
 
 pg-boss runs:
 
-- reminders and escalations, checked every few minutes;
-- the nightly forecast recalculation;
-- sending notifications;
+- the morning reminders and escalations (08:30 Indian time; nothing goes out on a day off);
+- the nightly recalculation of every running project's dates and health (00:10 Indian time);
 - the daily audit-chain check (02:30 Indian time);
-- removing stored Idempotency-Key responses after a day.
+- removing stored Idempotency-Key responses after a day;
+- the virus-scan sweep (every minute, for uploads the scanner couldn't reach).
 
-The audit-chain check, the clean-up and the virus-scan sweep (every minute, for uploads the scanner couldn't reach) run now; the others come with their blocks. Documents are rendered while a version is saved, not by a job, so a version never exists without its PDF. The price is that the save holds the project's lock while Gotenberg works (it gives up after 30 seconds, `PDF_TIMEOUT_MS`), and the render uses the save's own database connection so a slow service can't starve the connection pool. Fine for R&D's size; a render job is the answer if saves ever queue up.
+Documents are rendered while a version is saved, not by a job, so a version never exists without its PDF. The price is that the save holds the project's lock while Gotenberg works (it gives up after 30 seconds, `PDF_TIMEOUT_MS`), and the render uses the save's own database connection so a slow service can't starve the connection pool. Fine for R&D's size; a render job is the answer if saves ever queue up.
 
-Jobs are written so that running one twice does no harm.
+Jobs are written so that running one twice does no harm: each reminder carries a key that stops a repeat to the same person.
+
+**Time.** The backend reads "now" from one place (`deps.now`), so due dates, reminders, task stamps and the lateness rules agree, and tests move the clock forward instead of waiting. Dates are calendar days in Indian time (`YYYY-MM-DD`); instants are UTC.
 
 ## Security basics
 

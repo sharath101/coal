@@ -89,6 +89,16 @@ async function versionById(ex: Executor, id: string) {
   return parseVersion(row);
 }
 
+/** Several versions at once, keyed by id: a list of runs may be on different versions. */
+export async function versionsByIds(ex: Executor, ids: string[]): Promise<Map<string, Version>> {
+  if (ids.length === 0) return new Map();
+  const rows = await ex
+    .select()
+    .from(processVersions)
+    .where(inArray(processVersions.id, [...new Set(ids)]));
+  return new Map(rows.map((r) => [r.id, parseVersion(r)]));
+}
+
 /** The columns of a step row that change as the step moves. */
 const stepChanges = (s: StepState, now: Date, previous?: StepState) => ({
   status: s.status,
@@ -115,6 +125,7 @@ export async function createRun(
   orgId: string,
   version: Version,
   state: RunState,
+  now: Date = new Date(),
 ): Promise<{ run: RunRow; stepIds: Map<StepKey, string> }> {
   const [run] = await tx
     .insert(processRuns)
@@ -123,9 +134,9 @@ export async function createRun(
       processVersionId: version.id,
       status: state.status,
       stage: currentStage(version.route, state),
+      startedAt: now,
     })
     .returning();
-  const now = new Date();
   const rows = await tx
     .insert(runSteps)
     .values(
@@ -258,11 +269,11 @@ export async function saveOutcome(
   effects: Effect[],
   attribution: Attribution,
   sendBackId?: string,
+  now: Date = new Date(),
 ): Promise<{ stepIds: Map<StepKey, string>; decisions: DecisionRow[] }> {
   const { run, route, state: before } = loaded;
   const recorded: DecisionRow[] = [];
   const stepIds = new Map(loaded.stepIds);
-  const now = new Date();
 
   for (const step of route.steps) {
     const was = before.steps[step.key] as StepState;
@@ -415,4 +426,71 @@ export async function stepHistory(ex: Executor, runId: string, key: StepKey) {
     .where(and(eq(decisions.runId, runId), eq(decisions.stepKey, key)))
     .orderBy(asc(decisions.createdAt), asc(decisions.id));
   return { iterations: rows, decisions: decisionRows };
+}
+
+/** The current iteration of every step of a run, with its dates. */
+export async function currentSteps(ex: Executor, runId: string): Promise<RunStepRow[]> {
+  return ex
+    .select()
+    .from(runSteps)
+    .where(and(eq(runSteps.runId, runId), sql`${runSteps.status} <> 'reset'`));
+}
+
+/** The current steps of several runs at once, for lists. */
+export async function currentStepsOfRuns(ex: Executor, runIds: string[]): Promise<RunStepRow[]> {
+  if (runIds.length === 0) return [];
+  return ex
+    .select()
+    .from(runSteps)
+    .where(and(inArray(runSteps.runId, runIds), sql`${runSteps.status} <> 'reset'`));
+}
+
+export interface StepScheduleRow {
+  id: string;
+  plannedStart: string | null;
+  plannedEnd: string | null;
+  forecastStart: string;
+  forecastEnd: string;
+  health: 'ok' | 'at_risk' | 'overdue' | null;
+}
+
+export interface RunScheduleRow {
+  plannedLaunch?: string | null;
+  forecastLaunch: string | null;
+  health: 'green' | 'amber' | 'red' | null;
+  healthReasons: unknown[];
+  scheduledOn: string;
+  baselineNo?: number;
+}
+
+/** Stores what the schedule module worked out: each step's dates and health, and the run's. */
+export async function saveSchedule(
+  tx: Tx,
+  runId: string,
+  steps: StepScheduleRow[],
+  run: RunScheduleRow,
+): Promise<void> {
+  for (const s of steps) {
+    await tx
+      .update(runSteps)
+      .set({
+        plannedStart: s.plannedStart,
+        plannedEnd: s.plannedEnd,
+        forecastStart: s.forecastStart,
+        forecastEnd: s.forecastEnd,
+        health: s.health,
+      })
+      .where(eq(runSteps.id, s.id));
+  }
+  await tx
+    .update(processRuns)
+    .set({
+      ...(run.plannedLaunch !== undefined && { plannedLaunch: run.plannedLaunch }),
+      ...(run.baselineNo !== undefined && { baselineNo: run.baselineNo }),
+      forecastLaunch: run.forecastLaunch,
+      health: run.health,
+      healthReasons: run.healthReasons,
+      scheduledOn: run.scheduledOn,
+    })
+    .where(eq(processRuns.id, runId));
 }

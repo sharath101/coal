@@ -508,6 +508,21 @@ describe('sending work back', () => {
     expect(row).toMatchObject({ fromStepKey: '13', toStepKey: '7' });
     expect(row!.resetRunStepIds).toHaveLength(4);
 
+    // The delay is recorded as a deviation with the reason "rework", for the step sent back to.
+    const rework = (await ok(call('GET', `/deviations?filter[project]=${id}`, 'vp'))).items;
+    expect(rework).toHaveLength(1);
+    expect(rework[0]).toMatchObject({
+      kind: 'rework',
+      reasonCode: 'rework',
+      stepKey: '7',
+      reasonText: 'The lab test failed on the plate',
+      cause: { type: 'role' },
+      can: { review: false },
+    });
+    // It is the system's record: nothing waits for review.
+    expect(
+      (await ok(call('GET', `/deviations?filter[project]=${id}&filter[state]=review`, 'vp'))).items,
+    ).toHaveLength(0);
     // The rework flows forward again.
     await finish(id, '7');
     expect((await stepOf(id, '10')).status).toBe('ready');

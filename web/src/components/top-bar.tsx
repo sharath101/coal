@@ -15,6 +15,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
+import { NotificationBell } from '@/components/notification-bell';
 import { api } from '@/lib/api';
 import { canManageTemplates } from '@/lib/roles';
 import { cn } from '@/lib/utils';
@@ -42,7 +43,8 @@ function PageToggle() {
             )}
           >
             <Icon className="size-4" aria-hidden />
-            {label}
+            <span className="hidden sm:inline">{label}</span>
+            <span className="sr-only sm:hidden">{label}</span>
           </Link>
         );
       })}
@@ -97,8 +99,8 @@ export function TopBar({ me }: { me: Me }) {
   });
 
   return (
-    <header className="flex h-14 items-center gap-4 border-b px-4">
-      <Link href="/dashboard" className="text-lg font-semibold tracking-tight">
+    <header className="flex h-14 items-center gap-2 border-b px-2 sm:gap-4 sm:px-4">
+      <Link href="/dashboard" className="text-base font-semibold tracking-tight sm:text-lg">
         {tApp('name')}
       </Link>
       <MainLinks roleKey={me.role.key} />
@@ -106,6 +108,7 @@ export function TopBar({ me }: { me: Me }) {
         <PageToggle />
       </div>
       <div className="flex items-center gap-1" aria-label={t('account')}>
+        <NotificationBell />
         <Link
           href="/profile"
           className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent"

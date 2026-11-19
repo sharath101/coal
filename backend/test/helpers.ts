@@ -29,7 +29,7 @@ export type TestApp = Awaited<ReturnType<typeof createTestApp>>;
 
 export async function createTestApp(
   env: Record<string, string> = {},
-  overrides: Partial<Pick<AppDeps, 'scanner'>> = {},
+  overrides: Partial<Pick<AppDeps, 'scanner' | 'now'>> = {},
 ) {
   const database = await createTestDatabase();
   const config = loadConfig({
@@ -43,7 +43,15 @@ export async function createTestApp(
   const storage = new S3FileStorage(config.storage);
   await storage.ensureBucket();
   const pdf = new FakePdfRenderer();
-  const deps: AppDeps = { config, db: database.db, storage, pdf, scanner: null, ...overrides };
+  const deps: AppDeps = {
+    config,
+    db: database.db,
+    storage,
+    pdf,
+    scanner: null,
+    now: () => new Date(),
+    ...overrides,
+  };
   const app = await buildApp(deps);
   return {
     app,

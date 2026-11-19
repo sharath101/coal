@@ -38,6 +38,7 @@ Node 22 and pnpm 10 (see `.nvmrc` and `packageManager`). Docker runs the local s
 | Settings | `cp .env.example .env` (defaults match `docker-compose.yml`) |
 | Migrate and load reference data | `pnpm --filter @coal/backend db:migrate` |
 | Load templates (drafts) from `private/templates/`, or COAL's made-up samples | `pnpm --filter @coal/backend templates:import` (`--samples`, or a folder) |
+| Fill an empty development database with made-up people and three projects (some late), so the Dashboard has something to show | `pnpm --filter @coal/backend seed:demo` (start again with `docker compose down -v`, then `pnpm db:up` and migrate) |
 | Virus scanner, optional locally | `docker compose --profile scan up -d`, then `CLAMAV_HOST=localhost` in `.env` |
 | Run the API, worker and website | `pnpm dev` (API on :4000, website on :3000, API docs at `/api/v1/docs`) |
 | Everything CI runs | `pnpm check` (lint, type checks, formatting, tests) |

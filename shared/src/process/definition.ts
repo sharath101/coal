@@ -76,6 +76,10 @@ export const StepDefinition = z.strictObject({
   checkpoint: z.boolean().default(false),
   /** Added or split at the COAL meeting (2a, 24a, 24b). */
   new: z.boolean().default(false),
+  /** The doers write each role's dates for the remaining steps here, and the sign-off makes them the baseline. */
+  baseline: z.boolean().default(false),
+  /** How long the step takes, in working days from when it opens, until the Action Plan sets dates (W14). */
+  default_days: z.number().int().min(0).max(365),
   doers: z.array(Key).min(1),
   /** People outside COAL who take part, for information. */
   outside: z.array(z.string()).default([]),
@@ -130,12 +134,50 @@ export const RunRules = z.strictObject({
   assumptions: z.array(QuestionId).default([]),
 });
 
+/**
+ * The words in a work message that COAL fills in. A template may use any of these, in braces.
+ * `{inputs}`: what the step's input steps produce. `{team}`: the project's Lead. `{signer}`: the
+ * role that signs. `{due}`: the due date. `{person}`: who a reminder is about. `{days}`: how late.
+ */
+export const MESSAGE_PLACEHOLDERS = [
+  'project',
+  'project_name',
+  'step',
+  'step_name',
+  'team',
+  'signer',
+  'due',
+  'inputs',
+  'person',
+  'days',
+  'decision',
+] as const;
+
+/** Work messages are written from these templates (docs/dashboard.md#notifications-and-work-messages). */
+export const MessageTemplates = z.strictObject({
+  task_assigned: z.string().min(1),
+  signature_requested: z.string().min(1),
+  work_returned: z.string().min(1),
+  checkpoint_decided: z.string().min(1),
+  project_held: z.string().min(1),
+  project_resumed: z.string().min(1),
+  project_dropped: z.string().min(1),
+  reminder_due_soon: z.string().min(1),
+  reminder_due_today: z.string().min(1),
+  escalation_late: z.string().min(1),
+  signature_waiting: z.string().min(1),
+  deviation_to_review: z.string().min(1),
+  named_as_cause: z.string().min(1),
+});
+export type MessageKey = keyof z.infer<typeof MessageTemplates>;
+
 export const RouteDefinition = z.strictObject({
   process: z.string().regex(/^[a-z][a-z0-9-]*$/),
   version: z.number().int().min(1),
   name: z.string().min(1),
   department: z.string().min(1),
   source: z.string().min(1),
+  messages: MessageTemplates,
   stages: z.array(z.strictObject({ no: z.number().int().min(1), name: z.string().min(1) })).min(1),
   milestones: z.array(MilestoneDefinition).default([]),
   run: RunRules,
@@ -212,6 +254,13 @@ export function validateRoute(
     if (allowTeam && role === TEAM) return;
     if (roles && !roles.has(role)) problems.push(`${where}: there is no role "${role}"`);
   };
+
+  const known = new Set<string>(MESSAGE_PLACEHOLDERS);
+  for (const [name, text] of Object.entries(route.messages)) {
+    for (const [, word] of text.matchAll(/\{([^}]*)\}/g)) {
+      if (!known.has(word as string)) problems.push(`Message ${name}: unknown word {${word}}`);
+    }
+  }
 
   const starts = route.steps.filter((s) => s.done_at_go);
   if (starts.length !== 1) problems.push('Exactly one step must be done at Go');

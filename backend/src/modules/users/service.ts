@@ -90,6 +90,15 @@ export async function findActiveUsersByRole(
     .orderBy(asc(users.name), asc(users.id));
 }
 
+/** Everyone with an active account, for the Dashboard's team views. */
+export async function listActiveUsers(ex: Executor, orgId: string): Promise<UserRow[]> {
+  return ex
+    .select()
+    .from(users)
+    .where(and(eq(users.orgId, orgId), eq(users.status, 'active')))
+    .orderBy(sql`lower(${users.name})`, asc(users.id));
+}
+
 export async function findUserByName(ex: Executor, orgId: string, name: string) {
   const [row] = await ex
     .select()

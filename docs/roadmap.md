@@ -29,7 +29,7 @@ This roadmap gives an **order, not dates**. Madhav's effort estimates and costs 
 
 Each block depends on the ones before it. Within a block, the work can run side by side.
 
-**Progress:** blocks 1 (Foundations), 2 (the route) and 3 (Documents and signing) are done. Block 4 (Dashboard) is next. Passkey signing is the last block (D16).
+**Progress:** blocks 1 (Foundations), 2 (the route), 3 (Documents and signing) and 4 (Dashboard) are done. The Workstation and AI (block 5) is next. Passkey signing is the last block (D16).
 
 1. **Foundations** ✅
    - The monorepo (pnpm workspaces): `backend/`, `web/` and `shared/`; `app/` waits for its phase.
@@ -54,10 +54,14 @@ Each block depends on the ones before it. Within a block, the work can run side 
    - Attachments and sources on steps, documents and tasks; virus scanning with ClamAV (optional locally, required in production).
    - On the website: the Templates page, documents on each step, the document page (form, versions, PDF, compare, signing), and "Waiting for my signature" on My tasks.
    - Left for later: passkey signing (the last block, D16), the signature block and seal on PDFs, the handover checklist at step 24b, and templates for each of the other steps as Jayon's documents arrive.
-4. **Dashboard**
-   - The widget framework on the website; W1 to W10; the project page.
-   - Dates from the route and then from the Action Plan; the forecast; reminders and escalation; deviations.
-   - In-app notifications.
+4. **Dashboard** ✅
+   - Dates: the working calendar and settings; each step's default length in the route; due dates on every task; the Action Plan's dates written at step 5 and made the baseline by the VP's sign-off; date changes by the Head (the launch by the VP).
+   - The forecast and health: each step's planned and forecast dates, the forecast launch, step and project health, worked out after every change and nightly.
+   - Deviations: reason, cause and new date; a late step or task can't be closed without one; the next role up confirms or corrects; the named cause shown only to those allowed; a "rework" deviation on every send-back.
+   - Notifications and live updates: work messages written from the route's templates; reminders and escalation each morning; the bell; a live stream of hints.
+   - The widget framework and W1 to W10 with each role's default layout and expanded views; the measures (on-time rate, days per task, sign-off turnaround, rework rate, open load); the project page's health, dates and Timeline tab.
+   - `seed:demo` makes a Dashboard worth looking at in local work.
+   - Left for later: the weekly digest of the exception list (with email), @mentions (with comments on steps), days per stage against plan and trend charts (with daily snapshots), personal layouts, and editing the settings and the calendar on a page (today: rows in `settings` and `work_calendar`).
 5. **Workstation and AI**
    - The chat screens on the website, on a channel-neutral chat service.
    - The AI gateway with Anthropic and OpenAI; read tools; proposals and action cards.

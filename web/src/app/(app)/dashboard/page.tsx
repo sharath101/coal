@@ -3,21 +3,22 @@
 import { FileText } from 'lucide-react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
+import { Suspense } from 'react';
+import { DashboardWidgets } from '@/components/widgets/dashboard-widgets';
 import { useMe } from '@/lib/queries';
 import { canManageTemplates } from '@/lib/roles';
 
 /**
- * The Dashboard answers three questions, in this order (docs/dashboard.md). Its widgets come
- * with the Dashboard block of the build; until then each section shows its empty state.
+ * The Dashboard answers three questions, in this order (docs/dashboard.md): the widgets of my
+ * layout, grouped under What needs me now?, What's coming? and How are we doing?
  */
 export default function DashboardPage() {
   const t = useTranslations('dashboard');
   const { data: me } = useMe();
   if (!me) return null;
 
-  const sections = [t('needsMe'), t('coming'), t('howWeAreDoing')];
   return (
-    <div className="mx-auto grid w-full max-w-6xl gap-8 p-6">
+    <div className="mx-auto grid w-full max-w-6xl gap-8 p-4 sm:p-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">
           {t('greeting', { name: me.name })}
@@ -40,16 +41,9 @@ export default function DashboardPage() {
           </span>
         </Link>
       )}
-      {sections.map((title) => (
-        <section key={title} className="grid gap-3">
-          <h2 className="text-sm font-medium tracking-wide text-muted-foreground uppercase">
-            {title}
-          </h2>
-          <div className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
-            {t('empty')}
-          </div>
-        </section>
-      ))}
+      <Suspense fallback={null}>
+        <DashboardWidgets />
+      </Suspense>
     </div>
   );
 }

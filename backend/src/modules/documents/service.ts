@@ -906,6 +906,35 @@ const isRecordDocument = async (deps: AppDeps, ctx: RequestContext, doc: Documen
   (await findTypesById(deps.db, ctx.orgId, [doc.documentTypeId])).get(doc.documentTypeId)?.kind ===
   'record';
 
+/**
+ * Who is asked to sign a document right now: the rows that are pending, with the person or the
+ * roles. A step's sign-off record isn't listed: its signer is asked through the step's own task.
+ */
+export async function pendingSignersOf(
+  ex: Executor,
+  orgId: string,
+  documentId: string,
+): Promise<{ meaning: string; roleKeys: string[]; assigneeId: string | null; number: string }[]> {
+  const doc = (await documentsById(ex, orgId, [documentId])).get(documentId);
+  if (!doc) return [];
+  const type = (await findTypesById(ex, orgId, [doc.documentTypeId])).get(doc.documentTypeId);
+  if (type?.kind === 'record') return [];
+  const versions = (await versionsOf(ex, [documentId])).get(documentId) ?? [];
+  const requests = await requestsOfVersions(
+    ex,
+    versions.map((v) => v.id),
+  );
+  return [...requests.values()]
+    .flat()
+    .filter((r) => r.status === 'pending')
+    .map((r) => ({
+      meaning: r.meaning,
+      roleKeys: r.roleKeys,
+      assigneeId: r.assigneeId,
+      number: doc.number,
+    }));
+}
+
 /** What waits for my signature, across the projects I may sign for. */
 export async function listWaiting(
   deps: AppDeps,

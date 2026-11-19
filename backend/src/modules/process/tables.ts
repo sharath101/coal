@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import {
+  date,
   index,
   integer,
   jsonb,
@@ -44,6 +45,14 @@ export const processRuns = pgTable(
     dropReason: text('drop_reason'),
     startedAt: timestamptz('started_at').notNull().defaultNow(),
     completedAt: timestamptz('completed_at'),
+    /** Planned and forecast launch, and health, are worked out by the schedule module (docs/dashboard.md). */
+    plannedLaunch: date('planned_launch', { mode: 'string' }),
+    forecastLaunch: date('forecast_launch', { mode: 'string' }),
+    health: text('health', { enum: ['green', 'amber', 'red'] }),
+    healthReasons: jsonb('health_reasons').$type<unknown[]>().notNull().default([]),
+    /** The first baseline is 1; 0 until the Action Plan is signed. */
+    baselineNo: integer('baseline_no').notNull().default(0),
+    scheduledOn: date('scheduled_on', { mode: 'string' }),
     ...timestamps(),
   },
   (t) => [index('process_runs_status').on(t.orgId, t.status)],
@@ -81,6 +90,11 @@ export const runSteps = pgTable(
     completedAt: timestamptz('completed_at'),
     /** Set when a send-back closed this iteration. */
     resetBySendBackId: uuid('reset_by_send_back_id'),
+    plannedStart: date('planned_start', { mode: 'string' }),
+    plannedEnd: date('planned_end', { mode: 'string' }),
+    forecastStart: date('forecast_start', { mode: 'string' }),
+    forecastEnd: date('forecast_end', { mode: 'string' }),
+    health: text('health', { enum: ['ok', 'at_risk', 'overdue'] }),
     ...timestamps(),
   },
   (t) => [

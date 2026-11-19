@@ -15,8 +15,10 @@ import {
 } from '@coal/shared';
 import { useMutation } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useConditionText } from '@/components/condition-text';
+import { RecordDeviationDialog } from '@/components/deviation-dialog';
+import { StepHealthBadge } from '@/components/health-badge';
 import { PreviewPanel } from '@/components/preview-panel';
 import { ProblemMessage } from '@/components/problem-message';
 import { StepStatusBadge } from '@/components/status-badge';
@@ -27,10 +29,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { api } from '@/lib/api';
-import { formatTime } from '@/lib/format';
-import { useStepDetail } from '@/lib/queries';
+import { isDeviationRequired } from '@/lib/deviation';
+import { formatDate, formatTime } from '@/lib/format';
+import { useMe, useStepDetail } from '@/lib/queries';
+import { cn } from '@/lib/utils';
 
 const OPEN = ['ready', 'in_progress', 'in_review', 'returned'];
+const OPEN_TASK = ['open', 'in_progress', 'waiting'];
 
 type Panel = 'return' | 'sendBack' | 'corrective' | null;
 
@@ -39,17 +44,26 @@ interface Props {
   step: StepView;
   route: RouteView;
   documents: DocumentSummary[];
+  /** Opened and scrolled to, when a widget row or a link points at this step. */
+  focused?: boolean;
   onChanged: () => void;
 }
 
-export function StepCard({ projectId, step, route, documents, onChanged }: Props) {
+export function StepCard({ projectId, step, route, documents, focused = false, onChanged }: Props) {
   const t = useTranslations('step');
   const conditionText = useConditionText(route);
+  const me = useMe();
   const params = { id: projectId, key: step.key };
   const [panel, setPanel] = useState<Panel>(null);
   const [text, setText] = useState('');
   const [target, setTarget] = useState(step.actions.sendBack[0] ?? '');
   const [preview, setPreview] = useState<ActionResult | null>(null);
+  const [deviationFor, setDeviationFor] = useState<'banner' | 'submit' | null>(null);
+  const card = useRef<HTMLLIElement>(null);
+
+  useEffect(() => {
+    if (focused) card.current?.scrollIntoView({ block: 'center' });
+  }, [focused]);
 
   const done = () => {
     setPanel(null);
@@ -58,7 +72,14 @@ export function StepCard({ projectId, step, route, documents, onChanged }: Props
     onChanged();
   };
   const start = useMutation({ mutationFn: () => api(startStep, { params }), onSuccess: done });
-  const submit = useMutation({ mutationFn: () => api(submitStep, { params }), onSuccess: done });
+  const submit = useMutation({
+    mutationFn: () => api(submitStep, { params }),
+    onSuccess: done,
+    // A late step can't go on until someone says why: ask now, then try again.
+    onError: (error) => {
+      if (isDeviationRequired(error)) setDeviationFor('submit');
+    },
+  });
   const approve = useMutation({ mutationFn: () => api(approveStep, { params }), onSuccess: done });
   const giveBack = useMutation({
     mutationFn: () => api(returnStep, { params, body: { comment: text } }),
@@ -103,9 +124,38 @@ export function StepCard({ projectId, step, route, documents, onChanged }: Props
   const hasButtons =
     a.start || a.submit || a.approve || a.return || a.sendBack.length > 0 || a.correctiveActions;
 
+  // Whose reason it is: the step's open work tasks, mine first. The API refuses anyone who may not.
+  const openTasks = step.tasks.filter((task) => OPEN_TASK.includes(task.status));
+  const workTasks = openTasks.filter((task) => task.kind === 'work');
+  const deviationTasks = (workTasks.length > 0 ? workTasks : openTasks)
+    .toSorted(
+      (x, y) => Number(y.assignee?.id === me.data?.id) - Number(x.assignee?.id === me.data?.id),
+    )
+    .map((task) => ({ id: task.id, title: task.title }));
+
   return (
-    <li id={`step-${step.key}`} className="rounded-lg border bg-card text-sm">
-      <details open={isOpen} className="group">
+    <li
+      ref={card}
+      id={`step-${step.key}`}
+      className={cn(
+        'rounded-lg border bg-card text-sm',
+        step.health === 'overdue' && 'border-red-500 ring-2 ring-red-500/60',
+        step.health === 'at_risk' && 'border-amber-400 ring-2 ring-amber-400/60',
+        focused && step.health !== 'overdue' && step.health !== 'at_risk' && 'ring-2 ring-ring',
+      )}
+    >
+      {step.needsDeviation && (
+        <div
+          role="alert"
+          className="flex flex-wrap items-center gap-3 rounded-t-lg border-b border-red-200 bg-red-50 p-3 text-red-950"
+        >
+          <p className="min-w-0 flex-1">{t('needsDeviation', { count: step.daysLate })}</p>
+          <Button size="sm" variant="destructive" onClick={() => setDeviationFor('banner')}>
+            {t('recordWhy')}
+          </Button>
+        </div>
+      )}
+      <details open={isOpen || focused} className="group">
         <summary className="flex cursor-pointer list-none flex-wrap items-center gap-2 p-3">
           <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-md bg-muted font-mono text-xs font-semibold">
             {step.key}
@@ -123,6 +173,12 @@ export function StepCard({ projectId, step, route, documents, onChanged }: Props
                 {t('iteration', { n: step.iteration })}
               </span>
             )}
+            {step.daysLate > 0 && (
+              <span className="text-xs font-medium text-red-700">
+                {t('daysLate', { count: step.daysLate })}
+              </span>
+            )}
+            <StepHealthBadge health={step.health} quiet />
             <StepStatusBadge status={step.status} />
           </span>
         </summary>
@@ -133,6 +189,29 @@ export function StepCard({ projectId, step, route, documents, onChanged }: Props
             <dd>{step.doers.map((d) => d.name).join(', ')}</dd>
             <dt className="text-muted-foreground">{t('signer')}</dt>
             <dd>{step.signer ? step.signer.name : t('noSigner')}</dd>
+            {step.plannedEnd && (
+              <>
+                <dt className="text-muted-foreground">{t('plannedEnd')}</dt>
+                <dd>
+                  {step.plannedStart
+                    ? `${formatDate(step.plannedStart)} → ${formatDate(step.plannedEnd)}`
+                    : formatDate(step.plannedEnd)}
+                </dd>
+              </>
+            )}
+            {step.forecastEnd && (
+              <>
+                <dt className="text-muted-foreground">{t('forecastEnd')}</dt>
+                <dd>
+                  {formatDate(step.forecastEnd)}
+                  {step.daysLate > 0 && (
+                    <span className="ml-2 font-medium text-red-700">
+                      {t('daysLate', { count: step.daysLate })}
+                    </span>
+                  )}
+                </dd>
+              </>
+            )}
             {step.outside.length > 0 && (
               <>
                 <dt className="text-muted-foreground">{t('outside')}</dt>
@@ -412,6 +491,16 @@ export function StepCard({ projectId, step, route, documents, onChanged }: Props
           <ProblemMessage error={error} />
         </div>
       </details>
+      <RecordDeviationDialog
+        open={deviationFor !== null}
+        onOpenChange={(open) => !open && setDeviationFor(null)}
+        tasks={deviationTasks}
+        intro={deviationFor === 'submit' ? t('lateBeforeSubmit') : undefined}
+        onRecorded={() => {
+          onChanged();
+          if (deviationFor === 'submit') submit.mutate();
+        }}
+      />
     </li>
   );
 }

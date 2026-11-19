@@ -2,10 +2,13 @@ import { buildApp, loggerOptions } from './app';
 import { systemContext } from './core/http/context';
 import { createRuntime } from './runtime';
 import { startWorker } from './jobs/worker';
+import { loadSampleCalendar } from './modules/schedule/calendar';
 import { loadSampleTemplates } from './modules/templates/service';
 
 /** Local development: the API and the worker in one process. */
 const runtime = await createRuntime();
+// Made-up holidays, so dates work before Jayon sends its calendar.
+await loadSampleCalendar(runtime.deps.db, runtime.deps.config.orgId);
 // So there is something to make documents from. Real templates replace the samples as new versions.
 try {
   const added = await loadSampleTemplates(

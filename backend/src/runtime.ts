@@ -21,6 +21,7 @@ export async function createRuntime() {
     storage,
     pdf: new GotenbergRenderer(config.pdf),
     scanner: config.scan ? new ClamdScanner(config.scan) : null,
+    now: () => new Date(),
   };
   return { deps, pool, log };
 }
