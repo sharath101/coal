@@ -248,7 +248,7 @@ export async function recordSendBack(
 /**
  * Saves what an action did: the run's status, each step that changed (a send-back closes the
  * old iteration and adds a new one), and the decisions and milestones it recorded.
- * Returns each step's current row id.
+ * Returns each step's current row id, and the decisions it recorded (which are then signed).
  */
 export async function saveOutcome(
   tx: Tx,
@@ -258,8 +258,9 @@ export async function saveOutcome(
   effects: Effect[],
   attribution: Attribution,
   sendBackId?: string,
-): Promise<Map<StepKey, string>> {
+): Promise<{ stepIds: Map<StepKey, string>; decisions: DecisionRow[] }> {
   const { run, route, state: before } = loaded;
+  const recorded: DecisionRow[] = [];
   const stepIds = new Map(loaded.stepIds);
   const now = new Date();
 
@@ -310,15 +311,17 @@ export async function saveOutcome(
 
   for (const effect of effects) {
     if (effect.type === 'decision.recorded') {
-      await recordDecision(tx, orgId, run.id, {
-        runStepId: effect.step ? stepIds.get(effect.step) : undefined,
-        stepKey: effect.step,
-        iteration: effect.iteration,
-        decision: effect.decision,
-        value: effect.value,
-        reason: attribution.reason,
-        by: attribution.userId,
-      });
+      recorded.push(
+        await recordDecision(tx, orgId, run.id, {
+          runStepId: effect.step ? stepIds.get(effect.step) : undefined,
+          stepKey: effect.step,
+          iteration: effect.iteration,
+          decision: effect.decision,
+          value: effect.value,
+          reason: attribution.reason,
+          by: attribution.userId,
+        }),
+      );
     } else if (effect.type === 'milestone.recorded') {
       await tx.insert(milestones).values({
         orgId,
@@ -332,8 +335,10 @@ export async function saveOutcome(
       });
     }
   }
-  return stepIds;
+  return { stepIds, decisions: recorded };
 }
+
+export type DecisionRow = typeof decisions.$inferSelect;
 
 /** Hold, resume and drop are decisions of the run, with their reason. */
 export async function recordDecision(
@@ -349,18 +354,27 @@ export async function recordDecision(
     reason?: string | null | undefined;
     by: string;
   },
-): Promise<void> {
-  await tx.insert(decisions).values({
-    orgId,
-    runId,
-    runStepId: input.runStepId ?? null,
-    stepKey: input.stepKey ?? null,
-    iteration: input.iteration ?? null,
-    decision: input.decision,
-    value: input.value,
-    reason: input.reason ?? null,
-    decidedBy: input.by,
-  });
+): Promise<DecisionRow> {
+  const [row] = await tx
+    .insert(decisions)
+    .values({
+      orgId,
+      runId,
+      runStepId: input.runStepId ?? null,
+      stepKey: input.stepKey ?? null,
+      iteration: input.iteration ?? null,
+      decision: input.decision,
+      value: input.value,
+      reason: input.reason ?? null,
+      decidedBy: input.by,
+    })
+    .returning();
+  return row as DecisionRow;
+}
+
+export async function findRunStep(ex: Executor, id: string): Promise<RunStepRow | null> {
+  const [row] = await ex.select().from(runSteps).where(eq(runSteps.id, id));
+  return row ?? null;
 }
 
 export async function runsByStatus(ex: Executor, orgId: string, statuses: RunRow['status'][]) {

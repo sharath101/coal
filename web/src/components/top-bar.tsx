@@ -3,6 +3,7 @@
 import { signOut, type Me } from '@coal/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
+  FileText,
   FolderKanban,
   LayoutDashboard,
   ListChecks,
@@ -15,6 +16,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';
+import { canManageTemplates } from '@/lib/roles';
 import { cn } from '@/lib/utils';
 
 /** The two pages per person, with the toggle between them (docs/dashboard.md). */
@@ -49,12 +51,16 @@ function PageToggle() {
 }
 
 /** Where the work is: every project, and the tasks that are mine. */
-function MainLinks() {
+function MainLinks({ roleKey }: { roleKey: string }) {
   const t = useTranslations('nav');
   const pathname = usePathname();
   const links = [
     { href: '/projects', label: t('projects'), icon: FolderKanban },
     { href: '/tasks', label: t('tasks'), icon: ListChecks },
+    // The VP and the R&D Head manage the template library.
+    ...(canManageTemplates(roleKey)
+      ? [{ href: '/templates', label: t('templates'), icon: FileText }]
+      : []),
   ];
   return (
     <nav aria-label={t('main')} className="flex gap-1">
@@ -95,7 +101,7 @@ export function TopBar({ me }: { me: Me }) {
       <Link href="/dashboard" className="text-lg font-semibold tracking-tight">
         {tApp('name')}
       </Link>
-      <MainLinks />
+      <MainLinks roleKey={me.role.key} />
       <div className="flex flex-1 justify-center">
         <PageToggle />
       </div>

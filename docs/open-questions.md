@@ -39,6 +39,7 @@
 | W18 | Steps 12, 24a and 24b are done by "the project team". Does every team member get a task at those steps, or only the Lead and DARD? | Every team member who has no other task at the step gets one | R&D Head |
 | W19 | Step 16: who raises the corrective actions, who closes them, and who may decide that one is no longer needed? | The Lead raises them, and they go to the Lead unless the Lead names someone; the person they are assigned to closes them | R&D Head |
 | W20 | When several people hold a role that the route needs (for example two DARD users, or two R&D Heads), who gets the task? | The role's queue, unless exactly one of them is on the project team; the Lead or Head can assign it | R&D Head |
+| W21 | Can the same person submit a step and sign it off? The route lets it happen where a role both does and signs a step (for example the Lead at step 14) | Yes, as the route lists it. The step's sign-off record then carries both signatures. Separation of duties applies to a document's own rows, not to step sign-offs | VP, R&D Head |
 
 ## People and access
 
@@ -60,11 +61,15 @@
 | ID | Question | Assumption in use | Ask |
 |---|---|---|---|
 | S1 | Who reviews each document type before approval? | The table in [documents-and-signing.md](./documents-and-signing.md#reviewers-and-approvers) | R&D Head, company QA |
-| S2 | Jayon's document numbering, revision and retention conventions | `{project code}-{type}-{nn}`; keep everything | Company QA |
+| S2 | Jayon's document numbering, revision and retention conventions | Numbered `{project code}-{abbreviation}-{nn}` (for example `SPN-26-001-PID-01`; abbreviations in [documents-and-signing.md](./documents-and-signing.md#document-types)); revision letters A, B, C given at approval; keep everything | Company QA |
 | S3 | Are passkey signatures enough under Indian law, and where is Aadhaar eSign or a DSC needed? | Not needed while data is made-up | An Indian lawyer |
 | S4 | May someone sign on another's behalf during leave? | Not for now | VP |
 | S5 | What is the policy on AI-drafted documents that will be signed? Should "AI-assisted" be printed on the PDF? | Allowed, as drafts that people review and sign; marked in the record only | Company QA |
-| S6 | Who adds templates and makes a version active: company QA, the R&D Head, or both? Must templates go through Jayon's document control? | The R&D Head or company QA | Company QA |
+| S6 | Who adds templates and makes a version active: company QA, the R&D Head, or both? Must templates go through Jayon's document control? | The VP or the R&D Head adds and activates (founders, 19 Nov 2026), including their own upload. No document-control step, and no two-person rule | Company QA |
+| S7 | Must a step's documents be approved before the step can be submitted for sign-off? | No. The website warns, and the sign-off record lists each output with its status and hash | VP, company QA |
+| S8 | Should a signed PDF show its signatures (names, meanings, dates)? | Not yet. Signatures are shown on screen and tied to the PDF's hash. A signature block and a company seal on the PDF come with the "sealed PDFs" item in [documents-and-signing.md](./documents-and-signing.md#later) | Company QA |
+| S9 | Should activating a template need a second person, so nobody activates their own upload? | No (S6). It is a one-line change if wanted | VP, company QA |
+| S10 | Is the product concept at step C a document, with its own template, and who writes it? | No document yet: Go records the idea's name and description, and that is the concept. A template can be added as a document type later | VP |
 
 ## AI
 

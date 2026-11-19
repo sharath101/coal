@@ -19,5 +19,6 @@ export const config = {
     '/profile/:path*',
     '/projects/:path*',
     '/tasks/:path*',
+    '/templates/:path*',
   ],
 };

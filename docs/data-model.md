@@ -44,6 +44,9 @@ erDiagram
   run_steps ||--o{ document_versions : "made in"
   document_versions ||--o{ signature_requests : needs
   signature_requests ||--o| signatures : "filled by"
+  decisions ||--o| signatures : "signed by"
+  process_runs ||--o{ attachments : holds
+  process_runs ||--o{ sources : cites
   run_steps ||--o{ decisions : records
   process_runs ||--o{ milestones : records
   tasks ||--o{ deviations : explains
@@ -55,7 +58,8 @@ In words:
 - A **process run** is one run of a process's **route** (`process_versions`). For R&D, each **project** has one run.
 - Each step becomes a **run step**, once per iteration, and run steps create **tasks**.
 - Runs produce **documents**. A document is made from a **template** version of its type, or uploaded, and has numbered **versions**.
-- Anything that needs a signature gets **signature requests**, which **signatures** fill. That includes a document version, a step sign-off record, or a decision.
+- A document version that needs signing gets **signature requests**, one for each row, which **signatures** fill. A step sign-off record is a document, so it works the same way. A decision is signed directly: its signature points at the decision.
+- **Attachments** and **sources** hang off a run and a step, document or task.
 - **Proposals** hold actions waiting for a person to confirm them.
 
 ## Tables
@@ -94,8 +98,8 @@ Departments, roles and product lines are reference data. Their rows are listed i
 | Table | Holds | Key columns |
 |---|---|---|
 | `milestones` *(insert-only)* | Milestones recorded, such as material received | run_id, milestone, step_key and iteration (where it counts), note, evidence_file_id, recorded_by, recorded_at |
-| `decisions` *(insert-only)* | Go, checkpoint and step decisions, and hold, resume and drop | run_id, run_step_id, step_key, iteration, decision (go, checkpoint, prototypes_ok, preclinical_needed, hold, resume, drop), value, reason, decided_by. *The signature link comes with signing* |
-| `send_backs` *(insert-only)* | Each time work is sent back to an earlier step | run_id, from_run_step_id, from_step_key, to_step_key, reason, evidence_file_id, decided_by, reset_run_step_ids. *The signature link comes with signing* |
+| `decisions` *(insert-only)* | Go, checkpoint and step decisions, and hold, resume and drop | run_id, run_step_id, step_key, iteration, decision (go, checkpoint, prototypes_ok, preclinical_needed, hold, resume, drop), value, reason, decided_by. *Each decision is signed: the signature points at the decision* |
+| `send_backs` *(insert-only)* | Each time work is sent back to an earlier step | run_id, from_run_step_id, from_step_key, to_step_key, reason, evidence_file_id, decided_by, reset_run_step_ids. *A send-back isn't signed; its reason is kept in the record and the audit trail* |
 | `tasks` | Every task and request | run_id, run_step_id and step_key (empty for work outside a process), task_key (names a task a step makes beyond one per doer role), kind (work, review, sign, decision, corrective action, request, own), title, body, role_key, assignee_id, queue_role (set while the task waits in a queue), assigned_by, via_ai, status (open, in progress, waiting, done, declined, cancelled), keep_on_reset (a send-back never cancels it: the step-20 follow-up), subject_type, subject_id and subject_label (the project, for links), done_at. *Due dates, requests and waiting reasons come with the Dashboard and Tasks work* |
 | `timeline_items` | Planned dates per step and role: defaults first, then each baseline from the Action Plan | run_id, baseline_no, step_key, role, user_id, planned_start, planned_end |
 | `deviations` *(insert-only)* | Late work, with the reason and the cause | run_id, task_id, run_step_id, kind (late, forecast slip, rework), planned_date, new_date, reason_code, reason_text, cause_type (person, role, outside party), cause_user_id, cause_role, cause_party, recorded_by, reviewed_by, corrects_id |
@@ -106,15 +110,17 @@ Departments, roles and product lines are reference data. Their rows are listed i
 
 | Table | Holds | Key columns |
 |---|---|---|
-| `document_types` | Each kind of document and its rules | code, name, department_id, step_keys, numbering_pattern, signature_rows (JSON: meaning, who, order) |
-| `templates` | The template library: every version of every document type's template ([documents-and-signing.md](./documents-and-signing.md#the-template-library)). At most one active version per type | document_type_id, version, docx_file_id, spec (JSON), placeholders (JSON, read from the Word file), sample_pdf_file_id, status (draft, active, retired), added_by, activated_by, activated_at |
-| `documents` | Every document | run_id, step_key, document_type_id, template_id (the version it was made from), number, title, status, current_version_id, origin (internal, outside) |
-| `document_versions` | Each draft and approved revision | document_id, run_step_id, version_no, rev_label, status (draft, in review, returned, approved, superseded), content (JSON), content_sha256, pdf_file_id, pdf_sha256, search_text (full-text), created_by, via_ai, ai_request_id |
-| `signature_requests` | Every signature needed | subject_type (document version, decision), subject_id, subject_version, meaning (prepared, reviewed, approved, received, decision), assignee_id, order_index, status, requested_at, due_at |
-| `signatures` *(insert-only)* | Each signature | request_id, subject_type, subject_id, subject_version, content_sha256, pdf_sha256, user_id, printed_name, role_snapshot, meaning, decision, reason, intent (JSON), intent_sha256, passkey_id, authenticator_data, client_data_json, assertion_signature, signed_at |
-| `files` | Every stored file | storage_key, name, mime_type (from the file extension), size, sha256 (recorded when the upload completes), status (pending, uploaded), uploaded_by, scan_status (not scanned, clean, infected), origin (internal, outside) |
-| `attachments` | Files and pictures on any record | target_type, target_id, file_id, caption |
-| `sources` | Sources added to a step or document | target_type, target_id, kind (link, file, citation), title, url, file_id, note, added_by |
+| `document_types` | Each kind of document and its rules ([documents-and-signing.md](./documents-and-signing.md#document-types)). Loaded from `catalogue.ts` on deploy | code, name, department_code, kind (template, upload, record), sensitivity (normal, budget), step_keys (empty: any step), numbering_pattern, signature_plan (JSON: rows, reviewed_by, approved_by) |
+| `templates` | The template library: every version of every document type's template ([documents-and-signing.md](./documents-and-signing.md#the-template-library)). At most one active version per type (a partial unique index) | document_type_id, version, status (draft, active, retired), name, spec (JSON), placeholders (JSON, the tags read from the Word file), docx_file_id, sample_pdf_file_id, notes, added_by (empty for templates COAL loaded itself), activated_by, activated_at, retired_at |
+| `documents` | Every document, on a run and a step | run_id, step_key, document_type_id, template_id (the version it was made from; empty for an upload), number (unique), title, signature_plan (JSON, fixed when it was made), created_by |
+| `document_versions` | Each draft and approved revision. **Its content never changes** (a trigger refuses it; see below) | document_id, run_step_id and iteration (the step iteration it was made in), version_no, rev_label (given at approval), status (draft, in review, returned, approved, superseded), content (JSON: fields and written sections), content_sha256, file_id (an uploaded file), pdf_file_id, pdf_sha256, search_text, note, created_by, via_ai, ai_request_id, carried_from_version_id |
+| `signature_requests` | Each signature a version needs, in order | version_id, meaning (prepared, reviewed, approved), role_keys (anyone with one of these may sign), assignee_id (when one person is named, such as each Board member), order_index, status (waiting, pending, signed, returned, cancelled), requested_at, completed_at, returned_by, return_comment |
+| `signatures` *(insert-only)* | Each signature, on a document version or a decision | request_id (empty for a decision), subject_type (document_version, decision), subject_id, content_sha256, pdf_sha256, user_id, printed_name, role_key, role_name, meaning (prepared, reviewed, approved, decision), decision, reason, method (`click` until passkeys), signed_at. *The passkey columns (intent, authenticator data, client data, assertion) come with passkeys* |
+| `files` | Every stored file | storage_key, name, mime_type (from the file extension), size, sha256 (recorded when the upload completes), status (pending, uploaded), uploaded_by (empty for a file COAL made with no person behind it), scan_status (not scanned, clean, infected), origin (internal, outside) |
+| `attachments` | Files and pictures on a step, document or task | run_id, step_key, document_id, task_id (exactly one of the last three), file_id, caption, added_by |
+| `sources` | Sources added to a step, document or task | run_id, step_key, document_id, task_id, kind (link, file, citation), title, url, file_id, note, added_by |
+
+**Guards in the database** (migration 0005): `signatures` is insert-only. `document_versions` rows can't be deleted, and an update may change only a version's status and revision letter, forwards: content, files, hashes, step iteration and author never change, an approved version can only become superseded, and a revision letter once given stays.
 
 The step sign-off record is a document of type `STEP_SIGNOFF`, so it needs no table of its own.
 

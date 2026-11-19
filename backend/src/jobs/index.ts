@@ -3,15 +3,18 @@ import type { Logger } from 'pino';
 import type { Db } from '../core/db/client';
 import type { AppDeps } from '../core/deps';
 import { deleteOldIdempotencyKeys } from '../core/http/idempotency';
+import { systemContext } from '../core/http/context';
 import { verifyAuditChain } from '../modules/audit/service';
+import { scanPending } from '../modules/files/service';
 
 /**
  * Background jobs (docs/architecture.md#background-jobs). Each job is safe to run twice.
- * Reminders, the forecast, rendering, virus scanning and notifications join as their blocks land.
+ * Reminders, the forecast and notifications join as their blocks land.
  */
 export const JOBS = {
   auditChainCheck: 'audit.verify-chain',
   idempotencyCleanup: 'platform.idempotency-cleanup',
+  scanPendingFiles: 'files.scan-pending',
 } as const;
 
 export async function runAuditChainCheck(db: Db, log: Logger) {
@@ -31,14 +34,21 @@ export async function startJobs(deps: AppDeps, log: Logger) {
 
   await boss.createQueue(JOBS.auditChainCheck);
   await boss.createQueue(JOBS.idempotencyCleanup);
+  await boss.createQueue(JOBS.scanPendingFiles);
   await boss.schedule(JOBS.auditChainCheck, '30 2 * * *', null, { tz: 'Asia/Kolkata' });
   await boss.schedule(JOBS.idempotencyCleanup, '0 * * * *', null, { tz: 'Asia/Kolkata' });
+  // Uploads whose scan didn't finish (the scanner was down) are tried again.
+  await boss.schedule(JOBS.scanPendingFiles, '* * * * *', null, { tz: 'Asia/Kolkata' });
 
   await boss.work(JOBS.auditChainCheck, async () => {
     await runAuditChainCheck(deps.db, log);
   });
   await boss.work(JOBS.idempotencyCleanup, async () => {
     await deleteOldIdempotencyKeys(deps.db);
+  });
+  await boss.work(JOBS.scanPendingFiles, async () => {
+    const scanned = await scanPending(deps, systemContext(deps.config.orgId, 'job'));
+    if (scanned > 0) log.info({ scanned }, 'scanned waiting uploads');
   });
 
   return boss;

@@ -87,10 +87,14 @@ async function stepAction(a: StepActionArgs): Promise<ActionResult> {
         'evidenceFileId',
       );
     }
-    const collected = await performAction(tx, log, env, await a.action(tx, env, step), {
-      userId: a.actor.userId,
-      ...a.attribution,
-    });
+    const collected = await performAction(
+      tx,
+      log,
+      env,
+      await a.action(tx, env, step),
+      { userId: a.actor.userId, ...a.attribution },
+      { deps: a.deps, preview },
+    );
     return { saved: !preview, preview: toPreview(collected) };
   });
 }
@@ -113,7 +117,14 @@ async function runAction(
       drop: 'projects.drop',
     } as const;
     assertMay(env, permission[type], runActionRoles(env.loaded.route, env.loaded.state)[type]);
-    const collected = await performAction(tx, log, env, { type }, { userId: actor.userId, reason });
+    const collected = await performAction(
+      tx,
+      log,
+      env,
+      { type },
+      { userId: actor.userId, reason },
+      { deps, preview },
+    );
     return { saved: !preview, preview: toPreview(collected) };
   });
 }
@@ -127,7 +138,10 @@ export const rndRoutes = [
 
   implement(createProject, ({ deps, ctx, actor, query, body }) =>
     previewable(deps.db, ctx, query.preview, async (tx, log) => {
-      const { project, collected, team } = await goProject(tx, log, ctx, actor, body);
+      const { project, collected, team } = await goProject(tx, log, ctx, actor, body, {
+        deps,
+        preview: query.preview,
+      });
       const preview = toPreview(
         collected,
         team.map((u) => ({ id: u.id, name: u.name })),
@@ -334,6 +348,7 @@ export const rndRoutes = [
           ...(body.note && { note: body.note }),
           ...(body.evidenceFileId && { evidenceFileId: body.evidenceFileId }),
         },
+        { deps, preview: query.preview },
       );
       return { saved: !query.preview, preview: toPreview(collected) };
     }),

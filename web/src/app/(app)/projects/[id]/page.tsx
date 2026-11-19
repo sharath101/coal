@@ -10,7 +10,7 @@ import { ProblemMessage } from '@/components/problem-message';
 import { ProjectStatusBadge } from '@/components/status-badge';
 import { StepCard } from '@/components/step-card';
 import { TeamPanel } from '@/components/team-panel';
-import { useProject, useProjectRoute, useRefreshProject } from '@/lib/queries';
+import { useProject, useProjectDocuments, useProjectRoute, useRefreshProject } from '@/lib/queries';
 
 /** The project page: the route by stage, with each step's state and what you may do now. */
 export default function ProjectPage() {
@@ -19,6 +19,7 @@ export default function ProjectPage() {
   const tProjects = useTranslations('projects');
   const project = useProject(id);
   const route = useProjectRoute(id);
+  const documents = useProjectDocuments(id);
   const refresh = useRefreshProject(id);
   const changed = () => void refresh();
 
@@ -62,6 +63,7 @@ export default function ProjectPage() {
         </header>
 
         <p className="text-xs text-muted-foreground">{t('signOffNote')}</p>
+        <ProblemMessage error={documents.error} />
         {r.openCorrectiveActions > 0 && (
           <p className="text-sm font-medium">
             {t('corrective', { count: r.openCorrectiveActions })}
@@ -83,6 +85,7 @@ export default function ProjectPage() {
                       projectId={id}
                       step={step}
                       route={r}
+                      documents={(documents.data ?? []).filter((d) => d.stepKey === step.key)}
                       onChanged={changed}
                     />
                   ))}

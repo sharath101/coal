@@ -74,7 +74,7 @@ Every backend endpoint declares what the AI may do with it: its **AI tier** ([ap
 
 - **Marked calls.** Every AI tool call is marked "via AI" and carries the user's identity.
 - **Refusals.** Endpoints at the `confirm` tier refuse marked calls, except to create a proposal. Endpoints at the `never` tier refuse them outright.
-- **Signing.** Signing also needs Face ID or a fingerprint on the user's own device, which the AI can't provide.
+- **Signing.** Signing is a person's own act: a confirmed click for now, and Face ID or a fingerprint on the user's own device once passkeys arrive. The AI can't do either, and the sign endpoints are closed to it (tier `never`).
 
 ### Action cards
 

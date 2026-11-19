@@ -292,6 +292,9 @@ function requireRunStatus(state: RunState, allowed: RunStatus[]): void {
 /** Step work goes on while the run is active, and after launch for steps still open (step 20). */
 const WORKING: RunStatus[] = ['active', 'completed'];
 
+/** Is the run in a state where step work (and so document work) can go on? */
+export const isWorking = (state: RunState): boolean => WORKING.includes(state.status);
+
 function requireOpen(key: StepKey, s: StepState): void {
   if (!isOpen(s.status)) {
     throw new EngineError(

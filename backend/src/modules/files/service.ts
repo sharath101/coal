@@ -1,5 +1,5 @@
 import { checkUpload, type StoredFile } from '@coal/shared';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { change } from '../../core/db/change';
 import type { Executor } from '../../core/db/client';
 import { newId } from '../../core/db/columns';
@@ -10,9 +10,9 @@ import { assertCanAccess } from '../permissions';
 import { isChangedSinceInspected } from './storage';
 import { files } from './tables';
 
-type FileRow = typeof files.$inferSelect;
+export type FileRow = typeof files.$inferSelect;
 
-const present = (row: FileRow): StoredFile => ({
+export const present = (row: FileRow): StoredFile => ({
   id: row.id,
   name: row.name,
   mimeType: row.mimeType,
@@ -49,6 +49,119 @@ async function loadFile(deps: AppDeps, ctx: RequestContext, id: string): Promise
     .where(and(eq(files.orgId, ctx.orgId), eq(files.id, id)));
   if (!row) throw notFound('file');
   return row;
+}
+
+export async function findFiles(ex: Executor, orgId: string, ids: string[]): Promise<FileRow[]> {
+  if (ids.length === 0) return [];
+  return ex
+    .select()
+    .from(files)
+    .where(and(eq(files.orgId, orgId), inArray(files.id, [...new Set(ids)])));
+}
+
+export interface GeneratedFile {
+  name: string;
+  bytes: Buffer;
+  contentType: string;
+  /** The person it is made for. Null when no person is behind it. */
+  userId: string | null;
+}
+
+/**
+ * Stores a file COAL made itself (a PDF) and records it as uploaded, with its hash. COAL made it,
+ * so it needs no virus scan. The bytes are written before the row, so a row never points at nothing.
+ */
+export async function storeGeneratedFile(
+  deps: AppDeps,
+  tx: Executor,
+  orgId: string,
+  input: GeneratedFile,
+): Promise<FileRow> {
+  const id = newId();
+  const storageKey = `${orgId}/${id}`;
+  const written = await deps.storage.write(storageKey, input.bytes, input.contentType);
+  const [row] = await tx
+    .insert(files)
+    .values({
+      id,
+      orgId,
+      storageKey,
+      name: input.name,
+      mimeType: input.contentType,
+      size: written.size,
+      sha256: written.sha256,
+      status: 'uploaded',
+      scanStatus: 'clean',
+      origin: 'internal',
+      uploadedBy: input.userId,
+    })
+    .returning();
+  return row as FileRow;
+}
+
+/** Reads a finished upload's bytes, for COAL's own use. */
+export async function readFileBytes(deps: AppDeps, row: FileRow): Promise<Buffer> {
+  return deps.storage.read(row.storageKey);
+}
+
+/**
+ * Scans a finished upload, and records the result. Where there is no scanner it does nothing,
+ * and the file stays "not scanned". A scanner that can't be reached leaves the file as it was; the
+ * worker's sweep, or a repeated `complete`, tries again.
+ */
+export async function scanStored(
+  deps: AppDeps,
+  ctx: RequestContext,
+  row: FileRow,
+): Promise<FileRow> {
+  if (!deps.scanner || row.status !== 'uploaded' || row.scanStatus !== 'not_scanned') return row;
+  let verdict;
+  try {
+    verdict = await deps.scanner.scan(await deps.storage.stream(row.storageKey));
+  } catch {
+    return row;
+  }
+  const scanStatus = verdict.clean ? 'clean' : 'infected';
+  return change(deps.db, ctx, async (tx, log) => {
+    const [updated] = await tx
+      .update(files)
+      .set({ scanStatus })
+      .where(
+        and(eq(files.orgId, ctx.orgId), eq(files.id, row.id), eq(files.scanStatus, 'not_scanned')),
+      )
+      .returning();
+    if (!updated) return row;
+    log.audit({
+      action: 'file.scanned',
+      recordType: 'file',
+      recordId: row.id,
+      before: { scanStatus: row.scanStatus },
+      after: { scanStatus, ...(verdict.clean ? {} : { threat: verdict.threat }) },
+    });
+    return updated;
+  });
+}
+
+/** The worker's sweep: scans uploads that are still "not scanned". Safe to run twice. */
+export async function scanPending(deps: AppDeps, ctx: RequestContext, limit = 25): Promise<number> {
+  if (!deps.scanner) return 0;
+  const rows = await deps.db
+    .select()
+    .from(files)
+    .where(
+      and(
+        eq(files.orgId, ctx.orgId),
+        eq(files.status, 'uploaded'),
+        eq(files.scanStatus, 'not_scanned'),
+      ),
+    )
+    .limit(limit);
+  let scanned = 0;
+  for (const row of rows) {
+    const after = await scanStored(deps, ctx, row);
+    if (after.scanStatus !== 'not_scanned') scanned += 1;
+  }
+  return scanned;
 }
 
 export async function createUpload(
@@ -108,7 +221,7 @@ export async function createUpload(
 export async function completeUpload(deps: AppDeps, ctx: RequestContext, actor: Actor, id: string) {
   const row = await loadFile(deps, ctx, id);
   assertCanAccess('files.upload', actor, { uploadedBy: row.uploadedBy });
-  if (row.status === 'uploaded') return present(row);
+  if (row.status === 'uploaded') return present(await scanStored(deps, ctx, row));
 
   const staged = await deps.storage.inspect(stagingKey(row), row.size);
   if (staged === 'missing') {
@@ -137,7 +250,7 @@ export async function completeUpload(deps: AppDeps, ctx: RequestContext, actor: 
   }
   const sha256 = staged.sha256;
 
-  return change(deps.db, ctx, async (tx, log) => {
+  const uploaded = await change(deps.db, ctx, async (tx, log) => {
     const [updated] = await tx
       .update(files)
       .set({ status: 'uploaded', sha256 })
@@ -150,18 +263,45 @@ export async function completeUpload(deps: AppDeps, ctx: RequestContext, actor: 
       before: snapshot(row),
       after: snapshot(updated!),
     });
-    return present(updated!);
+    return updated!;
   });
+  return present(await scanStored(deps, ctx, uploaded));
 }
 
-export async function fileLink(deps: AppDeps, ctx: RequestContext, actor: Actor, id: string) {
+/**
+ * A short-lived link to a file. The uploader may always open it; anyone else needs a record they
+ * may see to hold it, which `viaRecord` decides (docs/roles-and-access.md).
+ */
+export async function fileLink(
+  deps: AppDeps,
+  ctx: RequestContext,
+  actor: Actor,
+  id: string,
+  viaRecord: (row: FileRow) => Promise<boolean>,
+) {
   const row = await loadFile(deps, ctx, id);
-  assertCanAccess('files.read', actor, { uploadedBy: row.uploadedBy });
+  const asUploader = actor.userId === row.uploadedBy;
+  assertCanAccess('files.read', actor, {
+    uploadedBy: row.uploadedBy,
+    viaRecord: asUploader ? false : await viaRecord(row),
+  });
+  return linkTo(deps, row);
+}
+
+/** Makes the link, once the person is known to be allowed: the file must be finished and not infected. */
+export async function linkTo(deps: AppDeps, row: FileRow) {
   if (row.status !== 'uploaded') {
     throw new AppError(409, 'UPLOAD_INCOMPLETE', 'The file has not been uploaded yet.');
   }
   if (row.scanStatus === 'infected') {
     throw new AppError(403, 'NOT_ALLOWED', 'This file failed the virus scan and cannot be opened.');
+  }
+  if (deps.scanner && row.scanStatus === 'not_scanned') {
+    throw new AppError(
+      409,
+      'FILE_NOT_SCANNED',
+      'This file has not been checked for viruses yet. Try again in a moment.',
+    );
   }
   const seconds = deps.config.storage.linkSeconds;
   return {
@@ -171,8 +311,8 @@ export async function fileLink(deps: AppDeps, ctx: RequestContext, actor: Actor,
 }
 
 /**
- * Evidence attached to a record must be a finished upload that the person may use. Until
- * attachments widen who may use a file, that is the uploader (docs/api.md#documents-templates-files-and-sources).
+ * A file attached to a record (evidence, an attachment, an uploaded document, a template) must be
+ * a finished upload by the person using it, and one that did not fail the virus scan.
  */
 export async function assertUsableEvidence(
   ex: Executor,
@@ -180,7 +320,7 @@ export async function assertUsableEvidence(
   actor: Actor,
   id: string,
   path: string,
-): Promise<void> {
+): Promise<FileRow> {
   const [row] = await ex
     .select()
     .from(files)
@@ -189,4 +329,8 @@ export async function assertUsableEvidence(
     throw validationFailed('The file has not been uploaded.', path);
   }
   assertCanAccess('files.read', actor, { uploadedBy: row.uploadedBy });
+  if (row.scanStatus === 'infected') {
+    throw validationFailed('This file failed the virus scan.', path);
+  }
+  return row;
 }

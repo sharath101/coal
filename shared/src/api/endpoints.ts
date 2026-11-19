@@ -1,4 +1,31 @@
 import type { EndpointSpec } from './contract';
+import {
+  createAttachment,
+  listAttachments,
+  createSource,
+  listSources,
+} from '../schemas/attachments';
+import {
+  compareVersions,
+  createDocument,
+  getDocument,
+  getVersionLinks,
+  listProjectDocuments,
+  listSignatureRequests,
+  returnRequest,
+  saveVersion,
+  signRequest,
+  submitVersion,
+} from '../schemas/documents';
+import {
+  activateTemplate,
+  createTemplate,
+  getActiveTemplate,
+  getTemplate,
+  getTemplateLinks,
+  listDocumentTypes,
+  listTemplates,
+} from '../schemas/templates';
 import { completeUpload, createUpload, getFileLink } from '../schemas/files';
 import { listRoles } from '../schemas/org';
 import { getProcess, getProcessStep, listProcesses } from '../schemas/process';
@@ -71,6 +98,27 @@ export const ENDPOINTS = [
   updateTask,
   claimTask,
   reassignTask,
+  listDocumentTypes,
+  listTemplates,
+  getActiveTemplate,
+  getTemplate,
+  createTemplate,
+  activateTemplate,
+  getTemplateLinks,
+  listProjectDocuments,
+  createDocument,
+  getDocument,
+  saveVersion,
+  getVersionLinks,
+  compareVersions,
+  submitVersion,
+  signRequest,
+  returnRequest,
+  listSignatureRequests,
+  createAttachment,
+  listAttachments,
+  createSource,
+  listSources,
 ] as const satisfies readonly EndpointSpec[];
 
 export type Endpoint = (typeof ENDPOINTS)[number];

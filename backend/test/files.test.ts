@@ -114,7 +114,7 @@ describe('file storage', () => {
     expect(res.statusCode).toBe(403);
     expect(res.json()).toMatchObject({
       code: 'NOT_ALLOWED',
-      whoCan: ['The person who uploaded it'],
+      whoCan: ['The person who uploaded it', 'People who can see the record it belongs to'],
     });
   });
 

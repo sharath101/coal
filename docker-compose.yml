@@ -41,6 +41,24 @@ services:
     ports:
       - '3100:3000'
 
+  # Virus scanning of uploads. Optional, and slow to start (it loads its signatures):
+  #   docker compose --profile scan up -d      then set CLAMAV_HOST=localhost
+  clamav:
+    image: clamav/clamav:stable
+    profiles: ['scan']
+    environment:
+      # Uploads may be up to 100 MB (shared/src/rules/files.ts).
+      CLAMD_CONF_StreamMaxLength: 100M
+      CLAMD_CONF_MaxFileSize: 100M
+    ports:
+      - '3310:3310'
+    healthcheck:
+      test: ['CMD', '/usr/local/bin/clamdcheck.sh']
+      interval: 10s
+      timeout: 10s
+      retries: 30
+      start_period: 120s
+
 volumes:
   postgres-data:
   minio-data:

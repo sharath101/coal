@@ -36,6 +36,11 @@ export interface FileStorage {
   /** Copies exactly the inspected bytes (checked by ETag) to the final key, then drops the staged copy. */
   promote(stagingKey: string, finalKey: string, etag: string, contentType: string): Promise<void>;
   downloadUrl(key: string, fileName: string, seconds: number): Promise<string>;
+  /** Writes bytes COAL made itself (a PDF) straight to a final key. */
+  write(key: string, bytes: Buffer, contentType: string): Promise<{ size: number; sha256: string }>;
+  /** Reads a stored file, for COAL's own use: filling a template, scanning. */
+  read(key: string): Promise<Buffer>;
+  stream(key: string): Promise<Readable>;
 }
 
 const statusOf = (error: unknown) =>
@@ -119,6 +124,29 @@ export class S3FileStorage implements FileStorage {
       }),
     );
     await this.client.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: stagingKey }));
+  }
+
+  async write(key: string, bytes: Buffer, contentType: string) {
+    await this.client.send(
+      new PutObjectCommand({
+        Bucket: this.bucket,
+        Key: key,
+        Body: bytes,
+        ContentType: contentType,
+      }),
+    );
+    return { size: bytes.length, sha256: createHash('sha256').update(bytes).digest('hex') };
+  }
+
+  async stream(key: string): Promise<Readable> {
+    const object = await this.client.send(new GetObjectCommand({ Bucket: this.bucket, Key: key }));
+    return object.Body as Readable;
+  }
+
+  async read(key: string): Promise<Buffer> {
+    const chunks: Buffer[] = [];
+    for await (const chunk of await this.stream(key)) chunks.push(chunk as Buffer);
+    return Buffer.concat(chunks);
   }
 
   async downloadUrl(key: string, fileName: string, seconds: number) {

@@ -35,7 +35,7 @@ This is the first-release endpoint list. The generated OpenAPI spec is the exact
     Successful responses are kept for a day.
   - Edits take an `If-Match` header with the version the user saw, so two people, or a person and the AI, can't overwrite each other. A stale version gets `412 VERSION_CONFLICT`. For `PATCH /me`, the version is the profile's `updatedAt`.
 - **Preview.** Every workflow action (Go, start, submit, approve, return, decisions, send back, milestones, corrective actions, hold, resume and drop) accepts `?preview=true`. An action that can't preview refuses it with `400 VALIDATION_FAILED` instead of ignoring it, so a caller that adds `preview=true` to everything never changes anything by accident. It returns what would happen (steps opened or reset, tasks with their assignees, signatures requested, people notified, warnings) without saving anything. It is the real action run inside a transaction that is rolled back, so the preview and the result can't drift apart.
-- **Errors** use the standard problem format (`application/problem+json`) with a code. The codes are listed in `shared/src/api/problem.ts`; for example `NOT_SIGNED_IN`, `NOT_ALLOWED`, `AI_NOT_ALLOWED`, `NOT_FOUND`, `VALIDATION_FAILED` (with the fields), `NAME_TAKEN`, `VERSION_CONFLICT`, `RATE_LIMITED`, `STEP_NOT_READY`, `PROJECT_NOT_ACTIVE`, `DECISION_REQUIRED`, `CORRECTIVE_ACTIONS_OPEN`, `ALREADY_DONE`, `SIGNATURE_REQUIRED` and `PREVIEW_CHANGED`. "Not allowed" names who can do it (`whoCan`); it never reveals content.
+- **Errors** use the standard problem format (`application/problem+json`) with a code. The codes are listed in `shared/src/api/problem.ts`; for example `NOT_SIGNED_IN`, `NOT_ALLOWED`, `AI_NOT_ALLOWED`, `NOT_FOUND`, `VALIDATION_FAILED` (with the fields), `NAME_TAKEN`, `VERSION_CONFLICT`, `RATE_LIMITED`, `STEP_NOT_READY`, `PROJECT_NOT_ACTIVE`, `DECISION_REQUIRED`, `CORRECTIVE_ACTIONS_OPEN`, `ALREADY_DONE`, `SIGNATURE_REQUIRED`, `PREVIEW_CHANGED`, `NO_TEMPLATE`, `DOCUMENT_LOCKED` (a version with the signers, an approved one, or a step that isn't open), `SEPARATION_OF_DUTIES` (the author can't also approve), `PDF_UNAVAILABLE` (the PDF service is down) and `FILE_NOT_SCANNED`. "Not allowed" names who can do it (`whoCan`); it never reveals content.
 
 ## Endpoints
 
@@ -52,16 +52,19 @@ This is the first-release endpoint list. The generated OpenAPI spec is the exact
 | `GET /roles` | Departments and their roles, for the sign-up form. Public | read |
 | `GET /product-lines` | R&D's product lines, for the sign-up form. Public | read |
 
-### Passkeys and signing
+### Signing
+
+Signing is a confirmed click until passkeys arrive in the last block ([D16](./decisions.md)). The passkey endpoints below are planned for then; the rest exist now.
 
 | Endpoint | Purpose | Tier |
 |---|---|---|
-| `POST /passkeys/registration/options`, `POST /passkeys/registration` | Register Face ID or a fingerprint on this device | — |
-| `GET /passkeys`, `DELETE /passkeys/{id}` | My devices; remove a lost one | — / never |
-| `GET /signature-requests?assignee=me` | What waits for my signature | read |
-| `POST /signatures/options` | Prepare a signing intent for a document version, step sign-off record, decision or Go: the hashes, the meaning, a one-time challenge | — |
-| `POST /signatures` | Sign, with the passkey response | never |
-| `POST /signature-requests/{id}/return` | Return to the authors with comments | never |
+| `GET /signature-requests` | What waits for my signature: the rows I may sign now, on documents (a step sign-off record is signed by approving its step) | read |
+| `POST /signature-requests/{id}/sign` | Sign a row. A confirmed click: the signature is tied to the version's content and PDF hashes. `?preview=true` supported | never |
+| `POST /signature-requests/{id}/return` | Return the document to its authors with a comment, instead of signing | never |
+| `POST /documents/{id}/versions/{n}/submit` | Submit a draft: the author signs Prepared and the next row opens. `?preview=true` supported | confirm |
+| `POST /passkeys/registration/options`, `POST /passkeys/registration` | *Planned (last block).* Register Face ID or a fingerprint on this device | — |
+| `GET /passkeys`, `DELETE /passkeys/{id}` | *Planned.* My devices; remove a lost one | — / never |
+| `POST /signatures/options`, `POST /signatures` | *Planned.* Prepare a signing intent, then sign with the passkey response. These replace `…/sign`, and the step approve and decision clicks | — / never |
 
 ### Processes
 
@@ -75,7 +78,7 @@ This is the first-release endpoint list. The generated OpenAPI spec is the exact
 
 | Endpoint | Purpose | Tier |
 |---|---|---|
-| `POST /projects` | Go: create the project from a concept, with its team and its first tasks. **Today a confirmed click by the VP**; it becomes a signed decision with passkeys. With `?preview=true`: the steps that open, the tasks and who gets them, the team and warnings, and nothing is saved | never |
+| `POST /projects` | Go: create the project from a concept, with its team and its first tasks. **A confirmed click by the VP, recorded as a signed decision** (passkeys come in the last block). With `?preview=true`: the steps that open, the tasks and who gets them, the team and warnings, and nothing is saved | never |
 | `GET /projects`, `GET /projects/{id}` | Every project's status (open to everyone signed in), with `filter[status]`, `filter[productLine]` and cursor paging. The detail also says what the signed-in person may do (`can`: hold, resume, drop, edit the team) | read |
 | `GET /projects/{id}/route` | Each step's state, iteration, doers, signer, what it waits for, its decisions and tasks, and what the signed-in person may do there now (`actions`); the milestones; the open corrective actions. This is the route view | read |
 | `GET /projects/{id}/team`, `PUT /projects/{id}/team` | See or change the project team (Lead or Head). The change is audited, and removed members keep their record | read / confirm |
@@ -91,7 +94,7 @@ This is the first-release endpoint list. The generated OpenAPI spec is the exact
 | `GET /projects/{id}/steps/{key}` | The step's view, every iteration with the reason a send-back closed it, and its decisions with their reasons (the reasons only for people in the project's scope) | read |
 | `POST /projects/{id}/steps/{key}/start` | A doer starts a step that is ready | confirm |
 | `POST /projects/{id}/steps/{key}/submit` | Submit for sign-off, which gives the signer a task (every Board member at steps 4 and 23). For steps without a sign-off, marks the step done. `?preview=true` shows what happens | confirm |
-| `POST /projects/{id}/steps/{key}/approve` | Sign off. **Today a confirmed click by the signer**, replaced by `POST /signatures` with passkeys. `?preview=true` supported | never |
+| `POST /projects/{id}/steps/{key}/approve` | Sign off. **A confirmed click by the signer**: it signs the step's sign-off record and records the checkpoint decision, signed. Passkeys replace the click in the last block (`POST /signatures`). `?preview=true` supported | never |
 | `POST /projects/{id}/steps/{key}/return` | Return to the authors with a comment (the same placeholder) | never |
 | `POST /projects/{id}/steps/{key}/decisions` | Record a decision (prototypes OK, pre-clinical study needed). Only the role the route names may. Same placeholder | never |
 | `POST /projects/{id}/steps/{key}/send-back` | Send work back to an earlier step the route allows, with a reason and optional evidence file. `?preview=true` lists the steps that would reset and the tasks that would be cancelled | never |
@@ -125,21 +128,23 @@ Every action returns `{ saved, preview }`: what changed (steps, tasks made with 
 
 | Endpoint | Purpose | Tier |
 |---|---|---|
-| `GET /templates`, `GET /templates/{id}` | The template library: each template's versions, status, specification and sample | read |
-| `GET /templates/active?document_type=` | The active template for a document type. The AI calls this every time it drafts | read |
-| `POST /templates` | Add a template, or a new version of one: the Word file and its specification. COAL checks the placeholders and makes a sample PDF | — |
-| `POST /templates/{id}/versions/{n}/activate` | Make a version active; the previous one is retired (R&D Head or company QA ⚠) | never |
-| `POST /documents` | A new document from the active template or an upload, as a draft I own | auto |
-| `GET /documents`, `GET /documents/{id}` | List and read | read |
-| `POST /documents/{id}/versions` | Save a new draft version | auto (my draft) / confirm |
-| `GET /documents/{id}/versions/{n}`, `…/pdf` | A version's content and PDF | read |
-| `GET /documents/{id}/compare?from=&to=` | Compare two versions | read |
-| `POST /documents/{id}/submit` (preview) | Start the signature rows | confirm |
+| `GET /document-types` | Each kind of document, with its active template if it has one | read |
+| `GET /templates`, `GET /templates/{id}` | The template library: each version's status, specification and who added and activated it. Everyone sees the active versions; the VP and the R&D Head also see drafts and retired ones | read |
+| `GET /templates/active?documentType=` | The active template for a document type. The AI calls this every time it drafts | read |
+| `GET /templates/{id}/links` | Short-lived links to a template's sample PDF, and its Word file for the VP and the Head | read |
+| `POST /templates` | Add a template version (VP or R&D Head): the Word file, uploaded first, and optionally a specification (left out, the previous version's is reused). COAL checks the file and makes a sample PDF; a failure is `400 VALIDATION_FAILED` with every problem in `errors`. A pass is saved as a draft | — |
+| `POST /templates/{id}/activate` | Make a draft or retired version active; the previous active one is retired (VP or R&D Head) | never |
+| `GET /projects/{id}/documents?step=` | The project's documents the person may see, with whether each is `restricted` to its outcome | read |
+| `POST /projects/{id}/documents` | A new document on a step, from the active template or an upload, as draft 1. `409 NO_TEMPLATE` when the type has no active template | auto |
+| `GET /documents/{id}?version=` | A document, its versions, and one version in full (the latest by default) with its signature rows and signatures | read |
+| `POST /documents/{id}/versions` | Save a new draft version: the fields and written sections that changed (or a new file, for an upload) and a note. Makes the PDF. Saving what is already saved makes no new version | auto |
+| `GET /documents/{id}/versions/{n}/links` | Short-lived links to a version's PDF and its uploaded file | read |
+| `GET /documents/{id}/compare?from=&to=` | Compare two versions of a template document | read |
 | `POST /files/upload-url` | Start an upload: checks the type and size, and returns a short-lived link to upload the file to a staging area in storage. The link accepts only the declared size | auto |
-| `POST /files/{id}/complete` | Finish an upload: COAL reads the staged file once, checks its size and records its SHA-256 hash, then moves exactly those bytes to where they're served from, which no upload link can write to | auto |
-| `GET /files/{id}/link` | A short-lived download link, after the permission check. Until attachments exist, only the uploader may use a file | read |
-| `POST /attachments`, `GET /attachments` | Attach files and pictures to a step, task or document | auto / read |
-| `POST /sources`, `GET /sources` | Add or list sources | auto / read |
+| `POST /files/{id}/complete` | Finish an upload: COAL reads the staged file once, checks its size and records its SHA-256 hash, then moves exactly those bytes to where they're served from, which no upload link can write to, and has it scanned for viruses where a scanner is set up. Safe to repeat | auto |
+| `GET /files/{id}/link` | A short-lived download link, after the permission check: the uploader, or anyone who may see a record that holds the file. An infected file is refused, and so is an unscanned one where a scanner is set up | read |
+| `POST /projects/{id}/attachments`, `GET /projects/{id}/attachments?step=&document=&task=` | Attach files and pictures to a step, document or task; list them | auto / read |
+| `POST /projects/{id}/sources`, `GET /projects/{id}/sources?step=&document=&task=` | Add or list sources (link, file or citation) | auto / read |
 | `GET /history/{recordType}/{id}` | A record's history | read |
 
 ### Dashboard and notifications
@@ -189,10 +194,10 @@ Events are written in the same transaction as the change ([architecture.md](./ar
 | Project | `project.created`, `project.held`, `project.resumed`, `project.dropped`, `project.launched`, `project.team_changed`, `project.closed` |
 | Step | `step.ready`, `step.started`, `step.submitted`, `step.signed` (one of several required approvals), `step.returned`, `step.approved`, `step.done`, `step.reset`, `step.cancelled`, `decision.recorded`, `milestone.recorded` |
 | Task | `task.created`, `task.assigned`, `task.updated`, `task.done`, `task.cancelled`, `task.due_soon`, `task.overdue`, `request.declined` |
-| Document | `document.created`, `document.version_saved`, `document.submitted`, `document.approved`, `document.returned`, `template.added`, `template.activated` |
-| Signature | `signature.requested`, `signature.signed` |
+| Document | `document.created`, `document.version_saved`, `document.submitted`, `document.approved`, `document.returned`, `document.carried_forward`, `template.added`, `template.activated` |
+| Signature | `signature.requested` (a row has opened), `signature.signed` |
 | Timeline | `deviation.required`, `deviation.recorded`, `timeline.changed`, `forecast.changed` |
-| Collaboration | `comment.added`, `mention.created`, `attachment.added` |
+| Collaboration | `comment.added`, `mention.created`, `attachment.added`, `source.added` |
 | Proposals | `proposal.created`, `proposal.confirmed`, `proposal.rejected` |
 
 ## Adding an endpoint

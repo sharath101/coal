@@ -9,6 +9,7 @@ import {
   startStep,
   submitStep,
   type ActionResult,
+  type DocumentSummary,
   type RouteView,
   type StepView,
 } from '@coal/shared';
@@ -19,6 +20,7 @@ import { useConditionText } from '@/components/condition-text';
 import { PreviewPanel } from '@/components/preview-panel';
 import { ProblemMessage } from '@/components/problem-message';
 import { StepStatusBadge } from '@/components/status-badge';
+import { StepDocuments } from '@/components/step-documents';
 import { selectClass } from '@/components/role-fields';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -36,10 +38,11 @@ interface Props {
   projectId: string;
   step: StepView;
   route: RouteView;
+  documents: DocumentSummary[];
   onChanged: () => void;
 }
 
-export function StepCard({ projectId, step, route, onChanged }: Props) {
+export function StepCard({ projectId, step, route, documents, onChanged }: Props) {
   const t = useTranslations('step');
   const conditionText = useConditionText(route);
   const params = { id: projectId, key: step.key };
@@ -232,6 +235,13 @@ export function StepCard({ projectId, step, route, onChanged }: Props) {
           )}
 
           {step.iteration > 1 && <EarlierIterations projectId={projectId} step={step} />}
+
+          <StepDocuments
+            projectId={projectId}
+            stepKey={step.key}
+            documents={documents}
+            canAdd={isOpen && step.status !== 'in_review'}
+          />
 
           {hasButtons && (
             <div className="flex flex-wrap gap-2">

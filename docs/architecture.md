@@ -63,9 +63,9 @@ flowchart TB
 | Website | Next.js (React), Tailwind, shadcn/ui, TanStack Query; next-intl for the text | Widely known; quick to build dashboards and chat; every piece of text ready for translation |
 | Mobile app | Later: React Native with Expo; TanStack Query | Shares TypeScript and logic with the website; one codebase for iOS and Android |
 | AI | Vercel AI SDK, with the Anthropic and OpenAI providers | One interface for both providers, tool calling and streaming |
-| Passkeys | SimpleWebAuthn on the backend and website; later, a React Native passkey library in the app | Standard WebAuthn passkeys |
+| Passkeys | The last block (D16): SimpleWebAuthn on the backend and website; later, a React Native passkey library in the app | Standard WebAuthn passkeys |
 | Documents | docxtemplater (fills Word templates) and Gotenberg (Word to PDF) | Keeps Jayon's own layouts |
-| Files | S3-compatible storage (MinIO for local development) | Cheap and durable |
+| Files | S3-compatible storage (MinIO for local development); ClamAV for virus scanning (optional locally, required in production) | Cheap and durable, and uploads are checked before anyone opens them |
 | Live updates | Server-Sent Events | Simple one-way updates, and AI streaming |
 | Push | Later, with the app: Expo push notifications | Covers iOS and Android |
 | Tests | Vitest, against a real PostgreSQL: each test file gets its own copy of a migrated template database | Fast, and tests see the real triggers and constraints |
@@ -108,9 +108,12 @@ coal/
                       transaction with its audit entries and events), the endpoint layer
                       (session, AI tier and permission checks, problem responses, Idempotency-Key)
       modules/        Platform modules: auth, users, org (departments and roles), permissions,
-                      audit, events (the outbox), files, process (route versions, runs and
-                      their steps, decisions, milestones, send-backs), tasks; later documents,
-                      templates, signatures, dashboard, notifications, ai
+                      audit, events (the outbox), files (storage, virus scanning), process
+                      (route versions, runs and their steps, decisions, milestones, send-backs),
+                      tasks, templates (document types, the template library, Word files),
+                      documents (documents, versions, PDFs, signature rows, step sign-off
+                      records), attachments (attachments and sources); later dashboard,
+                      notifications, ai
                       Department modules: rnd (product lines, projects, teams, task routing,
                       and the actions that turn the engine's effects into tasks); others later
                       Each module has tables.ts, service.ts and routes.ts
@@ -141,6 +144,8 @@ coal/
 ```
 
 Each backend module owns its tables, its services and its routes. Modules call each other through their services, not each other's tables.
+
+**How documents reach the route.** The documents module works on a project through plain facts (`ProjectFacts`: code, name, team, product line and so on) and a `Viewer`, which the R&D module builds, so the lifecycle code doesn't depend on R&D. The R&D module tells it what the route did through hooks (`documents/signoff.ts`), called from `rnd/actions.ts` inside the action's transaction: a submitted step gets its sign-off record, an approval signs it, a return or a send-back closes it, a send-back carries each document forward, and every decision is signed. A preview runs the same hooks without writing any file, and rolls back. The files module doesn't know about documents: the route that serves a file link passes it the records to ask ("may this person see a record that holds this file?").
 
 ## The process engine
 
@@ -243,13 +248,11 @@ pg-boss runs:
 
 - reminders and escalations, checked every few minutes;
 - the nightly forecast recalculation;
-- document rendering;
-- virus scanning of uploads;
 - sending notifications;
 - the daily audit-chain check (02:30 Indian time);
 - removing stored Idempotency-Key responses after a day.
 
-The audit-chain check and the clean-up run now; the others come with their blocks.
+The audit-chain check, the clean-up and the virus-scan sweep (every minute, for uploads the scanner couldn't reach) run now; the others come with their blocks. Documents are rendered while a version is saved, not by a job, so a version never exists without its PDF. The price is that the save holds the project's lock while Gotenberg works (it gives up after 30 seconds, `PDF_TIMEOUT_MS`), and the render uses the save's own database connection so a slow service can't starve the connection pool. Fine for R&D's size; a render job is the answer if saves ever queue up.
 
 Jobs are written so that running one twice does no harm.
 
@@ -257,8 +260,8 @@ Jobs are written so that running one twice does no harm.
 
 - **Encryption.** TLS everywhere, and storage and database encryption.
 - **Secrets** live in a secrets manager, never in the code.
-- **Database accounts.** The backend's database account can't change or delete audit entries or signatures.
-- **Uploads** are virus-scanned and limited by type and size. Clients upload to a staging area; COAL checks the bytes and copies them to where they're served from, so a file's recorded hash always matches what's served. Files are served only through short-lived links. In production, a storage rule removes staged uploads left unfinished after a day.
+- **Database accounts.** The backend's database account can't change or delete audit entries or signatures, and can't change what a saved document version holds (triggers refuse it now; in production the account will also lack the privileges).
+- **Uploads** are virus-scanned (ClamAV, required in production) and limited by type and size. Clients upload to a staging area; COAL checks the bytes and copies them to where they're served from, so a file's recorded hash always matches what's served. Files are served only through short-lived links, after a check that the person may see a record that holds the file. Word templates are also refused if they would unpack to something huge (a zip bomb), and only `http` and `https` links are accepted as sources. In production, a storage rule removes staged uploads left unfinished after a day.
 - **Rate limits** on sign-in and the AI endpoints, counted per address. The backend believes `X-Forwarded-For` only from the reverse proxies named in `TRUST_PROXY`, and only a proxy that overwrites that header with the connecting address may be named. The website's own rewrite passes a browser's header through, so it's never trusted: locally, and until demo hosting puts such a proxy in front of `/api/v1`, everyone shares one counter.
 - **Logs** never contain document content, prompts or AI results. Error reports are scrubbed before they're stored.
 

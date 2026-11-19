@@ -18,7 +18,8 @@ import { getRuns, stepHistory } from '../process/service';
 import { activeTasksOfRun, presentTasks } from '../tasks/service';
 import { findUsersByIds, present } from '../users/service';
 import type { Env } from './actions';
-import { canSeeProjectContent, may } from './env';
+import { visibleDocuments } from '../documents/service';
+import { canSeeProjectContent, may, viewerOf } from './env';
 import { activeMembers, type ProjectRow } from './projects';
 import { roleName } from './routing';
 import { listProductLines } from './service';
@@ -258,8 +259,22 @@ export async function presentActivity(
       : Object.fromEntries(
           Object.entries(payload).filter(([k]) => STATUS_PAYLOAD_KEYS.includes(k)),
         );
+
+  // Events about a document are shown only to people who may read the document, and drafts only to
+  // the people who work on the project: the feed must not reveal what the document list hides.
+  const aboutDocument = (type: string) => /^(document|signature)\./.test(type);
+  const documents = rows.some((r) => aboutDocument(r.type))
+    ? await visibleDocuments(ex, await viewerOf(ex, env))
+    : null;
+  const DRAFT_EVENTS = ['document.created', 'document.version_saved', 'document.carried_forward'];
+  const shown = rows.filter((row) => {
+    if (!documents || !aboutDocument(row.type)) return true;
+    const documentId = (row.payload as { documentId?: unknown }).documentId;
+    if (typeof documentId !== 'string' || !documents.readable.has(documentId)) return false;
+    return documents.drafts || !DRAFT_EVENTS.includes(row.type);
+  });
   return {
-    items: rows.map((row) => ({
+    items: shown.map((row) => ({
       id: row.id,
       type: row.type,
       at: row.createdAt.toISOString(),

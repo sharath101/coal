@@ -35,12 +35,16 @@ jobs:
           docker run -d --name minio -p 9000:9000
           -e MINIO_ROOT_USER=coal -e MINIO_ROOT_PASSWORD=coal-local-only
           pgsty/minio:latest server /data
+      - name: Start the PDF service
+        run: docker run -d --name gotenberg -p 3100:3000 gotenberg/gotenberg:8
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm format:check
       - name: Wait for file storage
         run: timeout 60 sh -c 'until curl -fs http://localhost:9000/minio/health/live; do sleep 1; done'
+      - name: Wait for the PDF service
+        run: timeout 60 sh -c 'until curl -fs http://localhost:3100/health; do sleep 1; done'
       - run: pnpm test
       - run: pnpm --filter @coal/web build
         env:

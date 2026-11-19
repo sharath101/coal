@@ -19,8 +19,8 @@ This roadmap gives an **order, not dates**. Madhav's effort estimates and costs 
 | The route | All 28 steps, checkpoints, milestones (recorded by hand), step 15's two paths, sending work back, hold and drop | [workflow.md](./workflow.md) |
 | Tasks | Tasks from the route; assigning work, requests, role queues, comments | [roles-and-access.md](./roles-and-access.md#assigning-work-and-making-requests) |
 | Access | Status visible to everyone; content need-to-know; one permission module with tests | [roles-and-access.md](./roles-and-access.md#how-access-is-enforced) |
-| Documents | The template library, with each step's templates as they're provided (stages 1 and 2 first); uploads where there's no template yet; versions; PDFs; pictures and sources | [documents-and-signing.md](./documents-and-signing.md#the-template-library) |
-| Signing | Face ID or fingerprint passkeys on the website; signature rows; step sign-off records; signed decisions; audit trail | [documents-and-signing.md](./documents-and-signing.md#signing-with-face-id-or-fingerprint) |
+| Documents | The template library, with each step's templates as they're provided (stages 1 and 2 first); uploads where there's no template yet; versions; PDFs; pictures and sources; virus scanning | [documents-and-signing.md](./documents-and-signing.md#the-template-library) |
+| Signing | Signature rows; step sign-off records; signed decisions; audit trail. Signing is a confirmed click until the last block adds Face ID or fingerprint passkeys on the website (D16) | [documents-and-signing.md](./documents-and-signing.md#signature-rows) |
 | Dashboard | The widget framework; widgets W1 to W10; the project page; dates, forecast, reminders, deviations; in-app notifications | [dashboard.md](./dashboard.md) |
 | Workstation and AI | Chat by project on the website, built channel-neutral for WhatsApp later; the five AI features, only when asked; action cards; Claude and OpenAI behind one gateway; tests against both | [workstation-and-ai.md](./workstation-and-ai.md) |
 | Platform | Backend, website and shared code, built to grow to all of Jayon; local setup; simple demo hosting when needed | [architecture.md](./architecture.md) |
@@ -29,7 +29,7 @@ This roadmap gives an **order, not dates**. Madhav's effort estimates and costs 
 
 Each block depends on the ones before it. Within a block, the work can run side by side.
 
-**Progress:** blocks 1 (Foundations) and 2 (the route) are done. Virus scanning of uploads comes with block 3. Block 3 (Documents and signing) is next.
+**Progress:** blocks 1 (Foundations), 2 (the route) and 3 (Documents and signing) are done. Block 4 (Dashboard) is next. Passkey signing is the last block (D16).
 
 1. **Foundations** ✅
    - The monorepo (pnpm workspaces): `backend/`, `web/` and `shared/`; `app/` waits for its phase.
@@ -46,12 +46,14 @@ Each block depends on the ones before it. Within a block, the work can run side 
    - Process runs and their steps, R&D projects, tasks and their routing; Go as a plain form.
    - Decisions, sending work back, milestones, hold and drop.
    - On the website: Go with its preview, the projects list, the project page (the route by stage, with each step's actions, team, milestones and activity), and My tasks.
-   - Left for later blocks, as planned: signing with passkeys (sign-offs are a confirmed click until then), documents on steps, due dates and deviations (route durations, `default_days`, arrive with the Dashboard), notifications.
-3. **Documents and signing**
-   - Document types and the template library: adding, checking and activating templates; the import command for `private/templates/`; the templates provided so far.
-   - Documents from templates and uploads; versions, comparison and PDFs.
-   - Passkey registration and signing on the website.
-   - Signature rows, step sign-off records, and signed decisions (Go included).
+   - Left for later blocks, as planned: documents on steps (block 3), due dates and deviations (route durations, `default_days`, arrive with the Dashboard), notifications, and signing with passkeys (sign-offs are a confirmed click until the last block).
+3. **Documents and signing** ✅
+   - Document types and the template library: adding, checking and activating templates (VP and R&D Head, on the Templates page); the import command for `private/templates/`; made-up sample templates for each document type until Jayon's forms arrive.
+   - Documents from templates and uploads, on each step; versions, comparison and PDFs (docxtemplater and Gotenberg); the budget annex as its own need-to-know document.
+   - Signature rows (Prepared, Reviewed, Approved) as a confirmed click, separation of duties, returns, revision letters; step sign-off records; signed decisions (Go included); documents carried forward when work is sent back.
+   - Attachments and sources on steps, documents and tasks; virus scanning with ClamAV (optional locally, required in production).
+   - On the website: the Templates page, documents on each step, the document page (form, versions, PDF, compare, signing), and "Waiting for my signature" on My tasks.
+   - Left for later: passkey signing (the last block, D16), the signature block and seal on PDFs, the handover checklist at step 24b, and templates for each of the other steps as Jayon's documents arrive.
 4. **Dashboard**
    - The widget framework on the website; W1 to W10; the project page.
    - Dates from the route and then from the Action Plan; the forecast; reminders and escalation; deviations.
@@ -61,13 +63,17 @@ Each block depends on the ones before it. Within a block, the work can run side 
    - The AI gateway with Anthropic and OpenAI; read tools; proposals and action cards.
    - The five AI features: questions, idea to project, drafting from the template library, assigning work, explaining documents.
    - The AI test sets, run against both providers; budgets and logging.
+6. **Passkey signing** (last, D16)
+   - Passkey registration on the website, and the signing intent: Face ID, fingerprint or Windows Hello for every signature, replacing the confirmed click.
+   - One prompt signs a step's sign-off record and the step's main document together.
+   - Signatures show on screen and on the PDF with name, role, meaning and Indian time.
 
 **Demo hosting** can be set up whenever you want to show COAL to people, once Foundations is done ([architecture.md](./architecture.md#environments-and-hosting)).
 
 ### Done when
 
 - **The route works end to end.** A made-up project goes from idea (Go) to launch, locally or on the demo host:
-  - every step is signed with Face ID or a fingerprint on the website;
+  - every step is signed with Face ID or a fingerprint on the website (after block 6; a confirmed click until then);
   - at least one send-back is exercised (13 → 7);
   - both paths of step 15 are exercised.
 - **The Dashboards work.** Every role's Dashboard shows the right live data, and nobody sees content they shouldn't.

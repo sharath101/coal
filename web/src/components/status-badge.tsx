@@ -1,6 +1,6 @@
 'use client';
 
-import type { StepView } from '@coal/shared';
+import type { RequestStatus, StepView, TemplateStatus, VersionStatus } from '@coal/shared';
 import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
 
@@ -12,7 +12,7 @@ const TONES = {
   bad: 'bg-red-100 text-red-900',
 } as const;
 
-function Pill({ tone, children }: { tone: keyof typeof TONES; children: string }) {
+export function Pill({ tone, children }: { tone: keyof typeof TONES; children: string }) {
   return (
     <span
       className={cn(
@@ -53,4 +53,48 @@ const STEP_TONE = {
 export function StepStatusBadge({ status }: { status: StepView['status'] }) {
   const t = useTranslations('stepStatus');
   return <Pill tone={STEP_TONE[status]}>{t(status)}</Pill>;
+}
+
+const DOCUMENT_TONE = {
+  draft: 'neutral',
+  in_review: 'waiting',
+  returned: 'bad',
+  approved: 'good',
+  superseded: 'neutral',
+} as const;
+
+/** A document's or version's state; an approved one shows its revision letter. */
+export function DocumentStatusBadge({
+  status,
+  rev,
+}: {
+  status: VersionStatus;
+  rev?: string | null;
+}) {
+  const t = useTranslations('documentStatus');
+  return (
+    <Pill tone={DOCUMENT_TONE[status]}>
+      {rev ? `${t(status)} · ${t('rev', { rev })}` : t(status)}
+    </Pill>
+  );
+}
+
+const TEMPLATE_TONE = { active: 'good', draft: 'waiting', retired: 'neutral' } as const;
+
+export function TemplateStatusBadge({ status }: { status: TemplateStatus }) {
+  const t = useTranslations('templateStatus');
+  return <Pill tone={TEMPLATE_TONE[status]}>{t(status)}</Pill>;
+}
+
+const REQUEST_TONE = {
+  waiting: 'neutral',
+  pending: 'waiting',
+  signed: 'good',
+  returned: 'bad',
+  cancelled: 'neutral',
+} as const;
+
+export function RequestStatusBadge({ status }: { status: RequestStatus }) {
+  const t = useTranslations('requestStatus');
+  return <Pill tone={REQUEST_TONE[status]}>{t(status)}</Pill>;
 }

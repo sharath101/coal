@@ -4,6 +4,7 @@ import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { ProblemMessage } from '@/components/problem-message';
 import { TaskRow } from '@/components/task-row';
+import { WaitingSignatures } from '@/components/waiting-signatures';
 import { Button } from '@/components/ui/button';
 import { flatten, useTasks } from '@/lib/queries';
 import { cn } from '@/lib/utils';
@@ -28,6 +29,8 @@ export default function TasksPage() {
         <h1 className="text-2xl font-semibold tracking-tight">{t('title')}</h1>
         <p className="text-sm text-muted-foreground">{t('intro')}</p>
       </div>
+
+      <WaitingSignatures />
 
       <div className="flex flex-wrap gap-4">
         <div className="flex rounded-lg bg-muted p-1">

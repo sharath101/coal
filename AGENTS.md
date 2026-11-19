@@ -29,7 +29,7 @@ COAL is an AI-assisted platform for Jayon, an orthopaedic implant maker. It star
 
 ## Commands
 
-Node 22 and pnpm 10 (see `.nvmrc` and `packageManager`). Docker runs the local services.
+Node 22 and pnpm 10 (see `.nvmrc` and `packageManager`). Docker runs the local services. Tests that make PDFs use a stand-in for Gotenberg; `test/gotenberg.test.ts` uses the real one when it is running.
 
 | What | Command |
 |---|---|
@@ -37,6 +37,8 @@ Node 22 and pnpm 10 (see `.nvmrc` and `packageManager`). Docker runs the local s
 | Start PostgreSQL, MinIO and Gotenberg | `pnpm db:up` (stop: `pnpm db:down`) |
 | Settings | `cp .env.example .env` (defaults match `docker-compose.yml`) |
 | Migrate and load reference data | `pnpm --filter @coal/backend db:migrate` |
+| Load templates (drafts) from `private/templates/`, or COAL's made-up samples | `pnpm --filter @coal/backend templates:import` (`--samples`, or a folder) |
+| Virus scanner, optional locally | `docker compose --profile scan up -d`, then `CLAMAV_HOST=localhost` in `.env` |
 | Run the API, worker and website | `pnpm dev` (API on :4000, website on :3000, API docs at `/api/v1/docs`) |
 | Everything CI runs | `pnpm check` (lint, type checks, formatting, tests) |
 | Lint | `pnpm lint` |
@@ -51,6 +53,8 @@ Node 22 and pnpm 10 (see `.nvmrc` and `packageManager`). Docker runs the local s
 
 - **An endpoint:** its contract (schemas, permission, AI tier) in `shared/src/schemas/` and the list in `shared/src/api/endpoints.ts`; its rule in `backend/src/modules/permissions/rules.ts` and its row in `permissions.test.ts`; its handler in the module's `routes.ts`. Steps: [docs/api.md § Adding an endpoint](docs/api.md#adding-an-endpoint).
 - **A route or its rules:** the YAML in `shared/src/process/` (a loaded version is never edited: add a new version file), its tests in `engine.test.ts`, and `docs/workflow.md`, together. The engine is pure (`shared/src/process/engine.ts`); what an action does to tasks, events and the audit trail is in `backend/src/modules/rnd/actions.ts`.
+- **A document type or its sample template:** the type in `backend/src/modules/templates/catalogue.ts`, the sample in `samples.ts`; a real template is a Word file plus a specification (`shared/src/rules/templates.ts`) loaded with the import command ([docs/documents-and-signing.md § The template library](docs/documents-and-signing.md#the-template-library)).
+- **Step effects on documents** (sign-off records, carrying documents forward, signed decisions): `backend/src/modules/documents/signoff.ts`, called from `backend/src/modules/rnd/actions.ts`. Who may read a document is one pure rule, `documentAccess` in `permissions/rules.ts`.
 - **A table:** in the owning module's `tables.ts`, then `db:generate`. Changes go through `change()` in `backend/src/core/db/change.ts`, so the audit entry and events are written in the same transaction.
 - **Website text:** in `web/messages/en.json`, never in a component. Lint fails on text written straight into JSX.
 - **Lint rules that keep the parts apart:** `eslint-plugin-coal.mjs` (`coal/part-boundaries`, `coal/module-tables`).

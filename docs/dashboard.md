@@ -17,6 +17,8 @@ The Dashboard answers three questions, in this order:
 
 Every number comes from the database, never from the AI. Every widget only counts what the viewer may see.
 
+**Until the widgets exist,** the Dashboard shows empty sections, plus a **Templates** link for the VP and the R&D Head, who manage the template library ([documents-and-signing.md](./documents-and-signing.md#adding-a-template)). Signatures waiting for me are on the My tasks page for now ("Waiting for my signature"); the "What needs me now?" widget takes them over.
+
 ## Widgets
 
 The Dashboard is a grid of **widgets**.

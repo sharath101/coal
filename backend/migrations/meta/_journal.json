@@ -29,6 +29,20 @@
       "when": 1795032378699,
       "tag": "0003_insert_only_process_tables",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1795076801482,
+      "tag": "0004_documents_templates_signatures",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1795076802086,
+      "tag": "0005_signatures_insert_only_and_locked_versions",
+      "breakpoints": true
     }
   ]
 }

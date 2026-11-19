@@ -5,6 +5,7 @@ import { loadConfig } from '../src/core/config';
 import { createDb } from '../src/core/db/client';
 import type { AppDeps } from '../src/core/deps';
 import { S3FileStorage } from '../src/modules/files/storage';
+import { FakePdfRenderer } from './fakes';
 import { TEMPLATE_DB, databaseUrl, newTestDbName, withAdmin } from './databases';
 
 /** A fresh copy of the template database, for one test file. */
@@ -26,7 +27,10 @@ export async function createTestDatabase() {
 
 export type TestApp = Awaited<ReturnType<typeof createTestApp>>;
 
-export async function createTestApp(env: Record<string, string> = {}) {
+export async function createTestApp(
+  env: Record<string, string> = {},
+  overrides: Partial<Pick<AppDeps, 'scanner'>> = {},
+) {
   const database = await createTestDatabase();
   const config = loadConfig({
     NODE_ENV: 'test',
@@ -38,11 +42,13 @@ export async function createTestApp(env: Record<string, string> = {}) {
   });
   const storage = new S3FileStorage(config.storage);
   await storage.ensureBucket();
-  const deps: AppDeps = { config, db: database.db, storage };
+  const pdf = new FakePdfRenderer();
+  const deps: AppDeps = { config, db: database.db, storage, pdf, scanner: null, ...overrides };
   const app = await buildApp(deps);
   return {
     app,
     deps,
+    pdf,
     database,
     async close() {
       await app.close();

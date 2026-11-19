@@ -21,6 +21,19 @@ export async function findProject(
   return row ?? null;
 }
 
+/** The project a process run belongs to: documents and signatures point at the run. */
+export async function findProjectByRun(
+  ex: Executor,
+  orgId: string,
+  runId: string,
+): Promise<ProjectRow | null> {
+  const [row] = await ex
+    .select()
+    .from(projects)
+    .where(and(eq(projects.orgId, orgId), eq(projects.processRunId, runId)));
+  return row ?? null;
+}
+
 const encodeCursor = (row: ProjectRow) =>
   Buffer.from(JSON.stringify([row.createdAt.toISOString(), row.id])).toString('base64url');
 

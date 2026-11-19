@@ -23,8 +23,7 @@ A product goes from the VP's idea (step **C**) to launch (step **25**) through *
 
 | Not yet | Comes with |
 |---|---|
-| Signing with Face ID or a fingerprint. Until then, a sign-off, a decision or Go is a confirmed click by the right role, recorded with who and when | Documents and signing |
-| Documents on each step, and carrying them forward when work is sent back | Documents and signing |
+| Signing with Face ID or a fingerprint. Until then, a sign-off, a decision or Go is a confirmed click by the right role, recorded with who and when | Passkey signing (the last block, [D16](./decisions.md)) |
 | Due dates, reminders and recording the delay as a deviation | Dashboard |
 | Notifications. Events are written; nothing sends them yet | Dashboard |
 
@@ -93,7 +92,8 @@ flowchart LR
 
 - **The signer's choices.** At a sign-off the signer either approves, or returns the work to its authors with comments (rework within the same step).
 - **Checkpoints and failure points** also allow sending the work back to an earlier step (see "Failure and rework" below).
-- **Signed online.** Every sign-off is signed online with Face ID or fingerprint, and produces a sign-off record ([documents-and-signing.md](./documents-and-signing.md#step-sign-off-records)). *Until passkeys arrive, the signer confirms with a click; the website says so.*
+- **Signed online.** Every sign-off is signed online with Face ID or fingerprint, and signs the step's **sign-off record**, which COAL makes when the step is submitted ([documents-and-signing.md](./documents-and-signing.md#step-sign-off-records)). *Until passkeys arrive (the last block), the signer confirms with a click; the website says so.*
+- **Documents don't block it.** A step can be submitted while its documents are still being reviewed ⚠ ([S7](./open-questions.md#documents-and-signing)). The preview warns which are not approved, and the sign-off record lists each output with its status and hash.
 - **The Board.** The MD and the CEO sign only as the Board, at steps 4 and 23. We assume both must sign ⚠. When the step is submitted, every person holding the Board role gets a sign-off task, and the step is approved when all of them have approved. If any one returns it, it goes back to its authors and the approvals so far are cleared. Anyone who joins the Board later doesn't join a sign-off already under way.
 - **Who may submit and sign.** Any doer of a step may start and submit it; only the step's signer may approve or return it. For checkpoints, approving records a `checkpoint` decision. Step 12 can't be approved until the Head has answered both of its questions, and "Are the prototypes OK?" must be *yes*.
 - **Steps without a sign-off.** C, 2a and 24a are complete when a doer marks them done. C is completed by the VP's signed Go.
@@ -152,7 +152,7 @@ The case study at step 16 lists corrective actions. Each becomes a task of kind 
 2. **Reopen.** The earlier step reopens as a new **iteration** (iteration 2, 3 and so on). History is never edited: the closed iteration, its decisions and the send-back with its reason stay on record. The reopened step is ready at once, because everything it waits for is upstream and untouched.
 3. **Reset what depends on it.** Every later step that depends on the reopened one, directly or indirectly, is reset to a new iteration that waits for its inputs. This includes the step where the failure happened. A step that hadn't opened yet has nothing to reset. Decisions and milestones belong to an iteration, so those of a reset step are needed again (for example, the Head answers step 12's questions again). Steps that don't depend on it carry on: for example, rework on the implant design (7) doesn't touch the instrument design (8) or the instrument prototype (11).
 4. **Clean up.** Open tasks on the reset steps are cancelled, and their new iterations create tasks again when they open.
-5. **Carry the documents forward.** The latest version of each document becomes a new draft in the new iteration, so people revise rather than start again.
+5. **Carry the documents forward.** The latest version of each document on a reset step becomes a new draft in the new iteration (same content and PDF, marked carried forward), so people revise rather than start again. A version that was with its signers is returned first. A step's sign-off record isn't copied: a new one is made when the step is submitted again.
 6. **Never reset the follow-up.** The step-20 patient follow-up is never reset, because patients already treated must still be followed. It is a task of its own, which a send-back never cancels, and which isn't created twice when step 20 reopens.
 7. **Record the delay.** The delay is recorded as a deviation with the reason "rework" ([dashboard.md](./dashboard.md#deadlines-alerts-and-deviations)). *Comes with the Dashboard block.*
 

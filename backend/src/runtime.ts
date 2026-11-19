@@ -2,6 +2,8 @@ import pino from 'pino';
 import { loadConfig } from './core/config';
 import { createDb } from './core/db/client';
 import type { AppDeps } from './core/deps';
+import { GotenbergRenderer } from './modules/documents/pdf';
+import { ClamdScanner } from './modules/files/scanner';
 import { S3FileStorage } from './modules/files/storage';
 
 /** Builds what the API and the worker both need. */
@@ -13,6 +15,12 @@ export async function createRuntime() {
   );
   const storage = new S3FileStorage(config.storage);
   if (config.storage.createBucket) await storage.ensureBucket();
-  const deps: AppDeps = { config, db, storage };
+  const deps: AppDeps = {
+    config,
+    db,
+    storage,
+    pdf: new GotenbergRenderer(config.pdf),
+    scanner: config.scan ? new ClamdScanner(config.scan) : null,
+  };
   return { deps, pool, log };
 }

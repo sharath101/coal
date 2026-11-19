@@ -17,8 +17,7 @@ export const files = pgTable('files', {
     .notNull()
     .default('not_scanned'),
   origin: text('origin', { enum: ['internal', 'outside'] }).notNull(),
-  uploadedBy: uuid('uploaded_by')
-    .notNull()
-    .references(() => users.id),
+  /** Null for files COAL made itself with no person behind them, such as a sample template's PDF. */
+  uploadedBy: uuid('uploaded_by').references(() => users.id),
   ...timestamps(),
 });

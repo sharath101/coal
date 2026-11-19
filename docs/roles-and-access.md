@@ -44,11 +44,11 @@ COAL starts with the simplest possible accounts, so we can build and demo everyt
 
 - **Create an account:** enter your name and choose your role from a dropdown. A Lead also chooses their product line. Names must be unique (case doesn't matter).
 - **Sign in:** enter your name. If an account with that name exists, you are in.
-- **Signing documents:** the first time you sign, register Face ID or a fingerprint on your device ([documents-and-signing.md](./documents-and-signing.md#signing-with-face-id-or-fingerprint)).
+- **Signing documents:** for now, a signature is a confirmed click by the right person. In the last block you will register Face ID or a fingerprint on your device the first time you sign ([documents-and-signing.md](./documents-and-signing.md#signing-with-face-id-or-fingerprint)).
 - **No admin for now.** You can change your own name, role and product line from your profile.
 - **One role per account** for now. Someone who needs two roles uses the more senior one ⚠.
 
-> **This is a placeholder, not security.** Anyone can sign in as anyone, so nothing in COAL counts as an official record yet, and passkey signatures don't prove who signed. COAL holds **made-up data only** until real sign-in exists.
+> **This is a placeholder, not security.** Anyone can sign in as anyone, so nothing in COAL counts as an official record yet, and signatures (a click now, passkeys later) don't prove who signed. COAL holds **made-up data only** until real sign-in exists.
 
 **Built so it can be swapped.** Sign-in lives in one backend module. It issues a session token, and everything else only uses the user ID from that session. Replacing name-only sign-in with company sign-in later changes that one module, not the rest.
 
@@ -90,9 +90,15 @@ Everyone with an account can see the **status** of every project. For now, that 
 - **Drafts.** A draft is visible to the doers, reviewers and signers of its step. Everyone else who can see the project's documents sees it once it's approved.
 - **Signers see what they sign.** Anyone asked to review or sign a document can read it and its inputs, even if the table would otherwise hide it.
 - **Budget figures** go in a separate budget annex, so the rest of a document can be shared without them.
+- **Board papers** are the documents of the steps the Board signs (4 and 23). The Board, the VP and the Head read them; the Lead of the product line sees that they exist and where they stand, not their content; the team doesn't see them.
+- **Checkpoint papers** are the documents of the checkpoint steps (4, 12, 18 and 23). Those are the only project documents the Board reads, and only once they are submitted.
+- **The budget annex** is a document type of its own (`BUDGET_ANNEX`), read by the Board, the VP, the Head, the Lead of the product line and R&D Ops on the project, and by anyone asked to sign it. Other team members don't see it, nor that it exists.
+- **A document with only drafts** isn't listed for anyone except the people who work on the project (the VP, the Head, the Lead of the line, the team). Others see it once it is submitted.
+- **Attachments and sources** follow what they are attached to: a document's, or the step's. The Board sees a step's only at checkpoints.
 - **"People below"** follows the role ladder in the next section.
 - **Delays.** Anyone who can't see the named cause sees only its category and the department or role.
-- **History follows the record.** Anyone who can see a record can see its history: who changed or signed it, and when.
+- **History follows the record.** Anyone who can see a record can see its history: who changed or signed it, and when. The project's activity feed follows the same rule for documents: an event about a document is shown only to people who may read it (a team member never sees events about the budget annex, nor the return comment on a Board paper), and drafts only to the people who work on the project.
+- **The sign-off record leaves out the budget annex.** Everyone on the team reads a step's sign-off record, so it lists the step's other outputs but not need-to-know documents. The annex is signed on its own.
 - **Anything not listed is denied.**
 
 ## What people can do
@@ -100,9 +106,9 @@ Everyone with an account can see the **status** of every project. For now, that 
 | Action | Who |
 |---|---|
 | Create a project (Go) | VP ⚠ |
-| Work on a step's documents and tasks | That step's doers, while the step is open |
+| Make or change a step's documents (save versions, submit them for signing) | That step's doers, while the step is open and the project is running |
 | Start or submit a step | Any doer of the step, and the project team where the route names it |
-| Sign a document row (Prepared, Reviewed, Approved) | The person the row names ([documents-and-signing.md](./documents-and-signing.md#signature-rows)) |
+| Sign a document row (Prepared, Reviewed, Approved) | The person the row names, or anyone holding its role within the project's scope; never Approved by the person who prepared the version ([documents-and-signing.md](./documents-and-signing.md#signature-rows)) |
 | Sign off a step | The step's signer ([workflow.md](./workflow.md#the-steps)) |
 | Decide at a checkpoint, choose the step-15 path, send work back | As in [workflow.md](./workflow.md#decisions-recorded-at-steps) |
 | Record a milestone | As in [workflow.md](./workflow.md#starting-steps) |
@@ -112,9 +118,11 @@ Everyone with an account can see the **status** of every project. For now, that 
 | Claim a queued task; give a task to someone | Anyone with the role; the VP or Head; the Lead within the project team |
 | Record a deviation | The task's assignee, the Lead, the Head |
 | Change dates after the Action Plan is signed | The Lead or the Head proposes; the Head approves; the VP also approves if the launch date moves ⚠ |
-| Add comments, pictures and sources | Anyone who can see the record |
+| Add pictures, files and sources | The people who do or sign the step, and the project team |
+| Add comments | Anyone who can see the record |
 | Change the R&D route | Not in COAL yet. Developers change it in the repository, with review |
-| Add a template; make a template version active | R&D Head or company QA ⚠ ([documents-and-signing.md](./documents-and-signing.md#adding-a-template)) |
+| Add a template; make a template version active | VP or R&D Head, including their own upload ⚠ ([documents-and-signing.md](./documents-and-signing.md#adding-a-template)) |
+| Read a template | Everyone reads the active ones; the VP and the Head also read drafts and retired versions |
 
 ## Assigning work and making requests
 
@@ -156,7 +164,8 @@ When a step opens, the engine creates one task for each doer role on the step, p
 - **Project rules.** Acting on a project takes two things. The role must be one the route names for that action *right now* (for example, only the signer approves, only the Head sends work back, and who may drop depends on which step is open). And the person must be in scope: the Board, the VP and the Head on any project, a Lead on their product line's projects, and everyone else on projects whose team they are on. A refusal names who can.
 - **Comments and reasons are content.** A return comment, a send-back reason, a decision's reason and a corrective action's text are visible to people in the project's scope. Everyone else sees the status of each event and step, not the words.
 - **Lists are filtered, not just checked.** Lists and searches only return what the person may see.
-- **Files** are only served through short-lived links issued after the permission check.
+- **Documents** follow [the need-to-know table](#content-is-need-to-know), decided by one pure rule (`documentAccess` in `rules.ts`) that the document endpoints, file links and attachments all use. The rule's cases have their own table in `permissions.test.ts`.
+- **Files** are only served through short-lived links issued after the permission check: to the uploader, or to anyone who may see a record that holds the file.
 - **Refusals.** When content is restricted, the response says so and names who can see it. It never hints at the content itself.
 - **Tests.** A table of role × action × expected result (allowed or denied) runs as tests on every change (`permissions.test.ts`). A new endpoint without a rule fails the build.
 - **The AI** acts as the person, with the same checks, plus extra limits ([workstation-and-ai.md](./workstation-and-ai.md#what-the-ai-may-do)).

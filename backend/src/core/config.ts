@@ -36,6 +36,16 @@ const Env = z.object({
   S3_CREATE_BUCKET: flag.default(false),
   FILE_LINK_SECONDS: z.coerce.number().int().positive().default(300),
   OUTBOX_POLL_MS: z.coerce.number().int().positive().default(5000),
+  /** Gotenberg turns the filled Word files into PDFs. */
+  GOTENBERG_URL: z.string().default('http://localhost:3100'),
+  // A PDF is made while a version is saved, holding the project's lock, so a stuck service must give up soon.
+  PDF_TIMEOUT_MS: z.coerce.number().int().positive().default(30_000),
+  /**
+   * The ClamAV daemon that scans uploads. Unset, uploads stay "not scanned" and can be opened,
+   * which is fine only while COAL holds made-up data (docs/documents-and-signing.md#files-pictures-and-sources).
+   */
+  CLAMAV_HOST: z.string().default(''),
+  CLAMAV_PORT: z.coerce.number().int().default(3310),
 });
 
 export type AppConfig = ReturnType<typeof loadConfig>;
@@ -44,6 +54,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
   const e = Env.parse(env);
   if (e.NODE_ENV === 'production' && e.S3_SECRET_ACCESS_KEY === 'coal-local-only') {
     throw new Error('Set real storage credentials for production.');
+  }
+  if (e.NODE_ENV === 'production' && !e.CLAMAV_HOST) {
+    throw new Error('Set CLAMAV_HOST so uploads are scanned for viruses in production.');
   }
   return {
     env: e.NODE_ENV,
@@ -69,5 +82,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
       linkSeconds: e.FILE_LINK_SECONDS,
     },
     outboxPollMs: e.OUTBOX_POLL_MS,
+    pdf: { url: e.GOTENBERG_URL, timeoutMs: e.PDF_TIMEOUT_MS },
+    scan: e.CLAMAV_HOST ? { host: e.CLAMAV_HOST, port: e.CLAMAV_PORT } : null,
   };
 }

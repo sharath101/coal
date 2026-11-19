@@ -12,20 +12,31 @@ import {
 } from '@coal/shared';
 import type { ChangeLog } from '../../core/db/change';
 import type { Tx } from '../../core/db/client';
+import type { AppDeps } from '../../core/deps';
 import type { Actor, RequestContext } from '../../core/http/context';
 import { AppError, fromEngineError, notFound, validationFailed } from '../../core/http/errors';
 import { getProductLine } from './service';
 import {
+  onStepReset,
+  onStepReturned,
+  onStepSigned,
+  onStepSubmitted,
+  signDecision,
+  type HookContext,
+} from '../documents/signoff';
+import {
   createRun,
+  findRunStep,
   latestVersion,
   recordDecision,
   recordSendBack,
   saveOutcome,
   type Attribution,
+  type DecisionRow,
   type LoadedRun,
 } from '../process/service';
 import { closeTasks, createTasks, findActiveKeyedTask, type NewTask } from '../tasks/service';
-import { findUsersByIds, type UserRow } from '../users/service';
+import { findUser, findUsersByIds, type UserRow } from '../users/service';
 import {
   addMembers,
   nextProjectCode,
@@ -33,6 +44,7 @@ import {
   startingTeam,
   type ProjectRow,
 } from './projects';
+import { factsOf } from './env';
 import { roleName, routeRole } from './routing';
 import { projects } from './tables';
 
@@ -63,6 +75,12 @@ export interface Env {
   loaded: LoadedRun;
   /** The active team, as people. */
   team: UserRow[];
+}
+
+/** What an action needs beyond the database: the file and PDF services, and whether it is only a preview. */
+export interface Services {
+  deps: AppDeps;
+  preview: boolean;
 }
 
 const STEP_CHANGE = {
@@ -297,9 +315,16 @@ async function applyEffects(
   newIds: Map<StepKey, string>,
   c: Collected,
   reason: string | undefined,
+  h: HookContext,
 ): Promise<void> {
   const { route, run } = env.loaded;
   const nameOf = (key: StepKey) => stepOf(route, key)?.name ?? key;
+  /** The person who signed: the one acting, or another signer of a step several must sign. */
+  const signerNamed = async (userId: string) => {
+    if (userId === env.actor.userId) return env.actor;
+    const user = await findUser(tx, env.orgId, userId);
+    return user ? { userId, name: user.name, roleKey: user.roleKey } : env.actor;
+  };
 
   for (const effect of effects) {
     if (effect.type in STEP_CHANGE) {
@@ -328,15 +353,30 @@ async function applyEffects(
         break;
       }
       case 'step.submitted': {
-        await openSignTasks(
-          tx,
-          log,
-          env,
-          c,
-          stepOf(route, effect.step) as StepDefinition,
-          newIds.get(effect.step),
-          effect.signers,
-        );
+        const step = stepOf(route, effect.step) as StepDefinition;
+        await openSignTasks(tx, log, env, c, step, newIds.get(effect.step), effect.signers);
+        const runStepId = newIds.get(effect.step) as string;
+        const row = await findRunStep(tx, runStepId);
+        const state = env.loaded.state;
+        const decisions = state.decisions
+          .filter((d) => d.step === effect.step && d.iteration === effect.iteration)
+          .map((d) => {
+            const def = step.decisions.find((x) => x.key === d.decision);
+            return {
+              name: def?.name ?? d.decision,
+              answer: def?.options.find((o) => o.value === d.value)?.name ?? d.value,
+            };
+          });
+        for (const warning of await onStepSubmitted(h, {
+          step,
+          runStepId,
+          iteration: effect.iteration,
+          openedAt: row?.openedAt ?? null,
+          signers: effect.signers,
+          decisions,
+        })) {
+          addWarning(c, warning);
+        }
         break;
       }
       case 'step.signed':
@@ -346,6 +386,7 @@ async function applyEffects(
           status: 'done',
           assigneeId: effect.by,
         });
+        await onStepSigned(h, effect.step, await signerNamed(effect.by));
         break;
       case 'step.approved':
         await closeAndLog(tx, log, env, {
@@ -353,6 +394,7 @@ async function applyEffects(
           kinds: ['sign', 'work'],
           status: 'done',
         });
+        await onStepSigned(h, effect.step, await signerNamed(effect.by));
         break;
       case 'step.done':
         await closeAndLog(tx, log, env, { stepKey: effect.step, kinds: ['work'], status: 'done' });
@@ -363,6 +405,7 @@ async function applyEffects(
           kinds: ['sign'],
           status: 'cancelled',
         });
+        await onStepReturned(h, effect.step, effect.comment);
         break;
       case 'step.reset':
         // The step-20 follow-up is never cancelled: patients already treated must still be followed (P16).
@@ -370,6 +413,10 @@ async function applyEffects(
           stepKey: effect.step,
           status: 'cancelled',
           keepOnReset: true,
+        });
+        await onStepReset(h, effect.step, {
+          runStepId: newIds.get(effect.step) as string,
+          iteration: effect.newIteration,
         });
         break;
       case 'run.dropped':
@@ -460,6 +507,7 @@ export async function performAction(
   env: Env,
   action: Action,
   attribution: Attribution,
+  services: Services,
 ): Promise<Collected> {
   const { loaded } = env;
   let outcome;
@@ -479,7 +527,7 @@ export async function performAction(
           attribution,
         })
       : undefined;
-  const newIds = await saveOutcome(
+  const saved = await saveOutcome(
     tx,
     env.orgId,
     loaded,
@@ -488,17 +536,34 @@ export async function performAction(
     attribution,
     sendBackId,
   );
+  const decided: DecisionRow[] = [...saved.decisions];
   if (action.type === 'hold' || action.type === 'resume' || action.type === 'drop') {
-    await recordDecision(tx, env.orgId, loaded.run.id, {
-      decision: action.type,
-      value: action.type,
-      reason: attribution.reason,
-      by: attribution.userId,
-    });
+    decided.push(
+      await recordDecision(tx, env.orgId, loaded.run.id, {
+        decision: action.type,
+        value: action.type,
+        reason: attribution.reason,
+        by: attribution.userId,
+      }),
+    );
   }
 
+  const hooks = await hookContext(tx, log, env, services);
+  // Every decision is signed by the person who made it.
+  for (const decision of decided) await signDecision(hooks, decision);
+
   const c = newCollected();
-  await applyEffects(tx, log, env, outcome.effects, loaded.stepIds, newIds, c, attribution.reason);
+  await applyEffects(
+    tx,
+    log,
+    env,
+    outcome.effects,
+    loaded.stepIds,
+    saved.stepIds,
+    c,
+    attribution.reason,
+    hooks,
+  );
   if (action.type === 'send_back') {
     log.audit({
       action: 'send_back.recorded',
@@ -509,6 +574,23 @@ export async function performAction(
     });
   }
   return c;
+}
+
+/** What the documents module is told as the action's effects are applied. */
+async function hookContext(
+  tx: Tx,
+  log: ChangeLog,
+  env: Env,
+  services: Services,
+): Promise<HookContext> {
+  return {
+    deps: services.deps,
+    tx,
+    log,
+    facts: await factsOf(tx, env),
+    preview: services.preview,
+    actor: env.actor,
+  };
 }
 
 export interface GoInput {
@@ -525,6 +607,7 @@ export async function goProject(
   ctx: RequestContext,
   actor: Actor,
   input: GoInput,
+  services: Services,
 ): Promise<{ project: ProjectRow; collected: Collected; team: UserRow[] }> {
   const line = await getProductLine(tx, ctx.orgId, input.productLineId);
   if (!line) throw validationFailed('There is no such product line.', 'productLineId');
@@ -556,10 +639,11 @@ export async function goProject(
   const loaded: LoadedRun = { run, version, route: version.route, state: start.state, stepIds };
   const env: Env = { orgId: ctx.orgId, actor, project: row, loaded, team };
 
-  // The VP's click is the Go decision; it becomes a signed decision with passkeys (block 3).
+  // The VP's click is the Go decision, and it is signed (a confirmed click until passkeys).
+  const hooks = await hookContext(tx, log, env, services);
   for (const effect of start.effects) {
     if (effect.type === 'decision.recorded') {
-      await recordDecision(tx, ctx.orgId, run.id, {
+      const decision = await recordDecision(tx, ctx.orgId, run.id, {
         runStepId: effect.step ? stepIds.get(effect.step) : undefined,
         stepKey: effect.step,
         iteration: effect.iteration,
@@ -567,6 +651,7 @@ export async function goProject(
         value: effect.value,
         by: actor.userId,
       });
+      await signDecision(hooks, decision);
     }
   }
   log.audit({
@@ -578,7 +663,7 @@ export async function goProject(
   log.event({ type: 'project.created', projectId: row.id, payload: { code, name: row.name } });
 
   const collected = newCollected();
-  await applyEffects(tx, log, env, start.effects, stepIds, stepIds, collected, undefined);
+  await applyEffects(tx, log, env, start.effects, stepIds, stepIds, collected, undefined, hooks);
   return { project: row, collected, team };
 }
 

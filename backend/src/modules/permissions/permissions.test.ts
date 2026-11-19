@@ -5,7 +5,7 @@ import { assertAiTier, guard } from '../../core/http/endpoint';
 import { IMPLEMENTATIONS } from '../index';
 import { ROLES } from '../org/catalogue';
 import { canAccess, canUse } from './index';
-import { RULES } from './rules';
+import { RULES, canSeeDrafts, documentAccess, type DocumentResource } from './rules';
 
 /**
  * The permission test table (docs/roles-and-access.md#how-access-is-enforced): for every
@@ -48,6 +48,23 @@ const ENDPOINT_TABLE: Record<PermissionKey, Who[]> = {
   'tasks.update': SIGNED_IN,
   'tasks.claim': SIGNED_IN,
   'tasks.reassign': ['vp', 'rd_head', 'rd_lead'],
+  'documentTypes.read': SIGNED_IN,
+  'templates.read': SIGNED_IN,
+  // ⚠ The VP or the Head adds and activates templates (S6).
+  'templates.write': ['vp', 'rd_head'],
+  'templates.activate': ['vp', 'rd_head'],
+  'documents.list': SIGNED_IN,
+  'documents.read': SIGNED_IN,
+  'documents.create': SIGNED_IN,
+  'documents.write': SIGNED_IN,
+  'documents.submit': SIGNED_IN,
+  'signatures.read': SIGNED_IN,
+  'signatures.sign': SIGNED_IN,
+  'signatures.return': SIGNED_IN,
+  'attachments.read': SIGNED_IN,
+  'attachments.write': SIGNED_IN,
+  'sources.read': SIGNED_IN,
+  'sources.write': SIGNED_IN,
 };
 
 /** Rules that need a project and the roles the route allows right now. */
@@ -65,6 +82,11 @@ const SCOPED = [
   'milestones.record',
   'correctiveActions.create',
   'tasks.reassign',
+  'documents.create',
+  'documents.write',
+  'documents.submit',
+  'attachments.write',
+  'sources.write',
 ] as const satisfies readonly PermissionKey[];
 /** Roles that act on any project, whoever is on its team. */
 const ANY_PROJECT: Who[] = ['board', 'vp', 'rd_head'];
@@ -113,8 +135,20 @@ describe('permission table', () => {
     expect(decision).toEqual({
       allowed: false,
       code: 'NOT_ALLOWED',
-      whoCan: ['The person who uploaded it'],
+      whoCan: ['The person who uploaded it', 'People who can see the record it belongs to'],
     });
+  });
+
+  it('opens a file for anyone who may see a record that holds it', () => {
+    const actor = actorFor('vp') as Actor;
+    expect(canAccess('files.read', actor, { uploadedBy: 'x', viaRecord: true }).allowed).toBe(true);
+    expect(canAccess('files.read', actor, { uploadedBy: null, viaRecord: false }).allowed).toBe(
+      false,
+    );
+    // Finishing an upload stays with the uploader, whatever holds the file.
+    expect(canAccess('files.upload', actor, { uploadedBy: 'x', viaRecord: true }).allowed).toBe(
+      false,
+    );
   });
 });
 
@@ -243,6 +277,164 @@ describe('task rules', () => {
     const dard = actorFor('dard') as Actor;
     const dardTask = { assigneeId: null, queueRole: 'dard', productLineId: 'spine' };
     expect(canAccess('tasks.claim', dard, dardTask).allowed).toBe(true);
+  });
+});
+
+describe('template rules', () => {
+  it.each(ROLE_KEYS)(
+    '%s reads an active template; drafts and retired versions only for the VP and the Head',
+    (who) => {
+      const actor = actorFor(who) as Actor;
+      expect(canAccess('templates.read', actor, { status: 'active' }).allowed).toBe(true);
+      for (const status of ['draft', 'retired'] as const) {
+        expect(canAccess('templates.read', actor, { status }).allowed).toBe(
+          ['vp', 'rd_head'].includes(who),
+        );
+      }
+    },
+  );
+});
+
+describe('document access (need-to-know)', () => {
+  const LINE = 'line-spine';
+  const base: DocumentResource = {
+    productLineId: LINE,
+    memberIds: [],
+    sensitivity: 'normal',
+    boardPaper: false,
+    checkpoint: false,
+    addressedRoles: [],
+    addressedUserIds: [],
+  };
+  const who = (
+    roleKey: string,
+    options: { line?: string; member?: boolean } = {},
+  ): [Actor, string[]] => [
+    { userId: 'user-1', name: roleKey, roleKey, productLineId: options.line ?? null },
+    options.member ? ['user-1'] : [],
+  ];
+  const access = (
+    [actor, memberIds]: [Actor, string[]],
+    resource: Partial<DocumentResource> = {},
+  ) => documentAccess(actor, { ...base, memberIds, ...resource });
+
+  it('gives a normal document to the VP, the Head, the Lead of its line and the team, and to no one else', () => {
+    expect(access(who('vp'))).toBe('full');
+    expect(access(who('rd_head'))).toBe('full');
+    expect(access(who('rd_lead', { line: LINE }))).toBe('full');
+    expect(access(who('rd_lead', { line: 'line-trauma' }))).toBe('none');
+    expect(access(who('design_engineer', { member: true }))).toBe('full');
+    expect(access(who('design_engineer'))).toBe('none');
+    expect(access(who('board'))).toBe('none');
+    expect(access(who('company_qa'))).toBe('none');
+    expect(access(who('marketing'))).toBe('none');
+  });
+
+  it('gives the Board checkpoint papers only', () => {
+    expect(access(who('board'), { checkpoint: true })).toBe('full');
+    expect(access(who('board'), { checkpoint: false })).toBe('none');
+  });
+
+  it('gives a Board paper to the Board, the VP and the Head, and only its outcome to the Lead', () => {
+    const paper = { boardPaper: true, checkpoint: true };
+    expect(access(who('board'), paper)).toBe('full');
+    expect(access(who('vp'), paper)).toBe('full');
+    expect(access(who('rd_head'), paper)).toBe('full');
+    expect(access(who('rd_lead', { line: LINE }), paper)).toBe('outcome');
+    expect(access(who('rd_lead', { line: 'line-trauma' }), paper)).toBe('none');
+    expect(access(who('design_engineer', { member: true }), paper)).toBe('none');
+  });
+
+  it('keeps budget figures to the Board, the VP, the Head, the Lead of the line and R&D Ops on the project', () => {
+    const budget = { sensitivity: 'budget' as const };
+    expect(access(who('board'), budget)).toBe('full');
+    expect(access(who('vp'), budget)).toBe('full');
+    expect(access(who('rd_head'), budget)).toBe('full');
+    expect(access(who('rd_lead', { line: LINE }), budget)).toBe('full');
+    expect(access(who('rd_lead', { line: 'line-trauma' }), budget)).toBe('none');
+    expect(access(who('rd_ops', { member: true }), budget)).toBe('full');
+    expect(access(who('rd_ops'), budget)).toBe('none');
+    expect(access(who('design_engineer', { member: true }), budget)).toBe('none');
+    expect(access(who('dard', { member: true }), budget)).toBe('none');
+  });
+
+  it('lets signers read what they are asked to sign', () => {
+    // By role: an outside role anywhere; an R&D role only where it is in the project's scope.
+    expect(access(who('company_qa'), { addressedRoles: ['company_qa'] })).toBe('full');
+    expect(access(who('dard'), { addressedRoles: ['dard'] })).toBe('none');
+    expect(access(who('dard', { member: true }), { addressedRoles: ['dard'] })).toBe('full');
+    // By name, wherever they are.
+    expect(access(who('dard'), { addressedUserIds: ['user-1'] })).toBe('full');
+    // Even a budget annex or a Board paper.
+    expect(
+      access(who('company_qa'), { addressedRoles: ['company_qa'], sensitivity: 'budget' }),
+    ).toBe('full');
+  });
+
+  it('shows drafts only to the people who work on the project', () => {
+    const scope = { productLineId: LINE, memberIds: ['user-1'] };
+    const draftsFor = (roleKey: string, line: string | null = null, member = false) =>
+      canSeeDrafts(who(roleKey, { line: line ?? undefined })[0], {
+        ...scope,
+        memberIds: member ? ['user-1'] : [],
+      });
+    expect(draftsFor('vp')).toBe(true);
+    expect(draftsFor('rd_head')).toBe(true);
+    expect(draftsFor('rd_lead', LINE)).toBe(true);
+    expect(draftsFor('design_engineer', null, true)).toBe(true);
+    expect(draftsFor('board')).toBe(false);
+    expect(draftsFor('company_qa')).toBe(false);
+    expect(draftsFor('design_engineer')).toBe(false);
+  });
+
+  it('names who can when it refuses, without revealing the content', () => {
+    const decision = canAccess('documents.read', who('design_engineer')[0], {
+      ...base,
+      sensitivity: 'budget',
+    });
+    expect(decision).toEqual({
+      allowed: false,
+      code: 'NOT_ALLOWED',
+      whoCan: [
+        'Board',
+        'VP',
+        'R&D Head',
+        'The R&D Lead of this product line',
+        'R&D Ops on the project',
+      ],
+    });
+  });
+});
+
+describe('signature rows', () => {
+  const row = (roleKeys: string[], assigneeId: string | null = null) => ({
+    productLineId: 'line-spine',
+    memberIds: [] as string[],
+    roleKeys,
+    assigneeId,
+  });
+  const as = (roleKey: string): Actor => ({
+    userId: 'user-1',
+    name: roleKey,
+    roleKey,
+    productLineId: roleKey === 'rd_lead' ? 'line-spine' : null,
+  });
+  const reach = (actor: Actor, r: ReturnType<typeof row>, member = false) =>
+    canAccess('signatures.sign', actor, { ...r, memberIds: member ? ['user-1'] : [] }).allowed;
+
+  it('lets the named person sign, and no one else', () => {
+    expect(reach(as('vp'), row(['vp'], 'user-1'))).toBe(true);
+    expect(reach(as('vp'), row(['vp'], 'user-2'))).toBe(false);
+  });
+
+  it('lets anyone with the asked role sign, within the project’s scope', () => {
+    expect(reach(as('vp'), row(['vp']))).toBe(true);
+    expect(reach(as('rd_head'), row(['vp']))).toBe(false);
+    expect(reach(as('dard'), row(['dard']))).toBe(false);
+    expect(reach(as('dard'), row(['dard']), true)).toBe(true);
+    expect(reach(as('company_qa'), row(['company_qa']))).toBe(true);
+    // Reviewers may be asked as any one of several roles.
+    expect(reach(as('rd_lead'), row(['dard', 'rd_lead']))).toBe(true);
   });
 });
 

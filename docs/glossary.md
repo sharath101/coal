@@ -20,15 +20,19 @@
 | **Corrective action** | A fix listed in the prototype case study (step 16). Each is a task, and step 18 can't be submitted while any is open |
 | **Deviation** | A record explaining late work: the reason, the cause and the new date |
 | **Doer** | A role or person who does the work of a step (as opposed to its signer) |
-| **Draft, version, revision** | Each save makes a new numbered draft version. A revision letter (A, B, C) is given when a version is approved |
+| **Document type** | A kind of document (PID, Action Plan, Budget annex…) with its numbering, signature rows and sensitivity ([documents-and-signing.md](./documents-and-signing.md#document-types)) |
+| **Draft, version, revision** | Each save makes a new numbered draft version, and nothing is overwritten. A revision letter (A, B, C) is given when a version is approved |
 | **Fields and written sections** | The two kinds of part in a template. Fields are filled by code, from records or from the person's answers; written sections are written by a person or the AI |
+| **Carried forward** | A document version copied unchanged into a step's new iteration when work is sent back, so people revise rather than start again |
+| **Confirmed click** | How every signature is made until passkeys exist: the right person confirms, and COAL records who, when and the hashes |
 | **Forecast** | The expected end of each open step, and the expected launch, worked out from planned durations and progress |
 | **Go** | The VP's signed decision that creates a project and opens steps 1, 2 and 2a |
 | **Health** | Green, amber or red, for a step or project, from its dates ([dashboard.md](./dashboard.md#health)) |
 | **Iteration** | One pass through a step. Sending work back opens a new iteration; earlier ones stay on record |
 | **Milestone** | A recorded fact that can open a step, such as "material received" or "trial surgeries complete" |
 | **Outside document** | A file from outside Jayon (a lab report, a vendor PDF). Treated with extra care by the AI |
-| **Passkey** | The standard behind Face ID, fingerprint and Windows Hello sign-in. COAL uses passkeys for signing |
+| **Passkey** | The standard behind Face ID, fingerprint and Windows Hello sign-in. COAL will use passkeys for signing, in the last block (D16) |
+| **Placeholder** | A `{name}` in a template's Word file, replaced when a document is made. Each must match the template's specification |
 | **Process run** | One run of a process's route. For R&D, each project has one run |
 | **Project** | One product idea going through R&D, from Go to launch. It has one process run |
 | **Project team** | The people on a project, named in its PID (step 1) |
@@ -43,9 +47,10 @@
 | **Stage** | One of the six groups of steps: idea and go-ahead; plan, design and source; make the prototype; test and gather feedback; clinical trials; release and launch |
 | **Status** | Where a project stands: its stage, step states, owners, dates and health. Visible to everyone (compare *content*) |
 | **Step** | One step of the route: C, 1 to 23, 2a, 24a, 24b and 25 |
-| **Step sign-off record** | A record COAL generates when a step is submitted, listing its outputs and their hashes. The signer signs it |
+| **Specification** | The part of a template that says which sections are fields and which are written, where each field comes from, and the signature rows |
+| **Step sign-off record** | A record COAL generates when a step is submitted, listing its outputs and their hashes. The signer signs it by approving the step |
 | **Task** | One person's piece of work. Kinds: work, review, sign, decision, corrective action, request, own |
-| **Template library** | Where COAL keeps the template for each document type, with its versions. One version per type is active, and the AI uses it every time |
+| **Template library** | Where COAL keeps the template for each document type, with its versions (draft, active, retired). One version per type is active, and the AI uses it every time |
 | **Via AI** | The mark on every request the AI makes on a user's behalf. The backend uses it to apply the AI tiers |
 | **Widget** | A Dashboard card that expands into a full view |
 | **Workstation** | Each person's chat page, organised by project, where they work with the AI |
