@@ -49,6 +49,7 @@ Node 22 and pnpm 10 (see `.nvmrc` and `packageManager`). Docker runs the local s
 | New migration after changing a `tables.ts` | `pnpm --filter @coal/backend db:generate` |
 | Write the OpenAPI spec to `backend/openapi.json` | `pnpm --filter @coal/backend openapi` |
 | Build the website | `pnpm --filter @coal/web build` |
+| Update the test deployment | Push to `main`: Railway rebuilds once CI passes ([docs/demo-hosting.md](docs/demo-hosting.md)) |
 
 ## Where things go
 

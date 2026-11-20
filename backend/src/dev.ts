@@ -5,7 +5,7 @@ import { startWorker } from './jobs/worker';
 import { loadSampleCalendar } from './modules/schedule/calendar';
 import { loadSampleTemplates } from './modules/templates/service';
 
-/** Local development: the API and the worker in one process. */
+/** Local development and the test deployment (docs/demo-hosting.md): the API and the worker in one process. */
 const runtime = await createRuntime();
 // Made-up holidays, so dates work before Jayon sends its calendar.
 await loadSampleCalendar(runtime.deps.db, runtime.deps.config.orgId);

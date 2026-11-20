@@ -9,6 +9,7 @@ An AI-assisted platform for Jayon. It starts by running R&D, from the VP's produ
 - **The plan:** [docs/README.md](docs/README.md). It has the overview, links to every detailed doc, and the rules for keeping the docs up to date.
 - **AI coding agents:** read [AGENTS.md](AGENTS.md).
 - **Run it locally:** `pnpm install`, `pnpm db:up`, `cp .env.example .env`, `pnpm --filter @coal/backend db:migrate`, then `pnpm dev` and open http://localhost:3000. The VP and the R&D Head can add templates on the Templates page; sample templates and a few made-up holidays are loaded when the backend starts. For a Dashboard with something on it, run `pnpm --filter @coal/backend seed:demo` once on an empty database. All commands are in [AGENTS.md § Commands](AGENTS.md#commands).
+- **The test deployment** for showing COAL to others: [docs/demo-hosting.md](docs/demo-hosting.md).
 
 ## Repository layout
 

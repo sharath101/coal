@@ -71,7 +71,7 @@ flowchart TB
 | Tests | Vitest, against a real PostgreSQL: each test file gets its own copy of a migrated template database | Fast, and tests see the real triggers and constraints |
 | Lint and format | ESLint with typescript-eslint (type-aware), COAL's own rules in `eslint-plugin-coal.mjs`, Prettier | Catches bugs and keeps the parts apart |
 | CI | GitHub Actions: lint, type checks, formatting, tests and the website build on every push and pull request | Every change is checked |
-| Hosting | Local for now; simple hosting for demos; production decided later (AWS Mumbai proposed) | Simple while testing; AWS Mumbai keeps data in India |
+| Hosting | Local for now; a test deployment on Railway for demos (D20); production decided later (AWS Mumbai proposed) | Simple while testing; AWS Mumbai keeps data in India |
 
 **Sized for all of Jayon.** This stack comfortably serves about 800 employees with one backend service (several copies when needed) and one PostgreSQL database. See the next section.
 
@@ -270,7 +270,7 @@ Jobs are written so that running one twice does no harm: each reminder carries a
 - **Secrets** live in a secrets manager, never in the code.
 - **Database accounts.** The backend's database account can't change or delete audit entries or signatures, and can't change what a saved document version holds (triggers refuse it now; in production the account will also lack the privileges).
 - **Uploads** are virus-scanned (ClamAV, required in production) and limited by type and size. Clients upload to a staging area; COAL checks the bytes and copies them to where they're served from, so a file's recorded hash always matches what's served. Files are served only through short-lived links, after a check that the person may see a record that holds the file. Word templates are also refused if they would unpack to something huge (a zip bomb), and only `http` and `https` links are accepted as sources. In production, a storage rule removes staged uploads left unfinished after a day.
-- **Rate limits** on sign-in and the AI endpoints, counted per address. The backend believes `X-Forwarded-For` only from the reverse proxies named in `TRUST_PROXY`, and only a proxy that overwrites that header with the connecting address may be named. The website's own rewrite passes a browser's header through, so it's never trusted: locally, and until demo hosting puts such a proxy in front of `/api/v1`, everyone shares one counter.
+- **Rate limits** on sign-in and the AI endpoints, counted per address. The backend believes `X-Forwarded-For` only from the reverse proxies named in `TRUST_PROXY`, and only a proxy that overwrites that header with the connecting address may be named. The website's own rewrite passes a browser's header through, so it's never trusted: locally and on the test deployment, where no such proxy stands in front of `/api/v1`, everyone shares one counter.
 - **Logs** never contain document content, prompts or AI results. Error reports are scrubbed before they're stored.
 
 ## Environments and hosting
@@ -278,7 +278,7 @@ Jobs are written so that running one twice does no harm: each reminder carries a
 | Environment | What | Data |
 |---|---|---|
 | Local | Docker Compose: PostgreSQL 18, Gotenberg, and MinIO (the `pgsty/minio` community build, since MinIO stopped publishing images); the backend creates its bucket | Made-up |
-| Demo, when needed | Simple hosting to show COAL to employees: for example, one small server running the same Docker Compose setup, behind a shared password ⚠ | Made-up |
+| Demo, when needed | The test deployment on Railway: the same pieces as local, built from `backend/Dockerfile` and `web/Dockerfile`, updated by pushing to `main` ([demo-hosting.md](./demo-hosting.md), D20) | Made-up |
 | Production | Decided at the end (AWS Mumbai proposed), with daily backups and point-in-time restore | Real Jayon data, **only once real sign-in exists** |
 
 When the mobile app comes, it's tested through Expo's internal distribution or TestFlight first.

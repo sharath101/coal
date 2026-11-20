@@ -89,7 +89,7 @@
 | AI8 | How is a phone number linked to an employee's account, and unlinked when they change phones or leave? | Not needed until the WhatsApp phase | Founders, Jayon IT |
 | AI9 | How long may an action card wait to be confirmed before it expires? | 72 hours (`PROPOSAL_EXPIRY_HOURS`). Confirming re-checks everything anyway, so a stale card can't do something different from what it shows | Founders |
 | AI10 | Do the AI's answers on Claude match what was tested on the Copilot stand-in (D19)? | Not yet known: the AI test sets run again on Anthropic as soon as the new laptop arrives | Sharath |
-| AI11 | What do the models really cost, and are the Anthropic model names right? | Starting prices by family per million tokens (Haiku $1 in and $5 out, Sonnet $3 and $15, Opus $5 and $25) set the budget; the names `claude-sonnet-5-5` and `claude-haiku-5-5` are unchecked, because the key can't be used from the company laptop. Check both when the new laptop arrives | Sharath |
+| AI11 | What do the models really cost? | Starting prices by family per million tokens (Haiku $1 in and $5 out, Sonnet $3 and $15, Opus $5 and $25) set the budget. Check them against Anthropic's bills. (The model names `claude-sonnet-5-5` and `claude-haiku-5-5` were confirmed on the test deployment on 20 Nov 2026) | Sharath |
 | AI12 | How long are chats and AI logs kept, and may a person delete their own chats? | Kept for as long as the database is; only the owner reads a chat | Jayon |
 | AI13 | Which sample files may a template be made from? | Word (`.docx`) and text PDFs (a PDF's layout can't be kept, so COAL builds a plain Word form and says so). Scans and photos are refused until a reader for them is added ⚠. Check with real samples whether PDFs read well enough | Sharath, Madhav |
 | AI14 | Are the drafting checks the right ones? The assistant's number rule lets single digits through, requires a person's own words for the fields they give, and does not check dates, names or standards. The idea card shows the tasks and who gets them, not due dates or work messages | Yes for now: they stop invented figures and keep the person's fields theirs; the person reads every draft. To be judged on real drafts, with the AI test sets ([AI10](#ai)) | Sharath, Madhav |
@@ -119,7 +119,6 @@ These matter when the [regulatory notes](./regulatory-notes.md) are taken up.
 | I5 | Where are existing R&D documents kept? Which projects are under way, at which steps, and do they move into COAL? | R&D Head |
 | I6 | COAL's web domain. Decided at the end (D13). Until then, passkeys work on `localhost`, and passkeys made on a demo host are registered again once the domain is set. The mobile app needs it too | Founders |
 | I7 | Who in Jayon's IT will look after COAL day to day? | Jayon |
-| I8 | Which simple host for showing COAL to employees? The plan suggests one small server running the same setup as local, behind a shared password | Founders |
 | I9 | Which file types must COAL accept, and how large can they be (for example CAD files, scans, videos of tests)? Assumption in use: PDF, Word, Excel, PowerPoint, CSV, text, PNG, JPEG, WebP, HEIC and STEP, up to 100 MB (`shared/src/rules/files.ts`) | Jayon IT, R&D Head |
 
 ## Business
@@ -156,3 +155,4 @@ These were listed at the COAL meeting, plus what the build needs:
 | ID | Question | Answer |
 |---|---|---|
 | AI1 | Which provider and models (Claude or OpenAI)? | Claude (Anthropic) only, for now ([D17](./decisions.md)). Models are set per purpose in configuration |
+| I8 | Which simple host for showing COAL to employees? | A test deployment on Railway, with the same pieces as local work ([D20](./decisions.md), [demo-hosting.md](./demo-hosting.md)) |

@@ -77,7 +77,7 @@ Each block depends on the ones before it. Within a block, the work can run side 
    - One prompt signs a step's sign-off record and the step's main document together.
    - Signatures show on screen and on the PDF with name, role, meaning and Indian time.
 
-**Demo hosting** can be set up whenever you want to show COAL to people, once Foundations is done ([architecture.md](./architecture.md#environments-and-hosting)).
+**Demo hosting:** a test deployment on Railway runs COAL as it runs locally, with made-up data, and updates when `main` passes CI ([demo-hosting.md](./demo-hosting.md), D20).
 
 ### Done when
 

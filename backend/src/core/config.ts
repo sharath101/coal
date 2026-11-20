@@ -11,7 +11,7 @@ export type AiPurpose = (typeof AI_PURPOSES)[number];
 export const AI_PROVIDERS = ['anthropic', 'copilot', 'none'] as const;
 export type AiProviderName = (typeof AI_PROVIDERS)[number];
 
-/** Each provider names its models its own way. ⚠ The Anthropic names are unchecked (AI11). */
+/** Each provider names its models its own way. */
 const DEFAULT_MODELS: Record<'anthropic' | 'copilot', Record<AiPurpose, string>> = {
   anthropic: {
     chat: 'claude-sonnet-5-5',

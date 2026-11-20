@@ -41,7 +41,7 @@ It acts as you, sees only what you can see, and anything that affects other peop
 
 **Accounts, for now.** Sign up with a name and a role; sign in with your name. This is a placeholder until real authentication is chosen, so COAL holds **made-up data only** until then. → [roles-and-access.md](./roles-and-access.md#accounts-for-now)
 
-**How it's built.** A separate backend (its API also serves the WhatsApp chat and the mobile app later), a Next.js website, and shared TypeScript code, on PostgreSQL. Platform modules serve every department, and each department adds its own. It runs locally for now; demos use simple hosting. → [architecture.md](./architecture.md)
+**How it's built.** A separate backend (its API also serves the WhatsApp chat and the mobile app later), a Next.js website, and shared TypeScript code, on PostgreSQL. Platform modules serve every department, and each department adds its own. It runs locally for now; demos use a test deployment on Railway ([demo-hosting.md](./demo-hosting.md)). → [architecture.md](./architecture.md)
 
 **First release.** The whole route, end to end, with made-up data, on the website, with basic AI and the template library. Step-specific modules (prototypes, QC, trials, regulatory) come after, designed from Jayon's real documents. → [roadmap.md](./roadmap.md)
 
@@ -64,7 +64,7 @@ The full log, with reasons, is in [decisions.md](./decisions.md).
 
 - **Scope:** R&D first, built to grow to all of Jayon, about 800 employees (D11).
 - **Parts:** a separate backend, website and mobile app, with shared code (D1). Web first; the app comes in a later phase (D12).
-- **Hosting:** local first; simple hosting for demos; the domain and production hosting are decided at the end (D13).
+- **Hosting:** local first; a test deployment on Railway for demos (D13, D20); the domain and production hosting are decided at the end (D13).
 - **AI:** Claude (Anthropic) behind one gateway (D17, replacing D2), with a budget of US$5 per person per day (D18); the Copilot SDK stands in on one development laptop for now (D19). Basic AI in the first release, only when asked (D3). The chat also comes to WhatsApp (D14).
 - **Templates:** a template for each step's documents, kept in COAL's template library; the AI checks it every time (D15).
 - **Signing:** Face ID or fingerprint passkeys, with the device PIN as fallback (D4), built last (D16). A confirmed click until then.
@@ -83,6 +83,7 @@ The full log, with reasons, is in [decisions.md](./decisions.md).
 | [workstation-and-ai.md](./workstation-and-ai.md) | The Workstation, the AI's features, tiers and action cards, the main flows, channels (website, WhatsApp, app), AI providers, safety, AI tests |
 | [documents-and-signing.md](./documents-and-signing.md) | Documents, the template library, versions, signature rows, step sign-off records, passkey signing, audit trail, files |
 | [architecture.md](./architecture.md) | The parts, stack, growing to all of Jayon, repo layout, process engine, events, AI module, sign-in, jobs, security, hosting |
+| [demo-hosting.md](./demo-hosting.md) | The test deployment on Railway: its pieces and settings, updating, filling and resetting it |
 | [api.md](./api.md) | API conventions, every first-release endpoint with its AI tier, proposals, events |
 | [data-model.md](./data-model.md) | Conventions and the first-release tables; what isn't modelled yet |
 | [regulatory-notes.md](./regulatory-notes.md) | Reference only: what the rules may require, and what's needed before COAL holds official records |
@@ -107,6 +108,7 @@ The full log, with reasons, is in [decisions.md](./decisions.md).
 | A template or the template library | [documents-and-signing.md § The template library](./documents-and-signing.md#the-template-library) |
 | Documents, versions or signing | [documents-and-signing.md](./documents-and-signing.md) |
 | The repo setup, the stack, hosting or security | [architecture.md](./architecture.md) |
+| Deploying, updating or resetting the test deployment | [demo-hosting.md](./demo-hosting.md) |
 | A new department or process | [architecture.md § Growing to all of Jayon](./architecture.md#growing-to-all-of-jayon), [data-model.md](./data-model.md), [roles-and-access.md](./roles-and-access.md) |
 | A new step module (prototypes, QC, testing, trials…) | [roadmap.md](./roadmap.md), [data-model.md § Not modelled yet](./data-model.md#not-modelled-yet-on-purpose), [regulatory-notes.md](./regulatory-notes.md), [workflow.md](./workflow.md) |
 | Deciding what to build next | [roadmap.md](./roadmap.md), [open-questions.md](./open-questions.md) |
