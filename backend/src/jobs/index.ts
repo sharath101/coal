@@ -64,9 +64,18 @@ export async function startJobs(deps: AppDeps, log: Logger) {
     log.info({ projects }, 'worked out the schedules again');
   });
   await boss.work(JOBS.sendReminders, async () => {
+    // Dates first, so a midnight run that was missed (the computer was off) is made up for.
+    await recomputeAll(deps, deps.config.orgId);
     const sent = await runReminders(deps, deps.config.orgId);
     if (sent > 0) log.info({ sent }, 'sent reminders');
   });
+
+  // Starting up also makes up for a missed midnight run.
+  try {
+    await recomputeAll(deps, deps.config.orgId);
+  } catch (error) {
+    log.warn({ err: error }, 'could not work the schedules out at start');
+  }
 
   return boss;
 }
