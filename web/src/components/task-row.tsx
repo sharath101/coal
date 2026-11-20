@@ -96,6 +96,18 @@ export function TaskRow({ task, sent = false }: { task: Task; sent?: boolean }) 
               {t('declinedBecause', { reason: task.request.declineReason })}
             </span>
           )}
+          {open && task.followsStep && (
+            <span className="text-xs text-muted-foreground">
+              {t(
+                task.kind === 'sign'
+                  ? 'followsStepSign'
+                  : task.status === 'waiting'
+                    ? 'followsStepWaiting'
+                    : 'followsStepNote',
+                { key: task.stepKey ?? '' },
+              )}
+            </span>
+          )}
           {open && task.daysLate > 0 && (
             <span className="mt-1">
               <Pill tone="bad">{t('daysLate', { count: task.daysLate })}</Pill>
@@ -131,7 +143,30 @@ export function TaskRow({ task, sent = false }: { task: Task; sent?: boolean }) 
                 </Button>
               </>
             )}
-            {!queued && open && !unanswered && (
+            {!queued && open && !unanswered && task.followsStep && (
+              <>
+                {task.onPlan && task.status !== 'waiting' && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setDeviation('time')}
+                    disabled={busy}
+                  >
+                    {t('moreTime')}
+                  </Button>
+                )}
+                {task.subject && task.stepKey && (
+                  <Button size="sm" asChild>
+                    <Link
+                      href={`/projects/${task.subject.id}?step=${encodeURIComponent(task.stepKey)}`}
+                    >
+                      {t('openStep', { key: task.stepKey })}
+                    </Link>
+                  </Button>
+                )}
+              </>
+            )}
+            {!queued && open && !unanswered && !task.followsStep && (
               <>
                 {task.status === 'open' && (
                   <Button

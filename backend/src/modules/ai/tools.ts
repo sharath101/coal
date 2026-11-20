@@ -180,6 +180,7 @@ const TOOLS: AiToolDef[] = [
         status: t.status,
         project: t.subject?.label ?? null,
         step: t.stepKey,
+        followsStep: t.followsStep,
         dueOn: t.dueOn,
         daysLate: t.daysLate,
         assignee: t.assignee?.name ?? null,

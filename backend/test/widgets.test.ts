@@ -97,7 +97,8 @@ describe('what needs me now', () => {
       title: 'Work on step 2: Market study',
       link: `/projects/${id}?step=2`,
       cells: { step: '2', kind: 'work', status: 'open' },
-      actions: ['start', 'done', 'more_time', 'open'],
+      // A step's task follows its step: it is started and handed in from the step.
+      actions: ['more_time', 'open'],
     });
     // Someone else's tasks aren't mine.
     const designer = await expanded('my-tasks', 'designer');
@@ -120,16 +121,17 @@ describe('what needs me now', () => {
     daysAhead = 0;
     const id = await w.go(fresh('Tabs'));
     const task = (await w.stepOf(id, '2')).tasks[0];
-    await ok(call('PATCH', `/tasks/${task.id}`, 'ops', { status: 'in_progress' }));
+    // The step moves its tasks: starting the step starts the task, and the task can't be started by hand.
+    expect(
+      (await call('PATCH', `/tasks/${task.id}`, 'ops', { status: 'in_progress' })).body.code,
+    ).toBe('USE_THE_STEP');
+    await ok(call('POST', `/projects/${id}/steps/2/start`, 'ops'));
     const inProgress = await expanded('my-tasks', 'ops', '&tab=in_progress');
     expect(rowsOf(inProgress).some((r) => r.id === task.id)).toBe(true);
     expect(inProgress.tab).toBe('in_progress');
-    expect(rowsOf(inProgress).find((r) => r.id === task.id).actions).toEqual([
-      'done',
-      'more_time',
-      'open',
-    ]);
-    await ok(call('PATCH', `/tasks/${task.id}`, 'ops', { status: 'done' }));
+    expect(rowsOf(inProgress).find((r) => r.id === task.id).actions).toEqual(['more_time', 'open']);
+    // Closed when the step is signed off.
+    await w.finish(id, '2');
     const done = await expanded('my-tasks', 'ops', '&tab=done');
     expect(rowsOf(done).some((r) => r.id === task.id)).toBe(true);
     expect(
@@ -378,8 +380,7 @@ describe('how we are doing', () => {
   it('shows my measures, and my team’s; the Board sees department totals', async () => {
     daysAhead = 0;
     const id = await w.go(fresh('Measures'));
-    const task = (await w.stepOf(id, '2')).tasks[0];
-    await ok(call('PATCH', `/tasks/${task.id}`, 'ops', { status: 'done' }));
+    await w.finish(id, '2');
 
     const own = await expanded('how-its-going', 'ops');
     expect(rowsOf(own)).toHaveLength(1);
@@ -420,7 +421,8 @@ describe('how we are doing', () => {
         newDate: today(),
       }),
     );
-    await ok(call('PATCH', `/tasks/${task.id}`, 'ops', { status: 'done' }));
+    // Handed in late, and signed off: the work counts as done, late against its first date.
+    await w.finish(id, '2');
     const row = rowsOf(await expanded('how-its-going', 'ops'))[0];
     // Moving the date doesn't improve the rate: at least one late task is counted.
     expect(row.cells.onTime).toBeLessThan(100);

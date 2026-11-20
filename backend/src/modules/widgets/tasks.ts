@@ -7,7 +7,7 @@ import {
 } from '@coal/shared';
 import { listWaiting } from '../documents/service';
 import { roleName } from '../rnd/routing';
-import { activeTasksOf, recentDoneTasks, type TaskRow } from '../tasks/service';
+import { activeTasksOf, followsStep, recentDoneTasks, type TaskRow } from '../tasks/service';
 import {
   codeOf,
   count,
@@ -98,12 +98,17 @@ export async function myTasks(w: WidgetContext): Promise<WidgetBody> {
           due: t.dueOn,
           status: t.status,
         },
+        // A step's task follows its step: it is started and handed in from the step ("open"), not here.
         actions:
           t.status === 'done'
             ? ['open']
-            : t.status === 'in_progress'
-              ? ['done', 'more_time', 'open']
-              : ['start', 'done', 'more_time', 'open'],
+            : followsStep(t)
+              ? t.status === 'waiting'
+                ? ['open']
+                : ['more_time', 'open']
+              : t.status === 'in_progress'
+                ? ['done', 'more_time', 'open']
+                : ['start', 'done', 'more_time', 'open'],
         ref: {
           taskId: t.id,
           ...(t.subjectId && { projectId: t.subjectId }),

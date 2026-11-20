@@ -110,7 +110,7 @@ Every action returns `{ saved, preview }`: what changed (steps, tasks made with 
 |---|---|---|
 | `GET /tasks` | My tasks (`scope=mine`), the tasks waiting in my role's queue (`scope=queue`), or the work and requests I gave others (`scope=sent`), open or closed | read |
 | `GET /tasks/{id}` | One task: mine, one waiting in my role's queue, or one I gave | read |
-| `PATCH /tasks/{id}` | Set my own task to open, in progress or done. Starting or finishing a request accepts it | auto (my own) |
+| `PATCH /tasks/{id}` | Set my own task, assignment, request or corrective action to open, in progress or done. Starting or finishing a request accepts it. A task of a step follows its step and is refused with `409 USE_THE_STEP`: start the step and submit it instead. A task has `followsStep` to say which it is | auto (my own) |
 | `POST /tasks/{id}/claim` | Claim a task from my role's queue. I join the project team if I'm not on it. A Lead may claim only for their own product line's projects | confirm |
 | `POST /tasks/{id}/reassign` | Give a task to someone who holds its role (the VP or the Head; the Lead only within the project team) | confirm |
 | `POST /tasks` | Make a task: for myself (`own`), assigned to someone I may direct (`work`), or a `request` to anyone else, decided by [the ladder](./roles-and-access.md#assigning-work-and-making-requests). Optionally on a project and step I work on, with a due date. `?preview=true` says which it would be | auto (my own); the AI proposes the rest |

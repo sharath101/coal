@@ -25,6 +25,7 @@ import {
   createTasks,
   findTask,
   isActive,
+  followsStep,
   listTasks,
   presentTask,
   previewTaskOf,
@@ -66,6 +67,17 @@ export const tasksRoutes = [
       assertCanAccess('tasks.update', actor, task);
       if (!['open', 'in_progress', 'waiting'].includes(task.status)) {
         throw new AppError(409, 'ALREADY_DONE', 'This task is already closed.');
+      }
+      // The step is the one truth: marking its task done by hand would leave the step open with
+      // nobody holding it, and nothing handed in for sign-off (docs/workflow.md#tasks).
+      if (followsStep(task)) {
+        throw new AppError(
+          409,
+          'USE_THE_STEP',
+          `This task belongs to step ${task.stepKey}, so it follows the step: start the step, then submit it${
+            task.kind === 'sign' ? ' (a sign-off task closes when you sign)' : ' for sign-off'
+          } from the step, and the task closes when the step is signed off.`,
+        );
       }
       // A late task of the route can't be closed until someone has said why (docs/dashboard.md#deviations).
       // Work given by hand isn't on the plan, so it needs no deviation.

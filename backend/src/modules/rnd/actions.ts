@@ -41,6 +41,7 @@ import {
   createTasks,
   findActiveKeyedTask,
   setStepTasksWaiting,
+  startStepTasks,
   type NewTask,
 } from '../tasks/service';
 import { findUser, findUsersByIds, type UserRow } from '../users/service';
@@ -389,6 +390,10 @@ async function applyEffects(
         );
         break;
       }
+      case 'step.started':
+        // The doers' tasks follow the step: no one marks them by hand (P96).
+        await startStepTasks(tx, run.id, effect.step, env.now);
+        break;
       case 'step.submitted': {
         const step = stepOf(route, effect.step) as StepDefinition;
         await openSignTasks(tx, log, env, c, step, newIds.get(effect.step), effect.signers, due);

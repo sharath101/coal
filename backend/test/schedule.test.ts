@@ -110,12 +110,16 @@ describe('when work is late', () => {
     travel(0);
   });
 
-  it('refuses to close a late task until its deviation is recorded', async () => {
+  it('refuses to hand in a late step until its deviation is recorded', async () => {
     travel(0);
     const id = await w.go('Late task');
     const task = (await w.stepOf(id, '2')).tasks[0];
     travel(30);
-    const refused = await call('PATCH', `/tasks/${task.id}`, 'ops', { status: 'done' });
+    // The step's task can't be closed by hand: handing in the step is how it closes.
+    const byHand = await call('PATCH', `/tasks/${task.id}`, 'ops', { status: 'done' });
+    expect(byHand.status).toBe(409);
+    expect(byHand.body.code).toBe('USE_THE_STEP');
+    const refused = await call('POST', `/projects/${id}/steps/2/submit`, 'ops');
     expect(refused.status).toBe(409);
     expect(refused.body.code).toBe('DEVIATION_REQUIRED');
     await ok(
@@ -128,8 +132,11 @@ describe('when work is late', () => {
         newDate: today(),
       }),
     );
-    const closed = await ok(call('PATCH', `/tasks/${task.id}`, 'ops', { status: 'done' }));
-    expect(closed.status).toBe('done');
+    await ok(call('POST', `/projects/${id}/steps/2/submit`, 'ops'));
+    // Handed in: the task waits for the signer, and closes when the step is signed off.
+    expect((await w.stepOf(id, '2')).tasks.find((x: any) => x.id === task.id).status).toBe(
+      'waiting',
+    );
     travel(0);
   });
 
@@ -149,14 +156,11 @@ describe('when work is late', () => {
 
     travel(30);
     await ok(explain(addWorkingDays(cal, today(), 3)));
-    // Within the new date: no new reason is needed to hand the step in or to close the task.
+    // Within the new date: no new reason is needed to hand the step in.
     expect((await w.stepOf(id, '2')).tasks[0].dueOn).toBe(addWorkingDays(cal, today(), 3));
 
     // The new date passes too.
     travel(60);
-    const refused = await call('PATCH', `/tasks/${task.id}`, 'ops', { status: 'done' });
-    expect(refused.status).toBe(409);
-    expect(refused.body.code).toBe('DEVIATION_REQUIRED');
     const step = await call('POST', `/projects/${id}/steps/2/submit`, 'ops');
     expect(step.status).toBe(409);
     expect(step.body.code).toBe('DEVIATION_REQUIRED');
@@ -191,9 +195,9 @@ describe('when work is late', () => {
     // The later date holds, though the earlier one was recorded last.
     expect(step(await timeline(id), '1').forecastEnd).toBe(far);
 
-    // Once the work with the far date is done, it no longer holds the forecast back.
-    await ok(call('PATCH', `/tasks/${tasks[0].id}`, 'lead', { status: 'done' }));
-    expect(step(await timeline(id), '1').forecastEnd).toBe(near);
+    // Once the step is handed in, no task holds the forecast back: the signer's window does.
+    await ok(call('POST', `/projects/${id}/steps/1/submit`, 'head'));
+    expect(step(await timeline(id), '1').forecastEnd).toBe(addWorkingDays(cal, today(), 3));
   });
 
   it('is judged by the signer’s wait, not the doers’, once a step is handed in', async () => {

@@ -299,7 +299,8 @@
     "upload_size": "That file is too big. The limit is {limit}.",
     "upload_empty": "That file is empty.",
     "upload_transfer": "The file couldn't be sent. Check your connection and try again.",
-    "generic": "Something went wrong. Try again."
+    "generic": "Something went wrong. Try again.",
+    "USE_THE_STEP": "This task belongs to a step, so it follows the step. Start the step and submit it for sign-off from the step, and the task closes when the step is signed off."
   },
   "status": {
     "active": "Active",
@@ -475,6 +476,7 @@
     "start": "Start",
     "done": "Mark done",
     "moreTime": "More time",
+    "openStep": "Open step {key}",
     "accept": "Accept",
     "decline": "Decline",
     "from": "From {name}",
@@ -523,7 +525,10 @@
     "step": "Step {key}",
     "more": "Show more",
     "waitingSignature": "Waiting for my signature",
-    "signatureLine": "Version {version} · {meaning} · Project {project} · Step {step} · since {when}"
+    "signatureLine": "Version {version} · {meaning} · Project {project} · Step {step} · since {when}",
+    "followsStepNote": "Part of step {key}: start it and submit it for sign-off from the step. This task closes when the step is signed off.",
+    "followsStepWaiting": "With the signer for step {key}. This task closes when the step is signed off.",
+    "followsStepSign": "Sign this off from step {key}. The task closes when you have signed."
   },
   "activity": {
     "by": "{name}",

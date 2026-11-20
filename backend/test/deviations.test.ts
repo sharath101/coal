@@ -124,7 +124,8 @@ describe('recording a deviation', () => {
         )
       ).status,
     ).toBe(201);
-    await ok(call('PATCH', `/tasks/${task.id}`, 'ops', { status: 'done' }));
+    // The task closes when its step is signed off, and then explains nothing more.
+    await w.finish(id, '2');
     expect((await call('POST', '/deviations', 'ops', body(task.id))).status).toBe(409);
     expect((await call('GET', `/projects/${id}/timeline`, 'vp')).status).toBe(200);
   });

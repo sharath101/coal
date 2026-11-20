@@ -814,15 +814,67 @@ describe('role queues, claims and reassigning', () => {
     const task = (await myTasks('ops')).find((x: any) => x.subject.id === id);
     expect((await call('GET', `/tasks/${task.id}`, 'pme')).status).toBe(403);
     expect((await call('PATCH', `/tasks/${task.id}`, 'pme', { status: 'done' })).status).toBe(403);
-    const started = await ok(call('PATCH', `/tasks/${task.id}`, 'ops', { status: 'in_progress' }));
+
+    // A task of my own, by hand: started, finished, then closed for good.
+    const own = (await ok(call('POST', '/tasks', 'ops', { title: 'Tidy the lab notes' }))).task;
+    expect(own.followsStep).toBe(false);
+    const started = await ok(call('PATCH', `/tasks/${own.id}`, 'ops', { status: 'in_progress' }));
     expect(started.status).toBe('in_progress');
-    await ok(call('PATCH', `/tasks/${task.id}`, 'ops', { status: 'done' }));
-    expect((await call('PATCH', `/tasks/${task.id}`, 'ops', { status: 'open' })).body.code).toBe(
+    await ok(call('PATCH', `/tasks/${own.id}`, 'ops', { status: 'done' }));
+    expect((await call('PATCH', `/tasks/${own.id}`, 'ops', { status: 'open' })).body.code).toBe(
       'ALREADY_DONE',
     );
-    expect((await myTasks('ops')).some((x: any) => x.id === task.id)).toBe(false);
+    expect((await myTasks('ops')).some((x: any) => x.id === own.id)).toBe(false);
     const closed = await ok(call('GET', '/tasks?filter[status]=closed&limit=100', 'ops'));
-    expect(closed.items.some((x: any) => x.id === task.id)).toBe(true);
+    expect(closed.items.some((x: any) => x.id === own.id)).toBe(true);
+  });
+
+  it('keeps a step’s tasks in step with the step: they are started, handed in and closed through it', async () => {
+    const id = await go('Tasks follow the step');
+    const task = (await myTasks('ops')).find((x: any) => x.subject.id === id && x.stepKey === '2');
+    expect(task).toMatchObject({ followsStep: true, status: 'open', onPlan: true });
+
+    // By hand, neither way: a task marked done would leave the step open and nothing handed in.
+    for (const status of ['in_progress', 'done', 'open']) {
+      const res = await call('PATCH', `/tasks/${task.id}`, 'ops', { status });
+      expect(res.status, status).toBe(409);
+      expect(res.body.code).toBe('USE_THE_STEP');
+      expect(res.body.detail).toMatch(/step 2/);
+    }
+    expect((await stepOf(id, '2')).status).toBe('ready');
+    expect((await myTasks('ops')).find((x: any) => x.id === task.id).status).toBe('open');
+
+    // Starting the step starts its tasks.
+    await ok(call('POST', `/projects/${id}/steps/2/start`, 'ops'));
+    expect((await stepOf(id, '2')).status).toBe('in_progress');
+    expect((await myTasks('ops')).find((x: any) => x.id === task.id).status).toBe('in_progress');
+
+    // Handing the step in makes them wait for the signer, who then holds the sign-off task.
+    await ok(call('POST', `/projects/${id}/steps/2/submit`, 'ops'));
+    expect((await stepOf(id, '2')).status).toBe('in_review');
+    expect((await myTasks('ops')).find((x: any) => x.id === task.id).status).toBe('waiting');
+    expect((await call('PATCH', `/tasks/${task.id}`, 'ops', { status: 'done' })).body.code).toBe(
+      'USE_THE_STEP',
+    );
+    const step = await stepOf(id, '2');
+    const signOff = (await myTasks(COOKIE_OF_ROLE[step.signer.key]!)).find(
+      (x: any) => x.subject.id === id && x.kind === 'sign',
+    );
+    // A sign-off task closes when it is signed, never by hand.
+    expect(signOff.followsStep).toBe(true);
+    expect(
+      (
+        await call('PATCH', `/tasks/${signOff.id}`, COOKIE_OF_ROLE[step.signer.key]!, {
+          status: 'done',
+        })
+      ).body.code,
+    ).toBe('USE_THE_STEP');
+    expect((await stepOf(id, '2')).status).toBe('in_review');
+
+    // Signed off: the work closes with the step.
+    await ok(call('POST', `/projects/${id}/steps/2/approve`, COOKIE_OF_ROLE[step.signer.key]!));
+    const closed = await ok(call('GET', '/tasks?filter[status]=closed&limit=100', 'ops'));
+    expect(closed.items.find((x: any) => x.id === task.id)?.status).toBe('done');
   });
 });
 

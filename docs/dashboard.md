@@ -56,7 +56,7 @@ interface WidgetDefinition {
 
 | # | Widget | Answers | Compact card | Expanded view |
 |---|---|---|---|---|
-| W1 | **My tasks** | Needs me now | Overdue, due this week, in progress; the 5 most urgent | Tabs: To do, In progress, Waiting, Done. Filters: project, step, kind, due date. Actions: start, mark done, comment, ask for more time, open in the Workstation |
+| W1 | **My tasks** | Needs me now | Overdue, due this week, in progress; the 5 most urgent | Tabs: To do, In progress, Waiting, Done. Filters: project, step, kind, due date. Actions: start and mark done (for tasks not on a step), open the step, comment, ask for more time, open in the Workstation |
 | W2 | **Waiting for my signature** | Needs me now | How many, the oldest in days, the next 3 | Each document or sign-off with its row (Prepared, Reviewed, Approved), what changed since the last version, and Sign or Return |
 | W3 | **Coming up** | What's coming | My tasks that will open soon, with expected start dates | Every future task of mine across projects, and what it waits for ("Your part starts after step 5, expected 3 Feb") |
 | W4 | **Upcoming checkpoints** | What's coming | The next checkpoints (4, 12, 18, 23) with dates | For each one: whether its inputs are ready and signed, and who signs |
@@ -69,7 +69,7 @@ interface WidgetDefinition {
 
 ### What each widget counts, as built
 
-- **W1** my assigned tasks (signatures are on W2). "This week" runs to the coming Sunday. Tabs: To do, In progress, Waiting (the step is with its signer: not late, [P69](./decisions.md)), Done (the last 50). Filters: project, step, kind, due (overdue, this week, later, none). A late task can't be marked done until its deviation is recorded.
+- **W1** my assigned tasks (signatures are on W2). "This week" runs to the coming Sunday. Tabs: To do, In progress, Waiting (the step is with its signer: not late, [P69](./decisions.md)), Done (the last 50). Filters: project, step, kind, due (overdue, this week, later, none). A step's task offers **More time** and **Open step**, not Start or Mark done: it follows its step ([workflow.md](./workflow.md#starting-steps)). Start and Mark done are for work given by hand, own tasks and corrective actions, and a late corrective action can't be marked done until its deviation is recorded.
 - **W2** the document rows waiting for me, and the step sign-offs assigned to me, oldest first.
 - **W3** the steps of mine that are still locked, in projects I'm on (or lead): the step's doers include my role, or "the project team" and I'm on it. "Waits for" names the unfinished steps it depends on, with the expected date.
 - **W4** the next unfinished checkpoint of each running project, with whether its inputs are finished, and who signs. Open to everyone: it is status.

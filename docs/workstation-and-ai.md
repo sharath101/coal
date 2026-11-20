@@ -242,7 +242,7 @@ Each tool is a thin wrapper over one endpoint, takes that endpoint's AI tier, an
 | `create_my_task` | `POST /tasks` | auto | A task on the person's **own** list. For anyone else, the server refuses a "via AI" call |
 | `propose`, `revise_card` | `POST /proposals`, `PATCH /proposals/{id}` | auto | Preparing or changing an action card. The card lists what it may carry: the endpoints that can go on a card ([api.md](./api.md#proposals-and-action-cards)) |
 
-Nothing that signs, decides, sends back, holds, drops, deletes or sends outside Jayon has a tool, and `confirm` and `reject` for cards are tier `never`. A test fails if a tool is built on an endpoint of any other tier, or if the card catalogue offers a `never` endpoint.
+No tool marks a task done: a step's tasks follow the step ([P96](./decisions.md)), so to hand in a step the assistant prepares a card for the step's own action (`steps.submit`), and the task closes when the step is signed off. Nothing that signs, decides, sends back, holds, drops, deletes or sends outside Jayon has a tool, and `confirm` and `reject` for cards are tier `never`. A test fails if a tool is built on an endpoint of any other tier, or if the card catalogue offers a `never` endpoint.
 
 ### Citations
 

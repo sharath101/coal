@@ -1,0 +1,10 @@
+# Kept out of the images (backend/Dockerfile, web/Dockerfile)
+**/node_modules
+**/.next
+**/*.tsbuildinfo
+.git
+.env
+.env.*
+private/
+backend/openapi.json
+.DS_Store

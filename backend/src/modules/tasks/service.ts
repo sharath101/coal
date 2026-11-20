@@ -144,6 +144,35 @@ export async function answerRequest(
   return row as TaskRow;
 }
 
+/**
+ * Whether a task's status is the step's to change: the route's work, sign-off and review tasks
+ * follow their step. Corrective actions are closed by hand, and work given by hand belongs to no step.
+ */
+export const followsStep = (task: Pick<TaskRow, 'runStepId' | 'kind'>) =>
+  task.runStepId !== null && task.kind !== 'corrective_action';
+
+/** When a step is started, the work of its doers is under way. */
+export async function startStepTasks(
+  tx: Tx,
+  runId: string,
+  stepKey: string,
+  now: Date = new Date(),
+): Promise<number> {
+  const rows = await tx
+    .update(tasks)
+    .set({ status: 'in_progress', updatedAt: now })
+    .where(
+      and(
+        eq(tasks.runId, runId),
+        eq(tasks.stepKey, stepKey),
+        eq(tasks.kind, 'work'),
+        eq(tasks.status, 'open'),
+      ),
+    )
+    .returning({ id: tasks.id });
+  return rows.length;
+}
+
 /** Whether a task is still to be done. */
 export const isActive = (task: Pick<TaskRow, 'status'>) => ACTIVE.includes(task.status);
 
@@ -430,6 +459,7 @@ export async function presentTasks(
         ? { type: row.subjectType, id: row.subjectId, label: row.subjectLabel ?? '' }
         : null,
     onPlan: row.runStepId !== null,
+    followsStep: followsStep(row),
     // Someone else gave it; a task I claimed or made for myself has no giver to show.
     assignedBy:
       row.assignedBy && row.assignedBy !== row.assigneeId

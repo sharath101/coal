@@ -39,6 +39,12 @@ export const Task = z.object({
   subject: z.object({ type: z.string(), id: Id, label: z.string() }).nullable(),
   /** Made by the route for a step: its dates are on the plan, and a late one needs a deviation. */
   onPlan: z.boolean(),
+  /**
+   * Its status follows its step (open, waiting while with the signer, done when the step is signed
+   * off), so it is started and handed in from the step, never by hand. Corrective actions, own
+   * tasks, assignments and requests are not like this.
+   */
+  followsStep: z.boolean(),
   /** Who gave it or asked for it; empty for work the route made. */
   assignedBy: Person.nullable(),
   /** Prepared by the AI in the Workstation, and confirmed by the person who gave it. */
@@ -88,7 +94,8 @@ export const updateTask = defineEndpoint({
   id: 'tasks.update',
   method: 'PATCH',
   path: '/tasks/{id}',
-  summary: 'Update the status of one of my tasks',
+  summary:
+    'Update the status of one of my own tasks, assignments or requests, or a corrective action. A task of a step follows its step and is refused (`USE_THE_STEP`)',
   auth: 'session',
   permission: 'tasks.update',
   aiTier: 'auto',

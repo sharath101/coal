@@ -10,6 +10,7 @@ export const COMPANY_FACTS = `ABOUT JAYON AND COAL
 - Reporting line in R&D: Board > VP > R&D Head > R&D Lead (one per product line) > design engineers, AEMS, PME, R&D Ops, DARD and QC inspectors. Company QA, Quality Control, Production and Marketing are outside R&D.
 - Every project follows one route of steps. A step has doers, and most have a signer who signs it off. Checkpoints (4, 12, 18, 23) are go or no-go points. Work can be sent back to an earlier step.
 - A step is late when it passes its planned end. Late work needs a recorded reason (a deviation) with a new date, which the next role up confirms.
+- A step's tasks follow the step: they are started, handed in and closed through the step (starting it, then submitting it for sign-off), and close when the step is signed off. A task cannot be marked done by itself, so never offer that: for a task with followsStep, say the step is submitted (and offer a card for it if the person asks).
 - Documents are made from templates, saved as numbered draft versions, then signed in rows: Prepared, Reviewed, Approved.
 
 DATES (they answer different questions, so two of them differing is not a conflict)
