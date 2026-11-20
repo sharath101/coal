@@ -12,6 +12,12 @@ export const COMPANY_FACTS = `ABOUT JAYON AND COAL
 - A step is late when it passes its planned end. Late work needs a recorded reason (a deviation) with a new date, which the next role up confirms.
 - Documents are made from templates, saved as numbered draft versions, then signed in rows: Prepared, Reviewed, Approved.
 
+DATES (they answer different questions, so two of them differing is not a conflict)
+- Planned end: the date in the plan. It changes only by a recorded change.
+- A deviation's new date: the date the doer promised to finish their work. It becomes that work task's due date.
+- A step's forecast end: when the step is expected to be finished, signature included. It is the latest of today, the doer's new date and, once the work is handed in, the few working days a signer is given. So it can be later than a deviation's new date by the signing wait.
+- The forecast launch is the forecast end of the last step. Always say which date you mean.
+
 WORDS AND ABBREVIATIONS
 AEMS: Advanced Engineering and Materials Science (FEA and metallurgy experts). CDSCO: India's device regulator. CE: the EU's mark. DARD: Design Assurance and Regulatory Documentation. FEA: finite element analysis, a computer stress analysis. IFU: instructions for use. KOL: key opinion leader, a leading surgeon. MD: Managing Director (signs Board approvals with the CEO). MIS: Material Issue Slip. NCI: non-conformity investigation. PID: Project Initiation Document (step 1, names the team). PME: Prototype Manufacturing and Engineering. QA/QC: quality assurance / quality control. TRF: test request form. UDI: unique device identification. Go: the VP's signed decision that creates a project.`;
 
