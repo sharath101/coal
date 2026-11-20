@@ -70,6 +70,7 @@ import {
   findRequest,
   findVersion,
   latestVersionOf,
+  matchingVersions,
   pendingRequests,
   requestsOfVersions,
   signaturesOf,
@@ -1031,4 +1032,73 @@ export async function fileViaDocuments(
 /** What the person may see of a run's documents, for the project's activity feed. */
 export async function visibleDocuments(ex: Executor, v: Viewer) {
   return documentVisibility(ex, v, await documentsOfRun(ex, v.facts.orgId, v.facts.runId));
+}
+
+const SUBMITTED_STATUSES: VersionRow['status'][] = ['in_review', 'approved', 'superseded'];
+
+export interface DocumentHit {
+  documentId: string;
+  projectId: string;
+  projectCode: string;
+  stepKey: string;
+  number: string;
+  title: string;
+  versionNo: number;
+  status: VersionRow['status'];
+  snippet: string;
+}
+
+/**
+ * Documents whose words match, for search: only those the person may open in full, and only
+ * versions they may read (drafts for the people who work on the project). A document they may
+ * know only the outcome of is left out, so its words can't be found by searching them.
+ */
+export async function searchDocuments(
+  ex: Executor,
+  ctx: RequestContext,
+  actor: Actor,
+  q: string,
+  limit: number,
+): Promise<DocumentHit[]> {
+  const rows = await matchingVersions(ex, ctx.orgId, q, 200);
+  const byRun = new Map<string, typeof rows>();
+  for (const row of rows) byRun.set(row.runId, [...(byRun.get(row.runId) ?? []), row]);
+  const allowed = new Map<string, { projectId: string; code: string; drafts: boolean }>();
+  for (const [runId, list] of byRun) {
+    const project = await findProjectByRun(ex, ctx.orgId, runId);
+    if (!project) continue;
+    const viewer = await viewerOf(ex, await loadEnv(ex, ctx.orgId, actor, project.id));
+    const docs = [
+      ...(
+        await documentsById(
+          ex,
+          ctx.orgId,
+          list.map((r) => r.documentId),
+        )
+      ).values(),
+    ];
+    const seen = await documentVisibility(ex, viewer, docs);
+    for (const id of seen.readable) {
+      allowed.set(id, { projectId: project.id, code: project.code, drafts: seen.drafts });
+    }
+  }
+  const hits = new Map<string, DocumentHit>();
+  for (const row of rows) {
+    const project = allowed.get(row.documentId);
+    if (!project || hits.has(row.documentId)) continue;
+    if (!project.drafts && !SUBMITTED_STATUSES.includes(row.status)) continue;
+    hits.set(row.documentId, {
+      documentId: row.documentId,
+      projectId: project.projectId,
+      projectCode: project.code,
+      stepKey: row.stepKey,
+      number: row.number,
+      title: row.title,
+      versionNo: row.versionNo,
+      status: row.status,
+      snippet: row.snippet,
+    });
+    if (hits.size >= limit) break;
+  }
+  return [...hits.values()];
 }

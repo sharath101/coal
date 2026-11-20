@@ -10,6 +10,7 @@ import {
   canSeeDrafts,
   causeNameVisible,
   documentAccess,
+  howToGive,
   isAboveOnLadder,
   type DocumentResource,
 } from './rules';
@@ -55,6 +56,8 @@ const ENDPOINT_TABLE: Record<PermissionKey, Who[]> = {
   'tasks.update': SIGNED_IN,
   'tasks.claim': SIGNED_IN,
   'tasks.reassign': ['vp', 'rd_head', 'rd_lead'],
+  'tasks.create': SIGNED_IN,
+  'tasks.answer': SIGNED_IN,
   'documentTypes.read': SIGNED_IN,
   'templates.read': SIGNED_IN,
   // ⚠ The VP or the Head adds and activates templates (S6).
@@ -84,6 +87,16 @@ const ENDPOINT_TABLE: Record<PermissionKey, Who[]> = {
   'notifications.markRead': SIGNED_IN,
   'notifications.markAllRead': SIGNED_IN,
   'widgets.read': SIGNED_IN,
+  'proposals.create': SIGNED_IN,
+  'proposals.list': SIGNED_IN,
+  'proposals.read': SIGNED_IN,
+  'proposals.write': SIGNED_IN,
+  'search.read': SIGNED_IN,
+  'ai.chats.create': SIGNED_IN,
+  'ai.chats.list': SIGNED_IN,
+  'ai.chats.read': SIGNED_IN,
+  'ai.chats.write': SIGNED_IN,
+  'ai.feedback': SIGNED_IN,
 };
 
 /** Rules that need a project and the roles the route allows right now. */
@@ -246,7 +259,12 @@ describe('task rules', () => {
       "someone else's task": { assigneeId: 'user-2', queueRole: null },
       'queued for my role': { assigneeId: null, queueRole: who },
       'queued for another role': { assigneeId: null, queueRole: other },
-    }[kind] as { assigneeId: string | null; queueRole: string | null };
+      'given by me to someone else': {
+        assigneeId: 'user-2',
+        queueRole: null,
+        assignedBy: 'user-1',
+      },
+    }[kind] as { assigneeId: string | null; queueRole: string | null; assignedBy?: string };
   };
   const TABLE = {
     'tasks.readOne': {
@@ -254,18 +272,28 @@ describe('task rules', () => {
       "someone else's task": false,
       'queued for my role': true,
       'queued for another role': false,
+      'given by me to someone else': true,
     },
     'tasks.update': {
       'my task': true,
       "someone else's task": false,
       'queued for my role': false,
       'queued for another role': false,
+      'given by me to someone else': false,
+    },
+    'tasks.answer': {
+      'my task': true,
+      "someone else's task": false,
+      'queued for my role': false,
+      'queued for another role': false,
+      'given by me to someone else': false,
     },
     'tasks.claim': {
       'my task': false,
       "someone else's task": false,
       'queued for my role': true,
       'queued for another role': false,
+      'given by me to someone else': false,
     },
   } as const;
   const cases = Object.entries(TABLE).flatMap(([permission, byCase]) =>
@@ -299,6 +327,98 @@ describe('task rules', () => {
     const dardTask = { assigneeId: null, queueRole: 'dard', productLineId: 'spine' };
     expect(canAccess('tasks.claim', dard, dardTask).allowed).toBe(true);
   });
+
+  it('links a new task to a project only for people who work on it', () => {
+    const project = { productLineId: 'spine', memberIds: ['user-1'] };
+    const pme = actorFor('pme') as Actor;
+    expect(canAccess('tasks.create', pme, { project: null }).allowed).toBe(true);
+    expect(canAccess('tasks.create', pme, { project }).allowed).toBe(true);
+    expect(canAccess('tasks.create', pme, { project: { ...project, memberIds: [] } })).toEqual({
+      allowed: false,
+      code: 'NOT_ALLOWED',
+      whoCan: ['Members of this project'],
+    });
+  });
+});
+
+describe('giving work: assignment or request (the ladder)', () => {
+  const RND_BELOW_LEAD = ['design_engineer', 'aems', 'pme', 'rd_ops', 'dard', 'qc_inspector'];
+  const OUTSIDE_RND = ['company_qa', 'quality_control', 'production', 'marketing'];
+  const give = (from: Who, to: Who, onLineTeam = false) =>
+    howToGive(actorFor(from) as Actor, { id: 'user-2', roleKey: to }, onLineTeam);
+
+  it('is my own task when I give it to myself', () => {
+    for (const who of ROLE_KEYS) {
+      expect(howToGive(actorFor(who) as Actor, { id: 'user-1', roleKey: who }, false)).toBe('own');
+    }
+  });
+
+  it('lets the Board assign to the VP only', () => {
+    expect(give('board', 'vp')).toBe('work');
+    for (const to of ['board', 'rd_head', 'rd_lead', ...RND_BELOW_LEAD, ...OUTSIDE_RND]) {
+      expect(give('board', to)).toBe('request');
+    }
+  });
+
+  it('lets the VP assign to anyone in R&D, and ask everyone else', () => {
+    for (const to of ['rd_head', 'rd_lead', ...RND_BELOW_LEAD]) expect(give('vp', to)).toBe('work');
+    for (const to of ['board', 'vp', ...OUTSIDE_RND]) expect(give('vp', to)).toBe('request');
+  });
+
+  it('lets the Head assign to anyone in R&D below them', () => {
+    for (const to of ['rd_lead', ...RND_BELOW_LEAD]) expect(give('rd_head', to)).toBe('work');
+    for (const to of ['board', 'vp', 'rd_head', ...OUTSIDE_RND]) {
+      expect(give('rd_head', to)).toBe('request');
+    }
+  });
+
+  it("lets a Lead assign to people below them on their line's projects only", () => {
+    for (const to of RND_BELOW_LEAD) {
+      expect(give('rd_lead', to, true)).toBe('work');
+      expect(give('rd_lead', to, false)).toBe('request');
+    }
+    for (const to of ['rd_head', 'rd_lead', 'vp', ...OUTSIDE_RND]) {
+      expect(give('rd_lead', to, true)).toBe('request');
+    }
+  });
+
+  it('makes everything from everyone else a request', () => {
+    for (const from of [...RND_BELOW_LEAD, ...OUTSIDE_RND]) {
+      for (const to of ROLE_KEYS) expect(give(from, to, true)).toBe('request');
+    }
+  });
+});
+
+describe('chat rules', () => {
+  it.each(['ai.chats.read', 'ai.chats.write', 'ai.feedback'] as const)(
+    '%s: only the person who started the chat, whatever their role',
+    (permission) => {
+      for (const who of ROLE_KEYS) {
+        const actor = actorFor(who) as Actor;
+        expect(canAccess(permission, actor, { userId: 'user-1' }).allowed).toBe(true);
+        expect(canAccess(permission, actor, { userId: 'user-2' })).toEqual({
+          allowed: false,
+          code: 'NOT_ALLOWED',
+          whoCan: ['The person who started the chat'],
+        });
+      }
+    },
+  );
+});
+
+describe('proposal rules', () => {
+  it.each(['proposals.read', 'proposals.write'] as const)(
+    '%s: only the person it was prepared for',
+    (permission) => {
+      const actor = actorFor('vp') as Actor;
+      expect(canAccess(permission, actor, { forUserId: 'user-1' }).allowed).toBe(true);
+      expect(canAccess(permission, actor, { forUserId: 'user-2' })).toEqual({
+        allowed: false,
+        code: 'NOT_ALLOWED',
+        whoCan: ['The person it was prepared for'],
+      });
+    },
+  );
 });
 
 describe('template rules', () => {
@@ -518,6 +638,17 @@ describe('AI tiers', () => {
       expect(() => guard(endpoint, ctx(true))).toThrow(
         expect.objectContaining({ code: 'AI_NOT_ALLOWED' }),
       );
+    }
+  });
+
+  it('lets only auto and confirm endpoints go on an action card, and only the person confirm one', () => {
+    const proposable = IMPLEMENTATIONS.filter((i) => i.describe).map((i) => i.endpoint);
+    expect(proposable.map((e) => e.id)).toEqual(
+      expect.arrayContaining(['tasks.create', 'tasks.reassign', 'deviations.record']),
+    );
+    for (const e of proposable) expect(['auto', 'confirm']).toContain(e.aiTier);
+    for (const id of ['proposals.confirm', 'proposals.reject']) {
+      expect(ENDPOINTS.find((e) => e.id === id)?.aiTier).toBe('never');
     }
   });
 });

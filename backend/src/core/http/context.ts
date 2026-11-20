@@ -13,6 +13,10 @@ export interface RequestContext {
   sessionId: string | null;
   /** Set by the backend when the AI calls an endpoint on the user's behalf; never by a client. */
   viaAi: boolean;
+  /** Set while the user's confirmed proposal (an action card) is being carried out. */
+  proposal?: { id: string; chatId: string | null; preparedByAi: boolean };
+  /** Set while the AI answers a message: the chat and the model request its tool calls belong to. */
+  aiChat?: { chatId: string; requestId: string };
 }
 
 export function systemContext(orgId: string, requestId = 'system'): RequestContext {

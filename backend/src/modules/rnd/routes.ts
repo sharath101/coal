@@ -30,11 +30,11 @@ import { change, previewable } from '../../core/db/change';
 import type { Tx } from '../../core/db/client';
 import type { AppDeps } from '../../core/deps';
 import type { Actor, RequestContext } from '../../core/http/context';
-import { implement } from '../../core/http/endpoint';
+import { implement, noEffects, type ActionDescription } from '../../core/http/endpoint';
 import { AppError, notFound, validationFailed } from '../../core/http/errors';
 import { assertUsableEvidence } from '../files/service';
 import { assertCanAccess } from '../permissions';
-import { assignTask, findTask, presentTask } from '../tasks/service';
+import { assignTask, findTask, presentTask, previewTaskOf, whereOf } from '../tasks/service';
 import { findActiveUsersByRole, findUser } from '../users/service';
 import { goProject, performAction, raiseCorrectiveAction, toPreview, type Env } from './actions';
 import { assertMay, loadEnv, type ScopedPermission } from './env';
@@ -130,6 +130,22 @@ async function runAction(
 }
 
 const OPEN_TASK = ['open', 'in_progress', 'waiting'];
+
+/** An action card for a step action: the route's own preview, and who gets a task from it. */
+const describeStep =
+  (verb: string) =>
+  (result: ActionResult, input: { params: { key: string } }): ActionDescription => {
+    const step = result.preview.steps.find((s) => s.key === input.params.key);
+    return {
+      summary: `${verb} step ${input.params.key}${step ? `, ${step.name}` : ''}`,
+      effects: result.preview,
+      notified: [
+        ...new Map(
+          result.preview.tasks.flatMap((t) => (t.assignee ? [[t.assignee.id, t.assignee]] : [])),
+        ).values(),
+      ],
+    };
+  };
 
 export const rndRoutes = [
   implement(listProductLinesEndpoint, async ({ deps, ctx }) => ({
@@ -227,39 +243,45 @@ export const rndRoutes = [
     return presentStep(deps.db, env, params.key, deps.now()) as never;
   }),
 
-  implement(startStep, ({ deps, ctx, actor, params, query }) =>
-    stepAction({
-      deps,
-      ctx,
-      actor,
-      projectId: params.id,
-      key: params.key,
-      preview: query.preview,
-      permission: 'steps.start',
-      roles: (step) => step.doers,
-      action: () => ({ type: 'start', step: params.key }),
-    }),
+  implement(
+    startStep,
+    ({ deps, ctx, actor, params, query }) =>
+      stepAction({
+        deps,
+        ctx,
+        actor,
+        projectId: params.id,
+        key: params.key,
+        preview: query.preview,
+        permission: 'steps.start',
+        roles: (step) => step.doers,
+        action: () => ({ type: 'start', step: params.key }),
+      }),
+    { describe: describeStep('Start') },
   ),
 
-  implement(submitStep, ({ deps, ctx, actor, params, query }) =>
-    stepAction({
-      deps,
-      ctx,
-      actor,
-      projectId: params.id,
-      key: params.key,
-      preview: query.preview,
-      permission: 'steps.submit',
-      roles: (step) => step.doers,
-      action: async (tx, env, step) => {
-        // At a Board checkpoint every Board member signs: the people holding the role now.
-        const signers =
-          step.all_must_sign && step.signer
-            ? (await findActiveUsersByRole(tx, env.orgId, step.signer)).map((u) => u.id)
-            : [];
-        return { type: 'submit', step: params.key, signers };
-      },
-    }),
+  implement(
+    submitStep,
+    ({ deps, ctx, actor, params, query }) =>
+      stepAction({
+        deps,
+        ctx,
+        actor,
+        projectId: params.id,
+        key: params.key,
+        preview: query.preview,
+        permission: 'steps.submit',
+        roles: (step) => step.doers,
+        action: async (tx, env, step) => {
+          // At a Board checkpoint every Board member signs: the people holding the role now.
+          const signers =
+            step.all_must_sign && step.signer
+              ? (await findActiveUsersByRole(tx, env.orgId, step.signer)).map((u) => u.id)
+              : [];
+          return { type: 'submit', step: params.key, signers };
+        },
+      }),
+    { describe: describeStep('Submit for sign-off:') },
   ),
 
   implement(approveStep, ({ deps, ctx, actor, params, query }) =>
@@ -363,111 +385,129 @@ export const rndRoutes = [
     }),
   ),
 
-  implement(claimTask, ({ deps, ctx, actor, params }) =>
-    change(deps.db, ctx, async (tx, log) => {
-      const task = await findTask(tx, ctx.orgId, params.id, { forUpdate: true });
-      if (!task) throw notFound('task');
-      const project =
-        task.subjectType === 'project' && task.subjectId
-          ? await findProject(tx, ctx.orgId, task.subjectId)
-          : null;
-      assertCanAccess('tasks.claim', actor, {
-        ...task,
-        productLineId: project?.productLineId ?? null,
-      });
-      if (!OPEN_TASK.includes(task.status)) {
-        throw new AppError(409, 'ALREADY_DONE', 'This task is already closed.');
-      }
-      const updated = await assignTask(tx, task, actor.userId, actor.userId);
-      // Whoever picks up queued work joins the project team, so they can act on its step.
-      if (task.subjectType === 'project' && task.subjectId) {
-        const team = await activeMembers(tx, ctx.orgId, task.subjectId);
-        const me = await findUser(tx, ctx.orgId, actor.userId);
-        if (me && !team.some((m) => m.user.id === me.id)) {
-          await addMembers(tx, ctx.orgId, task.subjectId, [me], actor.userId);
+  implement(
+    claimTask,
+    ({ deps, ctx, actor, params }) =>
+      change(deps.db, ctx, async (tx, log) => {
+        const task = await findTask(tx, ctx.orgId, params.id, { forUpdate: true });
+        if (!task) throw notFound('task');
+        const project =
+          task.subjectType === 'project' && task.subjectId
+            ? await findProject(tx, ctx.orgId, task.subjectId)
+            : null;
+        assertCanAccess('tasks.claim', actor, {
+          ...task,
+          productLineId: project?.productLineId ?? null,
+        });
+        if (!OPEN_TASK.includes(task.status)) {
+          throw new AppError(409, 'ALREADY_DONE', 'This task is already closed.');
+        }
+        const updated = await assignTask(tx, task, actor.userId, actor.userId);
+        // Whoever picks up queued work joins the project team, so they can act on its step.
+        if (task.subjectType === 'project' && task.subjectId) {
+          const team = await activeMembers(tx, ctx.orgId, task.subjectId);
+          const me = await findUser(tx, ctx.orgId, actor.userId);
+          if (me && !team.some((m) => m.user.id === me.id)) {
+            await addMembers(tx, ctx.orgId, task.subjectId, [me], actor.userId);
+            log.audit({
+              action: 'project.team_changed',
+              recordType: 'project',
+              recordId: task.subjectId,
+              after: { added: [me.id], by: 'claim' },
+            });
+            log.event({
+              type: 'project.team_changed',
+              projectId: task.subjectId,
+              payload: { added: [me.id], removed: [] },
+            });
+          }
+        }
+        log.audit({
+          action: 'task.claimed',
+          recordType: 'task',
+          recordId: task.id,
+          before: { assigneeId: null, queueRole: task.queueRole },
+          after: { assigneeId: actor.userId },
+        });
+        log.event({
+          type: 'task.assigned',
+          projectId: task.subjectId,
+          stepKey: task.stepKey,
+          payload: { taskId: task.id, assigneeId: actor.userId },
+        });
+        return presentTask(tx, ctx.orgId, updated, deps.now());
+      }),
+    {
+      describe: (task) => ({
+        summary: `Claim from the queue: ${task.title}${whereOf(task)}`,
+        effects: { ...noEffects(), tasks: [previewTaskOf(task)] },
+        notified: [],
+      }),
+    },
+  ),
+
+  implement(
+    reassignTask,
+    ({ deps, ctx, actor, params, body }) =>
+      change(deps.db, ctx, async (tx, log) => {
+        const task = await findTask(tx, ctx.orgId, params.id, { forUpdate: true });
+        if (!task) throw notFound('task');
+        if (task.subjectType !== 'project' || !task.subjectId) {
+          throw validationFailed('Only a project task can be reassigned here.');
+        }
+        if (!OPEN_TASK.includes(task.status)) {
+          throw new AppError(409, 'ALREADY_DONE', 'This task is already closed.');
+        }
+        const env = await loadEnv(tx, ctx.orgId, actor, task.subjectId);
+        assertMay(env, 'tasks.reassign', ['vp', 'rd_head', 'rd_lead']);
+        const [assignee] = await requireActiveUsers(tx, ctx.orgId, [body.assigneeId], 'assigneeId');
+        if (!assignee) throw notFound('person');
+        if (task.roleKey && assignee.roleKey !== task.roleKey) {
+          throw validationFailed('The task is for someone in that role.', 'assigneeId');
+        }
+        const onTeam = env.team.some((u) => u.id === assignee.id);
+        if (actor.roleKey === 'rd_lead' && !onTeam) {
+          throw validationFailed(
+            'A Lead can give work only to people on the project team.',
+            'assigneeId',
+          );
+        }
+        if (!onTeam) {
+          await addMembers(tx, ctx.orgId, env.project.id, [assignee], actor.userId);
           log.audit({
             action: 'project.team_changed',
             recordType: 'project',
-            recordId: task.subjectId,
-            after: { added: [me.id], by: 'claim' },
+            recordId: env.project.id,
+            after: { added: [assignee.id], by: 'reassign' },
           });
           log.event({
             type: 'project.team_changed',
-            projectId: task.subjectId,
-            payload: { added: [me.id], removed: [] },
+            projectId: env.project.id,
+            payload: { added: [assignee.id], removed: [] },
           });
         }
-      }
-      log.audit({
-        action: 'task.claimed',
-        recordType: 'task',
-        recordId: task.id,
-        before: { assigneeId: null, queueRole: task.queueRole },
-        after: { assigneeId: actor.userId },
-      });
-      log.event({
-        type: 'task.assigned',
-        projectId: task.subjectId,
-        stepKey: task.stepKey,
-        payload: { taskId: task.id, assigneeId: actor.userId },
-      });
-      return presentTask(tx, ctx.orgId, updated, deps.now());
-    }),
-  ),
-
-  implement(reassignTask, ({ deps, ctx, actor, params, body }) =>
-    change(deps.db, ctx, async (tx, log) => {
-      const task = await findTask(tx, ctx.orgId, params.id, { forUpdate: true });
-      if (!task) throw notFound('task');
-      if (task.subjectType !== 'project' || !task.subjectId) {
-        throw validationFailed('Only a project task can be reassigned here.');
-      }
-      if (!OPEN_TASK.includes(task.status)) {
-        throw new AppError(409, 'ALREADY_DONE', 'This task is already closed.');
-      }
-      const env = await loadEnv(tx, ctx.orgId, actor, task.subjectId);
-      assertMay(env, 'tasks.reassign', ['vp', 'rd_head', 'rd_lead']);
-      const [assignee] = await requireActiveUsers(tx, ctx.orgId, [body.assigneeId], 'assigneeId');
-      if (!assignee) throw notFound('person');
-      if (task.roleKey && assignee.roleKey !== task.roleKey) {
-        throw validationFailed('The task is for someone in that role.', 'assigneeId');
-      }
-      const onTeam = env.team.some((u) => u.id === assignee.id);
-      if (actor.roleKey === 'rd_lead' && !onTeam) {
-        throw validationFailed(
-          'A Lead can give work only to people on the project team.',
-          'assigneeId',
-        );
-      }
-      if (!onTeam) {
-        await addMembers(tx, ctx.orgId, env.project.id, [assignee], actor.userId);
+        const updated = await assignTask(tx, task, assignee.id, actor.userId);
         log.audit({
-          action: 'project.team_changed',
-          recordType: 'project',
-          recordId: env.project.id,
-          after: { added: [assignee.id], by: 'reassign' },
+          action: 'task.reassigned',
+          recordType: 'task',
+          recordId: task.id,
+          before: { assigneeId: task.assigneeId, queueRole: task.queueRole },
+          after: { assigneeId: assignee.id },
         });
         log.event({
-          type: 'project.team_changed',
+          type: 'task.assigned',
           projectId: env.project.id,
-          payload: { added: [assignee.id], removed: [] },
+          stepKey: task.stepKey,
+          payload: { taskId: task.id, assigneeId: assignee.id },
         });
-      }
-      const updated = await assignTask(tx, task, assignee.id, actor.userId);
-      log.audit({
-        action: 'task.reassigned',
-        recordType: 'task',
-        recordId: task.id,
-        before: { assigneeId: task.assigneeId, queueRole: task.queueRole },
-        after: { assigneeId: assignee.id },
-      });
-      log.event({
-        type: 'task.assigned',
-        projectId: env.project.id,
-        stepKey: task.stepKey,
-        payload: { taskId: task.id, assigneeId: assignee.id },
-      });
-      return presentTask(tx, ctx.orgId, updated, deps.now());
-    }),
+        return presentTask(tx, ctx.orgId, updated, deps.now());
+      }),
+    {
+      describe: (task) => ({
+        summary: `Give to ${task.assignee?.name ?? 'them'}: ${task.title}${whereOf(task)}`,
+        effects: { ...noEffects(), tasks: [previewTaskOf(task)] },
+        notified: task.assignee ? [task.assignee] : [],
+      }),
+    },
   ),
 ];

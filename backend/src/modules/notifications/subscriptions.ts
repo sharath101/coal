@@ -55,6 +55,7 @@ async function context(tx: Tx, event: OutboxEvent): Promise<ProjectContext | nul
 
 /** A task was made: tell the person it is for (or the holders of the role whose queue it joined). */
 async function onTaskCreated(event: OutboxEvent, tx: Tx) {
+  if ((event.payload as Payload).given) return onTaskGiven(event, tx);
   const ctx = await context(tx, event);
   const p = event.payload as Payload;
   const step = ctx?.route.steps.find((s) => s.key === event.stepKey);
@@ -82,6 +83,61 @@ async function onTaskCreated(event: OutboxEvent, tx: Tx) {
       },
     }),
   );
+}
+
+/**
+ * Work given by hand, or a request: the person it is for hears who gave it. These aren't the
+ * route's work, so the words are COAL's own, not the route's templates.
+ */
+async function onTaskGiven(event: OutboxEvent, tx: Tx) {
+  const taskId = str((event.payload as Payload).taskId);
+  const task = taskId ? await findTask(tx, event.orgId, taskId) : null;
+  if (!task?.assigneeId || !task.assignedBy || task.assigneeId === task.assignedBy) return;
+  const giver = await findUser(tx, event.orgId, task.assignedBy);
+  const name = giver?.name ?? 'Someone';
+  const where = task.subjectLabel ? ` on ${task.subjectLabel}` : '';
+  const due = task.dueOn ? ` Due ${shortDate(task.dueOn)}.` : '';
+  await notify(tx, event.orgId, [
+    {
+      userId: task.assigneeId,
+      kind: 'work_message',
+      eventType: event.type,
+      title: task.kind === 'request' ? `${name} asks: ${task.title}` : task.title,
+      body:
+        task.kind === 'request'
+          ? `${name} asked you for this${where}.${due} Accept it to make it your task, or decline it with a reason.`
+          : `${name} assigned this to you${where}.${due}`,
+      link: '/tasks',
+      projectId: task.subjectId,
+      stepKey: task.stepKey,
+      dedupeKey: `event:${event.id}`,
+    },
+  ]);
+}
+
+/** A request was accepted or declined: the person who asked hears. The reason stays on the task. */
+async function onRequestAnswered(event: OutboxEvent, tx: Tx) {
+  const taskId = str((event.payload as Payload).taskId);
+  const task = taskId ? await findTask(tx, event.orgId, taskId) : null;
+  if (!task?.assignedBy || !task.assigneeId) return;
+  const person = await findUser(tx, event.orgId, task.assigneeId);
+  const name = person?.name ?? 'Someone';
+  const accepted = event.type === 'task.accepted';
+  await notify(tx, event.orgId, [
+    {
+      userId: task.assignedBy,
+      kind: accepted ? 'work_message' : 'alert',
+      eventType: event.type,
+      title: `${name} ${accepted ? 'accepted' : 'declined'}: ${task.title}`,
+      body: accepted
+        ? `${name} took on your request.`
+        : `${name} declined your request. Open it to see why.`,
+      link: '/tasks?scope=sent',
+      projectId: task.subjectId,
+      stepKey: task.stepKey,
+      dedupeKey: `event:${event.id}`,
+    },
+  ]);
 }
 
 /** A task was claimed or given to someone: tell them, unless they did it themselves. */
@@ -258,6 +314,8 @@ async function sendWidgetHints(event: OutboxEvent, tx: Tx) {
 export const NOTIFICATION_SUBSCRIPTIONS: Subscription[] = [
   { type: 'task.created', handle: onTaskCreated },
   { type: 'task.assigned', handle: onTaskAssigned },
+  { type: 'task.accepted', handle: onRequestAnswered },
+  { type: 'task.declined', handle: onRequestAnswered },
   { type: 'step.returned', handle: onStepReturned },
   { type: 'decision.recorded', handle: onDecision },
   { type: 'project.held', handle: onProject('project_held', 'on hold') },

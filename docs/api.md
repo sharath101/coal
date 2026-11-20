@@ -35,7 +35,7 @@ This is the first-release endpoint list. The generated OpenAPI spec is the exact
     Successful responses are kept for a day.
   - Edits take an `If-Match` header with the version the user saw, so two people, or a person and the AI, can't overwrite each other. A stale version gets `412 VERSION_CONFLICT`. For `PATCH /me`, the version is the profile's `updatedAt`.
 - **Preview.** Every workflow action (Go, start, submit, approve, return, decisions, send back, milestones, corrective actions, hold, resume and drop) accepts `?preview=true`. An action that can't preview refuses it with `400 VALIDATION_FAILED` instead of ignoring it, so a caller that adds `preview=true` to everything never changes anything by accident. It returns what would happen (steps opened or reset, tasks with their assignees, signatures requested, people notified, warnings) without saving anything. It is the real action run inside a transaction that is rolled back, so the preview and the result can't drift apart.
-- **Errors** use the standard problem format (`application/problem+json`) with a code. The codes are listed in `shared/src/api/problem.ts`; for example `NOT_SIGNED_IN`, `NOT_ALLOWED`, `AI_NOT_ALLOWED`, `NOT_FOUND`, `VALIDATION_FAILED` (with the fields), `NAME_TAKEN`, `VERSION_CONFLICT`, `RATE_LIMITED`, `STEP_NOT_READY`, `PROJECT_NOT_ACTIVE`, `DECISION_REQUIRED`, `CORRECTIVE_ACTIONS_OPEN`, `ALREADY_DONE`, `SIGNATURE_REQUIRED`, `PREVIEW_CHANGED`, `NO_TEMPLATE`, `DOCUMENT_LOCKED` (a version with the signers, an approved one, or a step that isn't open), `SEPARATION_OF_DUTIES` (the author can't also approve), `PDF_UNAVAILABLE` (the PDF service is down) and `FILE_NOT_SCANNED`, and `DEVIATION_REQUIRED` (a late step can't be submitted, and a late task can't be closed, until a deviation says why). "Not allowed" names who can do it (`whoCan`); it never reveals content.
+- **Errors** use the standard problem format (`application/problem+json`) with a code. The codes are listed in `shared/src/api/problem.ts`; for example `NOT_SIGNED_IN`, `NOT_ALLOWED`, `AI_NOT_ALLOWED`, `NOT_FOUND`, `VALIDATION_FAILED` (with the fields), `NAME_TAKEN`, `VERSION_CONFLICT`, `RATE_LIMITED`, `STEP_NOT_READY`, `PROJECT_NOT_ACTIVE`, `DECISION_REQUIRED`, `CORRECTIVE_ACTIONS_OPEN`, `ALREADY_DONE`, `SIGNATURE_REQUIRED`, `PREVIEW_CHANGED`, `PROPOSAL_EXPIRED`, `AI_UNAVAILABLE`, `AI_BUDGET_REACHED`, `CHAT_BUSY`, `NO_TEMPLATE`, `DOCUMENT_LOCKED` (a version with the signers, an approved one, or a step that isn't open), `SEPARATION_OF_DUTIES` (the author can't also approve), `PDF_UNAVAILABLE` (the PDF service is down) and `FILE_NOT_SCANNED`, and `DEVIATION_REQUIRED` (a late step can't be submitted, and a late task can't be closed, until a deviation says why). "Not allowed" names who can do it (`whoCan`); it never reveals content.
 
 ## Endpoints
 
@@ -107,13 +107,18 @@ Every action returns `{ saved, preview }`: what changed (steps, tasks made with 
 
 | Endpoint | Purpose | Tier |
 |---|---|---|
-| `GET /tasks` | My tasks (`scope=mine`) or the tasks waiting in my role's queue (`scope=queue`), open or closed | read |
-| `GET /tasks/{id}` | One task: mine, or one waiting in my role's queue | read |
-| `PATCH /tasks/{id}` | Set my own task to open, in progress or done | auto (my own) |
+| `GET /tasks` | My tasks (`scope=mine`), the tasks waiting in my role's queue (`scope=queue`), or the work and requests I gave others (`scope=sent`), open or closed | read |
+| `GET /tasks/{id}` | One task: mine, one waiting in my role's queue, or one I gave | read |
+| `PATCH /tasks/{id}` | Set my own task to open, in progress or done. Starting or finishing a request accepts it | auto (my own) |
 | `POST /tasks/{id}/claim` | Claim a task from my role's queue. I join the project team if I'm not on it. A Lead may claim only for their own product line's projects | confirm |
 | `POST /tasks/{id}/reassign` | Give a task to someone who holds its role (the VP or the Head; the Lead only within the project team) | confirm |
+| `POST /tasks` | Make a task: for myself (`own`), assigned to someone I may direct (`work`), or a `request` to anyone else, decided by [the ladder](./roles-and-access.md#assigning-work-and-making-requests). Optionally on a project and step I work on, with a due date. `?preview=true` says which it would be | auto (my own); the AI proposes the rest |
+| `POST /tasks/{id}/accept` | Accept a request made of me: it becomes my task, and the person who asked is told | confirm |
+| `POST /tasks/{id}/decline` | Decline a request made of me, with a reason the person who asked sees on the task | confirm |
 
-*Later:* `POST /tasks` (own tasks, assignments and requests), `accept`, `decline` and comments.
+Work given by hand (`POST /tasks`) isn't on the route's plan: no step closes or resets it, and a late one can be closed without a deviation ⚠ ([W25](./open-questions.md#workflow)).
+
+*Later:* comments on tasks.
 
 ### Deviations
 
@@ -162,16 +167,38 @@ Every action returns `{ saved, preview }`: what changed (steps, tasks made with 
 | `GET /widgets/{key}?view=compact\|expanded&tab=&filter[...]=` | One widget's data: counts, and rows with a title, a subtitle, badges, the table's cells, actions and references. Counts only what I may see | read |
 | `GET /notifications`, `POST /notifications/{id}/read`, `POST /notifications/read-all` | My notifications and work messages, and the unread count | read / auto |
 | `GET /stream` | Server-Sent Events. Hints only, never content: `{"type":"widgets","keys":[…]}` (fetch these widgets again) and `{"type":"notification"}`. Needs a session. *Not in the endpoint list or the OpenAPI file, because it isn't a request and response* | — |
-| `GET /search?q=` | Projects, documents, tasks and people, filtered by permission *(later)* | read |
+| `GET /search?q=&types=` | Projects, documents, tasks and people matching some words (PostgreSQL full-text search with English stemming, plus parts of codes and names). Each kind is filtered by its own rule: every project (status is open), documents the person may open in full (drafts only for the people who work on the project), their own tasks, queue and given work, and the people directory | read |
 
 ### AI
 
+None of these is available to the AI as a tool (`—`): they are how a person talks to it. A chat belongs to the person who started it, whatever their role.
+
 | Endpoint | Purpose | Tier |
 |---|---|---|
-| `POST /ai/chats`, `GET /ai/chats`, `GET /ai/chats/{id}` | Start a chat (optionally with a project, step, document, task or widget as context); list and read my chats | — |
-| `POST /ai/chats/{id}/messages` | Send a message. The reply streams back | — |
-| `POST /ai/chats/{id}/stop` | Stop the current reply | — |
-| `POST /ai/feedback` | Thumbs up or down on a reply | — |
+| `POST /ai/chats` | Start a chat, optionally pinned to a project, a step of it, a document, a task or a widget. What it is pinned to must exist and be something the person may open | — |
+| `GET /ai/chats?filter[project]=` | My chats, most recently used first, or those about one project | — |
+| `GET /ai/chats/{id}` | One of my chats with its messages (the latest 200), my ratings, and its action cards as they stand now | — |
+| `POST /ai/chats/{id}/messages` | Send a message and get the reply. Plain: the finished reply as JSON (`userMessage` and `message`). With `Accept: text/event-stream`: the reply streams as events ([below](#streaming-a-reply)). `409 CHAT_BUSY` while a reply is being written; `429 AI_BUDGET_REACHED` once today's budget is used; `503 AI_UNAVAILABLE` where no provider is set up; `502 AI_UNAVAILABLE` when the model can't be reached. Refusals come back as a normal problem response, before any stream starts | — |
+| `POST /ai/chats/{id}/stop` | Stop the reply being written. What was written is kept and marked `stopped`. `{ "stopped": false }` when none is running. It reaches the API copy that is writing it ⚠ | — |
+| `POST /ai/feedback` | Thumbs up or down, with an optional comment, on a reply of mine. Sending again changes the rating | — |
+
+A **message** has `parts` that every channel shows in its own way: `text` (with its `citations`, the records it rests on), `activity` (what the AI looked at, one line each) and `card` (an action card, by proposal id; the card itself is in the chat's `proposals`).
+
+#### Streaming a reply
+
+The events, in order, each as `event: <type>` and `data: <json>` (the shapes are `ChatStreamEvent` in `shared/src/schemas/ai.ts`):
+
+| Event | Meaning |
+|---|---|
+| `start` | The person's message is saved |
+| `text` | Some more of the reply (`delta`). Words that follow a lookup start a new paragraph |
+| `activity` | A lookup started, finished or failed (`id`, `tool`, `label`, `state`) |
+| `card` | An action card was prepared or changed (`proposalId`) |
+| `done` | The reply is saved (`message`, with citations resolved: tags the AI made up are gone) |
+| `title` | A short title for a new chat |
+| `error` | The reply failed (`code`, `detail`). A reply that was cut short is still saved |
+
+Closing the connection stops the reply.
 
 ## Proposals and action cards
 
@@ -180,17 +207,23 @@ A proposal is a set of actions with their preview, waiting for the user to confi
 | Endpoint | Purpose | Tier |
 |---|---|---|
 | `POST /proposals` | Create a proposal from one or more actions. The server previews them and stores the result as version 1 | auto |
-| `GET /proposals?status=pending`, `GET /proposals/{id}` | My pending proposals | read |
-| `PATCH /proposals/{id}` | Edit (assignee, dates, wording). Previews again and creates a new version | auto |
+| `GET /proposals?status=`, `GET /proposals/{id}` | My proposals (pending, confirmed, rejected, expired) | read |
+| `PATCH /proposals/{id}` | Edit (assignee, dates, wording). Previews again and creates a new version. `If-Match` with the version seen is checked when sent | auto |
 | `POST /proposals/{id}/confirm` | Carry it out. Needs `If-Match` with the version the user saw | never |
 | `POST /proposals/{id}/reject` | Discard it | never |
+
+**Actions.** An action is a call to an endpoint, as `{ endpoint, params, query, body, ifMatch }`, such as `{ "endpoint": "tasks.create", "body": { "title": "Rerun the FEA", "assigneeId": "…" } }`. It runs through the endpoint's own checks and handler, as the user, so a card can do exactly what the user could do on a screen. Only endpoints of the `auto` or `confirm` tier whose implementation says how to describe itself can be proposed (`describe` in `implement()`; the backend refuses to start otherwise). Now: `tasks.create`, `tasks.accept`, `tasks.decline`, `tasks.claim`, `tasks.reassign`, `steps.start`, `steps.submit` and `deviations.record`. More are added as the AI needs them.
+
+**The preview** of each action has a summary in plain words ("Assign to Dev Example: Rerun the FEA, due 27 Nov"), its effects (steps that move, tasks made with their assignees or queues, warnings) and who is told.
 
 **Rules**
 
 - **Who can confirm.** Only the user the proposal is for can confirm it, and never through a "via AI" call.
-- **Re-check on confirm.** Confirming checks permissions again and previews again. If who or what would be affected has changed, it returns `PREVIEW_CHANGED` with the new preview, and nothing happens.
-- **All or nothing.** All the actions in a proposal run in one transaction, at most once. The audit trail records the user and the chat that prepared it.
-- **Expiry.** Proposals expire if not confirmed (a setting).
+- **How the preview is made.** The server runs every action, in order, inside one transaction and rolls it back, so a later action sees what an earlier one would do. Nothing is stored or rendered during a preview: no file is written and no PDF is made.
+- **Re-check on confirm.** Confirming runs the actions again for real, in one transaction, and compares what they did with the preview the user saw. If anything differs (for example, the assignee left the team, so an assignment would now be a request), it is all undone, the new preview is saved as the next version, and the answer is `409 PREVIEW_CHANGED`. The user looks again and confirms the new version.
+- **All or nothing.** All the actions in a proposal run in one transaction, at most once. If any is refused, nothing happens, the refusal names the action ("Action 2: …"), and the card stays pending so it can be edited or discarded.
+- **Recorded.** The audit trail records each action as the user's, and a `proposal.confirmed` entry with the chat that prepared it, in the same transaction. A task made from a card the AI prepared shows that it came through the Workstation.
+- **Expiry.** A proposal expires if it isn't confirmed within `PROPOSAL_EXPIRY_HOURS` (72 hours ⚠, [AI9](./open-questions.md#ai)): `409 PROPOSAL_EXPIRED`.
 
 ## Events
 
@@ -200,7 +233,7 @@ Events are written in the same transaction as the change ([architecture.md](./ar
 |---|---|
 | Project | `project.created`, `project.held`, `project.resumed`, `project.dropped`, `project.launched`, `project.team_changed`, `project.closed` |
 | Step | `step.ready`, `step.started`, `step.submitted`, `step.signed` (one of several required approvals), `step.returned`, `step.approved`, `step.done`, `step.reset`, `step.cancelled`, `decision.recorded`, `milestone.recorded` |
-| Task | `task.created`, `task.assigned`, `task.updated`, `task.done`, `task.cancelled` |
+| Task | `task.created`, `task.assigned`, `task.updated`, `task.done`, `task.cancelled`, `task.accepted`, `task.declined`. Events about work given by hand carry no project, so the project's activity feed (which shows status to everyone) never shows their words |
 | Document | `document.created`, `document.version_saved`, `document.submitted`, `document.approved`, `document.returned`, `document.carried_forward`, `template.added`, `template.activated` |
 | Signature | `signature.requested` (a row has opened), `signature.signed` |
 | Timeline | `timeline.changed` (a baseline or a date change), `forecast.changed`, `project.health_changed`, `deviation.recorded`, `deviation.reviewed` |
@@ -213,4 +246,5 @@ Events are written in the same transaction as the change ([architecture.md](./ar
 2. **Add the permission rule** in `backend/src/modules/permissions/rules.ts`; the type check fails until you do. Add its row to the test table in `permissions.test.ts`, which tests every role, allowed and denied ([roles-and-access.md](./roles-and-access.md#how-access-is-enforced)). Record-level rules get their own cases there.
 3. **Implement it** with `implement()` in the module's `routes.ts`, and list the module's routes in `backend/src/modules/index.ts`. The backend won't start while an endpoint has no implementation.
 4. **If it changes state,** run it through `change()` (`backend/src/core/db/change.ts`) so its audit entries and events are written in the same transaction, and support `?preview=true` if it's a workflow action.
-5. **Update the tables in this doc.**
+5. **If the AI may propose it** (an `auto` or `confirm` endpoint), give its `implement()` a `describe` that puts its result in plain words for the action card, and add a test that confirms a card with it.
+6. **Update the tables in this doc.**

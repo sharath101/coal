@@ -11,6 +11,7 @@ import { useWidgetText, CountStats } from '@/components/widgets/count-stats';
 import { RowBadges, StageStrip, toneBar } from '@/components/widgets/widget-parts';
 import { Button } from '@/components/ui/button';
 import { useWidget, type WidgetInfo } from '@/lib/queries';
+import { workstationHref } from '@/lib/workstation';
 import { cn } from '@/lib/utils';
 
 /** The cells shown under a row on the compact card: the date or number that matters most. */
@@ -30,16 +31,16 @@ const COMPACT_CELLS: Record<WidgetKey, string[]> = {
 const isHealth = (value: unknown): value is Health =>
   value === 'green' || value === 'amber' || value === 'red';
 
-/** "Ask AI" arrives with the Workstation; until then the button is shown, and disabled. */
-export function AskAiButton() {
+/** "Ask AI": opens the Workstation with a new chat about this widget. */
+export function AskAiButton({ widgetKey }: { widgetKey: WidgetKey }) {
   const t = useTranslations('widgets');
   return (
-    <span title={t('askSoon')} className="inline-flex">
-      <Button size="xs" variant="outline" disabled>
+    <Button asChild size="xs" variant="outline">
+      <Link href={workstationHref({ widgetKey })}>
         <Sparkles aria-hidden />
         {t('ask')}
-      </Button>
-    </span>
+      </Link>
+    </Button>
   );
 }
 
@@ -65,7 +66,7 @@ export function WidgetCard({ info, onOpen }: { info: WidgetInfo; onOpen: () => v
           {name}
         </h3>
         <div className="flex shrink-0 gap-1">
-          <AskAiButton />
+          <AskAiButton widgetKey={info.key} />
           <Button
             size="xs"
             variant="ghost"

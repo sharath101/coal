@@ -36,6 +36,9 @@ export const tasks = pgTable(
     subjectId: uuid('subject_id'),
     subjectLabel: text('subject_label'),
     doneAt: timestamptz('done_at'),
+    /** A request: when its assignee took it on, or why they declined it. */
+    acceptedAt: timestamptz('accepted_at'),
+    declineReason: text('decline_reason'),
     /** When the doers handed the step in, while it waits for its signer: the measures stop the clock here. */
     handedInAt: timestamptz('handed_in_at'),
     /** When it is due now, and when it was first due: the on-time rate counts the first (docs/dashboard.md#measures). */
@@ -48,5 +51,6 @@ export const tasks = pgTable(
     index('tasks_queue').on(t.orgId, t.queueRole, t.status),
     index('tasks_run').on(t.runId, t.stepKey),
     index('tasks_due').on(t.orgId, t.dueOn),
+    index('tasks_assigned_by').on(t.orgId, t.assignedBy, t.status),
   ],
 );

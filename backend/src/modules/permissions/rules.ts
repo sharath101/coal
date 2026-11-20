@@ -31,6 +31,8 @@ export interface RoleScope extends Scope {
 export interface TaskResource {
   assigneeId: string | null;
   queueRole: string | null;
+  /** Who gave it or asked for it. */
+  assignedBy?: string | null;
 }
 
 /** A queued task, with the product line of the project it belongs to (empty outside a project). */
@@ -104,6 +106,46 @@ const queuedForMyRole = (actor: Actor, task: TaskResource): Decision =>
   task.assigneeId === null && task.queueRole === actor.roleKey
     ? allow
     : deny(...roleNames(task.queueRole ? [task.queueRole] : []));
+
+/** Mine, waiting in my role's queue, or given or asked for by me. */
+const taskReadable = (actor: Actor, task: TaskResource): Decision => {
+  if (task.assignedBy === actor.userId) return allow;
+  const own = ownTask(actor, task);
+  return own.allowed ? own : queuedForMyRole(actor, task);
+};
+
+/** A new task may belong to a project only for the people who work on it. */
+export interface NewTaskResource {
+  project: Scope | null;
+}
+
+const mayLinkTask = (actor: Actor, r: NewTaskResource): Decision =>
+  !r.project || inScope(actor, r.project) ? allow : deny('Members of this project');
+
+/**
+ * What giving someone work becomes (docs/roles-and-access.md#assigning-work-and-making-requests):
+ * my `own` task, `work` assigned to someone below me on the ladder whom I may direct, or a
+ * `request` they accept or decline. `onLineTeam`: the person is on a project of my product line.
+ */
+export function howToGive(
+  actor: Actor,
+  assignee: { id: string; roleKey: string },
+  onLineTeam: boolean,
+): 'own' | 'work' | 'request' {
+  if (assignee.id === actor.userId) return 'own';
+  if (!isAboveOnLadder(actor.roleKey, assignee.roleKey)) return 'request';
+  switch (actor.roleKey) {
+    case 'board':
+      return assignee.roleKey === 'vp' ? 'work' : 'request';
+    case 'vp':
+    case 'rd_head':
+      return ROLE_DEPARTMENTS.get(assignee.roleKey) === 'RND' ? 'work' : 'request';
+    case 'rd_lead':
+      return onLineTeam ? 'work' : 'request';
+    default:
+      return 'request';
+  }
+}
 
 /**
  * Anyone with the role may claim from its queue, but a Lead's scope is their product line: a
@@ -299,6 +341,22 @@ export function causeNameVisible(
 const ownNotification = (actor: Actor, n: { userId: string }): Decision =>
   n.userId === actor.userId ? allow : deny('The person it was sent to');
 
+/** A proposal is for the person it was prepared for: only they see, change and confirm it. */
+export interface ProposalResource {
+  forUserId: string;
+}
+
+const ownProposal = (actor: Actor, p: ProposalResource): Decision =>
+  p.forUserId === actor.userId ? allow : deny('The person it was prepared for');
+
+/** A chat is private to the person who started it, whatever their role (docs/roles-and-access.md#content-is-need-to-know). */
+export interface ChatResource {
+  userId: string;
+}
+
+const ownChat = (actor: Actor, c: ChatResource): Decision =>
+  c.userId === actor.userId ? allow : deny('The person who started the chat');
+
 export const RULES = {
   'auth.signUp': { endpoint: anyone },
   'auth.signIn': { endpoint: anyone },
@@ -328,16 +386,13 @@ export const RULES = {
   'milestones.record': { endpoint: signedIn, resource: inRoles },
   'correctiveActions.create': { endpoint: onlyRoles('rd_lead'), resource: inRoles },
   'tasks.read': { endpoint: signedIn },
-  'tasks.readOne': {
-    endpoint: signedIn,
-    resource: (a: Actor, t: TaskResource) => {
-      const own = ownTask(a, t);
-      return own.allowed ? own : queuedForMyRole(a, t);
-    },
-  },
+  'tasks.readOne': { endpoint: signedIn, resource: taskReadable },
   'tasks.update': { endpoint: signedIn, resource: ownTask },
   'tasks.claim': { endpoint: signedIn, resource: claimable },
   'tasks.reassign': { endpoint: onlyRoles('vp', 'rd_head', 'rd_lead'), resource: inRoles },
+  // Anyone may make their own tasks and ask anyone; the ladder decides what it becomes.
+  'tasks.create': { endpoint: signedIn, resource: mayLinkTask },
+  'tasks.answer': { endpoint: signedIn, resource: ownTask },
   'documentTypes.read': { endpoint: signedIn },
   'templates.read': { endpoint: signedIn, resource: templateReadable },
   'templates.write': { endpoint: onlyRoles('vp', 'rd_head') },
@@ -368,6 +423,17 @@ export const RULES = {
   'notifications.markRead': { endpoint: signedIn, resource: ownNotification },
   'notifications.markAllRead': { endpoint: signedIn },
   'widgets.read': { endpoint: signedIn },
+  'proposals.create': { endpoint: signedIn },
+  'proposals.list': { endpoint: signedIn },
+  'proposals.read': { endpoint: signedIn, resource: ownProposal },
+  'proposals.write': { endpoint: signedIn, resource: ownProposal },
+  // Each result is filtered by the rule of what it is (docs/roles-and-access.md#how-access-is-enforced).
+  'search.read': { endpoint: signedIn },
+  'ai.chats.create': { endpoint: signedIn },
+  'ai.chats.list': { endpoint: signedIn },
+  'ai.chats.read': { endpoint: signedIn, resource: ownChat },
+  'ai.chats.write': { endpoint: signedIn, resource: ownChat },
+  'ai.feedback': { endpoint: signedIn, resource: ownChat },
 } satisfies Record<
   PermissionKey,
   | Rule<never>
@@ -375,6 +441,7 @@ export const RULES = {
   | Rule<RoleScope>
   | Rule<TaskResource>
   | Rule<ClaimResource>
+  | Rule<NewTaskResource>
   | Rule<TemplateResource>
   | Rule<DocumentResource>
   | Rule<SignatureResource>
@@ -382,6 +449,8 @@ export const RULES = {
   | Rule<DeviationReviewResource>
   | Rule<DeviationCauseResource>
   | Rule<{ userId: string }>
+  | Rule<ProposalResource>
+  | Rule<ChatResource>
 >;
 
 type Rules = typeof RULES;

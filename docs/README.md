@@ -33,7 +33,7 @@ This is the main doc. It gives the whole picture on one page and points to the d
 - assigns work;
 - explains documents before you sign.
 
-It acts as you, sees only what you can see, and anything that affects other people needs your confirmation on an action card. It never signs or decides. Claude and OpenAI are both integrated; the choice comes later. → [workstation-and-ai.md](./workstation-and-ai.md)
+It acts as you, sees only what you can see, and anything that affects other people needs your confirmation on an action card. It never signs or decides. It runs on Claude (Anthropic). → [workstation-and-ai.md](./workstation-and-ai.md)
 
 **Signing.** Documents and decisions are signed in rows (Prepared, Reviewed, Approved), each signature tied to the exact version's hash. Until the last block it is a confirmed click; then Face ID or a fingerprint (passkeys). Everything is recorded in an add-only audit trail. → [documents-and-signing.md](./documents-and-signing.md)
 
@@ -65,7 +65,7 @@ The full log, with reasons, is in [decisions.md](./decisions.md).
 - **Scope:** R&D first, built to grow to all of Jayon, about 800 employees (D11).
 - **Parts:** a separate backend, website and mobile app, with shared code (D1). Web first; the app comes in a later phase (D12).
 - **Hosting:** local first; simple hosting for demos; the domain and production hosting are decided at the end (D13).
-- **AI:** Claude and OpenAI behind one gateway, to choose later (D2). Basic AI in the first release, only when asked (D3). The chat also comes to WhatsApp (D14).
+- **AI:** Claude (Anthropic) behind one gateway (D17, replacing D2), with a budget of US$5 per person per day (D18); the Copilot SDK stands in on one development laptop for now (D19). Basic AI in the first release, only when asked (D3). The chat also comes to WhatsApp (D14).
 - **Templates:** a template for each step's documents, kept in COAL's template library; the AI checks it every time (D15).
 - **Signing:** Face ID or fingerprint passkeys, with the device PIN as fallback (D4), built last (D16). A confirmed click until then.
 - **Accounts:** name and role sign-up, and name sign-in, for now; no admin (D5).

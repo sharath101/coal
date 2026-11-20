@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import { boolean, index, integer, jsonb, pgTable, text, unique, uuid } from 'drizzle-orm/pg-core';
 import type { DocumentContent, SignaturePlan } from '@coal/shared';
 import { idColumn, orgIdColumn, timestamps, timestamptz } from '../../core/db/columns';
@@ -72,6 +73,8 @@ export const documentVersions = pgTable(
   (t) => [
     unique('document_versions_doc_no').on(t.documentId, t.versionNo),
     index('document_versions_step').on(t.runStepId),
+    // Search (GET /search) matches the words of each version.
+    index('document_versions_search').using('gin', sql`to_tsvector('english', ${t.searchText})`),
   ],
 );
 

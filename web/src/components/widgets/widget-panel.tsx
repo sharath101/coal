@@ -172,7 +172,7 @@ export function WidgetPanel({ info, state, onChange, onClose }: Props) {
               {question}
             </DialogDescription>
           </div>
-          <AskAiButton />
+          <AskAiButton widgetKey={info.key} />
           <DialogClose asChild>
             <Button variant="ghost" size="icon-sm" aria-label={t('close')}>
               <X aria-hidden />

@@ -4,7 +4,8 @@ import {
   recordDeviation as recordDeviationEndpoint,
   reviewDeviation as reviewDeviationEndpoint,
 } from '@coal/shared';
-import { implement } from '../../core/http/endpoint';
+import { implement, noEffects } from '../../core/http/endpoint';
+import { shortDate } from '../notifications/service';
 import * as service from './service';
 
 export const deviationsRoutes = [
@@ -12,8 +13,16 @@ export const deviationsRoutes = [
     service.listDeviations(deps.db, ctx.orgId, actor, query),
   ),
 
-  implement(recordDeviationEndpoint, ({ deps, ctx, actor, body }) =>
-    service.recordDeviation(deps, ctx, actor, body),
+  implement(
+    recordDeviationEndpoint,
+    ({ deps, ctx, actor, body }) => service.recordDeviation(deps, ctx, actor, body),
+    {
+      describe: (d) => ({
+        summary: `Record why ${d.taskTitle ? `"${d.taskTitle}"` : 'the work'} on ${d.project.code} is late: new date ${shortDate(d.newDate)}`,
+        effects: noEffects(),
+        notified: [],
+      }),
+    },
   ),
 
   implement(reviewDeviationEndpoint, ({ deps, ctx, actor, params, body }) =>

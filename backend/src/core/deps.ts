@@ -1,3 +1,4 @@
+import type { AiProvider } from '../modules/ai/provider';
 import type { PdfRenderer } from '../modules/documents/pdf';
 import type { VirusScanner } from '../modules/files/scanner';
 import type { FileStorage } from '../modules/files/storage';
@@ -12,6 +13,8 @@ export interface AppDeps {
   pdf: PdfRenderer;
   /** Null where no virus scanner is set up (docs/documents-and-signing.md#files-pictures-and-sources). */
   scanner: VirusScanner | null;
+  /** The model provider, or null where the AI isn't set up: the chat endpoints then say so. */
+  ai: AiProvider | null;
   /** The time, in one place so tests can move it forward (due dates and reminders depend on today). */
   now: () => Date;
 }

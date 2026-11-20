@@ -43,6 +43,7 @@
 | W22 | Which days are holidays, and which Saturdays are worked? | Monday to Friday are working days, and a few made-up holidays are loaded for local work (`SAMPLE_HOLIDAYS`). Jayon's calendar replaces them as rows of `work_calendar` | R&D Head |
 | W23 | Are the timings right? A step is at risk 2 working days before it is due and not started, or when a signature has waited more than 3; a project is red when the forecast launch is more than 30 days late or a step is more than 10 working days overdue; a signature is due 3 working days after it is asked for; reminders go 2 working days before and on the due date; a late task is escalated at 2 and 5 working days | These are the starting values in `settings` and can be changed without a release | VP, R&D Head |
 | W24 | Who confirms a deviation, and does the weekly exception list need to be a document? | The next role up the ladder, or anyone above, in the project's scope; the "list" is a notification to the Head and the VP at 5 working days late, plus the Delays widget (P63) | R&D Head |
+| W25 | Must work given by hand (an assignment or a request, not the route's own work) also say why when it is late? Should it get reminders? | No: it isn't on the plan, so a late one can be closed without a deviation, and it gets no reminders. It still shows how late it is | R&D Head |
 
 ## People and access
 
@@ -78,14 +79,17 @@
 
 | ID | Question | Assumption in use | Ask |
 |---|---|---|---|
-| AI1 | Which provider and models (Claude or OpenAI)? | Both integrated; choose after testing on real tasks | Founders |
 | AI2 | Which data may be sent to which AI provider? Must it be processed in India? | Only made-up data for now, so no limit yet | Jayon |
-| AI3 | What is the AI budget per person or per month, and what response time is acceptable? | A daily budget per person, set in configuration | Founders, Jayon |
+| AI3 | What response time is acceptable? (The budget is decided: [D18](./decisions.md)) | A few seconds for a question; drafts may take longer | Founders, Jayon |
 | AI4 | May we use past Jayon documents to test the AI? Who scores the AI's drafts for each role? | Made-up examples until then | Jayon |
 | AI5 | Is Malayalam needed in the chat and screens, or only for meetings later? | English screens; the AI may answer in Malayalam if asked | Jayon |
 | AI6 | WhatsApp: Meta's own Cloud API, or a provider such as Twilio or Gupshup? | Not needed until the WhatsApp phase | Founders |
 | AI7 | What may be shown in WhatsApp? Messages pass through Meta's servers | Nothing confidential until Jayon decides | Jayon |
 | AI8 | How is a phone number linked to an employee's account, and unlinked when they change phones or leave? | Not needed until the WhatsApp phase | Founders, Jayon IT |
+| AI9 | How long may an action card wait to be confirmed before it expires? | 72 hours (`PROPOSAL_EXPIRY_HOURS`). Confirming re-checks everything anyway, so a stale card can't do something different from what it shows | Founders |
+| AI10 | Do the AI's answers on Claude match what was tested on the Copilot stand-in (D19)? | Not yet known: the AI test sets run again on Anthropic as soon as the new laptop arrives | Sharath |
+| AI11 | What do the models really cost, and are the Anthropic model names right? | Starting prices by family per million tokens (Haiku $1 in and $5 out, Sonnet $3 and $15, Opus $5 and $25) set the budget; the names `claude-sonnet-5-5` and `claude-haiku-5-5` are unchecked, because the key can't be used from the company laptop. Check both when the new laptop arrives | Sharath |
+| AI12 | How long are chats and AI logs kept, and may a person delete their own chats? | Kept for as long as the database is; only the owner reads a chat | Jayon |
 
 ## Regulatory
 
@@ -145,4 +149,6 @@ These were listed at the COAL meeting, plus what the build needs:
 
 ## Answered
 
-*None yet.*
+| ID | Question | Answer |
+|---|---|---|
+| AI1 | Which provider and models (Claude or OpenAI)? | Claude (Anthropic) only, for now ([D17](./decisions.md)). Models are set per purpose in configuration |

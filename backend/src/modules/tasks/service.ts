@@ -1,7 +1,8 @@
 import { dateOfInstant, workingDaysBetween, type Task } from '@coal/shared';
-import { and, desc, eq, inArray, isNull, sql, type SQL } from 'drizzle-orm';
+import { and, desc, eq, ilike, inArray, isNull, ne, or, sql, type SQL } from 'drizzle-orm';
 import type { Executor, Tx } from '../../core/db/client';
 import { msOf } from '../../core/db/columns';
+import { containing, wordsQuery } from '../../core/db/search';
 import { notFound, validationFailed } from '../../core/http/errors';
 import { listRoles } from '../org/service';
 import { loadCalendar } from '../schedule/calendar';
@@ -114,12 +115,70 @@ export async function setTaskStatus(
   status: 'open' | 'in_progress' | 'done',
   now: Date = new Date(),
 ): Promise<TaskRow> {
+  // Starting or finishing a request takes it on.
+  const acceptedAt = task.kind === 'request' && !task.acceptedAt ? now : task.acceptedAt;
   const [row] = await tx
     .update(tasks)
-    .set({ status, doneAt: status === 'done' ? now : null, updatedAt: now })
+    .set({ status, doneAt: status === 'done' ? now : null, acceptedAt, updatedAt: now })
     .where(eq(tasks.id, task.id))
     .returning();
   return row as TaskRow;
+}
+
+/** The assignee's answer to a request: accepted (it stays open as their task) or declined, with why. */
+export async function answerRequest(
+  tx: Tx,
+  task: TaskRow,
+  answer: { accepted: true } | { accepted: false; reason: string },
+  now: Date = new Date(),
+): Promise<TaskRow> {
+  const [row] = await tx
+    .update(tasks)
+    .set(
+      answer.accepted
+        ? { acceptedAt: now, updatedAt: now }
+        : { status: 'declined', declineReason: answer.reason, updatedAt: now },
+    )
+    .where(eq(tasks.id, task.id))
+    .returning();
+  return row as TaskRow;
+}
+
+/** Whether a task is still to be done. */
+export const isActive = (task: Pick<TaskRow, 'status'>) => ACTIVE.includes(task.status);
+
+/**
+ * Tasks whose title or words match, among those the person may see: theirs, their role's queue,
+ * and what they gave or asked others for. Open ones first.
+ */
+export async function searchTasks(
+  ex: Executor,
+  orgId: string,
+  actor: { userId: string; roleKey: string },
+  q: string,
+  limit: number,
+): Promise<TaskRow[]> {
+  const words = sql`to_tsvector('english', ${tasks.title} || ' ' || ${tasks.body})`;
+  return ex
+    .select()
+    .from(tasks)
+    .where(
+      and(
+        eq(tasks.orgId, orgId),
+        or(
+          eq(tasks.assigneeId, actor.userId),
+          eq(tasks.assignedBy, actor.userId),
+          and(isNull(tasks.assigneeId), eq(tasks.queueRole, actor.roleKey)),
+        ),
+        or(sql`${words} @@ ${wordsQuery(q)}`, ilike(tasks.title, containing(q))),
+      ),
+    )
+    .orderBy(
+      sql`case when ${inArray(tasks.status, ACTIVE)} then 0 else 1 end`,
+      desc(sql`ts_rank(${words}, ${wordsQuery(q)})`),
+      desc(tasks.createdAt),
+    )
+    .limit(limit);
 }
 
 /** While a step is with its signer, the doers' tasks wait; when it is returned they are open again. */
@@ -227,7 +286,7 @@ function decodeCursor(cursor: string): [string, string] {
   throw validationFailed('The cursor is not valid.', 'cursor');
 }
 
-/** My tasks, or the tasks waiting in my role's queue; newest first. */
+/** My tasks, the tasks waiting in my role's queue, or what I gave or asked others for; newest first. */
 export async function listTasks(
   ex: Executor,
   orgId: string,
@@ -235,7 +294,7 @@ export async function listTasks(
   query: {
     cursor?: string | undefined;
     limit: number;
-    scope: 'mine' | 'queue';
+    scope: 'mine' | 'queue' | 'sent';
     'filter[status]': 'active' | 'closed';
   },
   now: Date = new Date(),
@@ -245,7 +304,9 @@ export async function listTasks(
     inArray(tasks.status, query['filter[status]'] === 'active' ? ACTIVE : CLOSED),
   ];
   if (query.scope === 'mine') conditions.push(eq(tasks.assigneeId, actor.userId));
-  else conditions.push(isNull(tasks.assigneeId), eq(tasks.queueRole, actor.roleKey));
+  else if (query.scope === 'sent') {
+    conditions.push(eq(tasks.assignedBy, actor.userId), ne(tasks.assigneeId, actor.userId));
+  } else conditions.push(isNull(tasks.assigneeId), eq(tasks.queueRole, actor.roleKey));
   if (query.cursor) {
     const [at, id] = decodeCursor(query.cursor);
     conditions.push(
@@ -337,7 +398,7 @@ export async function presentTasks(
     findUsersByIds(
       ex,
       orgId,
-      rows.flatMap((r) => (r.assigneeId ? [r.assigneeId] : [])),
+      rows.flatMap((r) => [r.assigneeId, r.assignedBy].filter((id): id is string => !!id)),
     ),
     listRoles(ex, orgId),
     loadCalendar(ex, orgId),
@@ -368,6 +429,20 @@ export async function presentTasks(
       row.subjectType && row.subjectId
         ? { type: row.subjectType, id: row.subjectId, label: row.subjectLabel ?? '' }
         : null,
+    onPlan: row.runStepId !== null,
+    // Someone else gave it; a task I claimed or made for myself has no giver to show.
+    assignedBy:
+      row.assignedBy && row.assignedBy !== row.assigneeId
+        ? { id: row.assignedBy, name: nameOf.get(row.assignedBy) ?? 'Unknown' }
+        : null,
+    viaAi: row.viaAi,
+    request:
+      row.kind === 'request'
+        ? {
+            state: row.status === 'declined' ? 'declined' : row.acceptedAt ? 'accepted' : 'pending',
+            declineReason: row.declineReason,
+          }
+        : null,
     createdAt: row.createdAt.toISOString(),
   }));
 }
@@ -382,3 +457,16 @@ export async function presentTask(
   if (!task) throw notFound('task');
   return task;
 }
+
+/** A task as an action card shows it. */
+export const previewTaskOf = (task: Task) => ({
+  stepKey: task.stepKey,
+  kind: task.kind,
+  title: task.title,
+  assignee: task.assignee,
+  queueRole: task.queueRole,
+});
+
+/** ` (SPN-26-004, step 7)`: where a task belongs, for a card's summary. */
+export const whereOf = (task: Task) =>
+  task.subject ? ` (${task.subject.label}${task.stepKey ? `, step ${task.stepKey}` : ''})` : '';

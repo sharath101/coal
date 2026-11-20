@@ -16,6 +16,7 @@ import {
 import { useMutation } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 import { useEffect, useRef, useState } from 'react';
+import { AskAiLink } from '@/components/ask-ai';
 import { useConditionText } from '@/components/condition-text';
 import { RecordDeviationDialog } from '@/components/deviation-dialog';
 import { StepHealthBadge } from '@/components/health-badge';
@@ -184,6 +185,9 @@ export function StepCard({ projectId, step, route, documents, focused = false, o
         </summary>
 
         <div className="grid gap-4 border-t p-3">
+          <div className="flex justify-end">
+            <AskAiLink pin={{ projectId, stepKey: step.key }} />
+          </div>
           <dl className="grid gap-2 sm:grid-cols-[8rem_1fr]">
             <dt className="text-muted-foreground">{t('doers')}</dt>
             <dd>{step.doers.map((d) => d.name).join(', ')}</dd>

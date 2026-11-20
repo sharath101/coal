@@ -76,6 +76,7 @@ export async function buildApp(
 
   registerEndpoints(app, IMPLEMENTATIONS, deps);
   registerStream(app, deps);
+  app.addHook('onClose', async () => deps.ai?.close?.());
   await app.ready();
   return app;
 }

@@ -14,6 +14,7 @@
 | **Boilerplate (BP)** | A company template that new documents start from, such as the Action Plan or the FEA report. In COAL, a template in the template library |
 | **Channel** | Where a person uses the AI chat: the website now; WhatsApp and the mobile app later |
 | **Checkpoint** | A go or no-go step: 4, 12, 18 and 23. Nothing after it starts until it is signed |
+| **Citation** | A link from a statement in an AI answer to the record it came from (`[S1]`). The server keeps only citations that match a record the AI actually read ([workstation-and-ai.md](./workstation-and-ai.md#citations)) |
 | **Content** | What's inside a project's documents and records. Visible on a need-to-know basis (compare *status*) |
 | **Decision** | A signed choice recorded at a step: Go, a checkpoint outcome, "prototypes OK", "pre-clinical study needed", hold, drop |
 | **Department module** | The part of the backend that holds one department's own records and rules. R&D's is the first |
@@ -26,6 +27,7 @@
 | **Carried forward** | A document version copied unchanged into a step's new iteration when work is sent back, so people revise rather than start again |
 | **Confirmed click** | How every signature is made until passkeys exist: the right person confirms, and COAL records who, when and the hashes |
 | **Forecast** | The expected end of each open step, and the expected launch (the expected end of step 25), worked out from each step's length, a doer's new dates and its inputs |
+| **Gateway** | The part of the backend that talks to a model provider (Anthropic; Copilot on one laptop for now) through one interface, and applies COAL's tools, budgets and logging the same way for each |
 | **Go** | The VP's signed decision that creates a project and opens steps 1, 2 and 2a |
 | **Health** | Green, amber or red, for a step or project, from its dates ([dashboard.md](./dashboard.md#health)) |
 | **Iteration** | One pass through a step. Sending work back opens a new iteration; earlier ones stay on record |
@@ -38,7 +40,7 @@
 | **Project team** | The people on a project, named in its PID (step 1) |
 | **Proposal** | One or more actions with a preview of their effects, waiting for the user to confirm. The AI creates proposals for anything that affects other people |
 | **Queue** | Where a task waits when no one person is assigned. Anyone with the role can claim it |
-| **Request** | A task asked of someone outside your reporting line. They can accept or decline it |
+| **Request** | A task asked of someone you can't assign work to ([the ladder](./roles-and-access.md#assigning-work-and-making-requests)). They can accept or decline it, with a reason |
 | **Route** | A process's steps, who does and signs each one, and how work moves. Stored as a versioned definition. Jayon's R&D route has 28 steps |
 | **Send back** | Returning work to an earlier step after a failure or a rejected checkpoint |
 | **Sign-off** | The signature that completes a step, given by the step's signer |

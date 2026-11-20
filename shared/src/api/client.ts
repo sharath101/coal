@@ -86,7 +86,8 @@ function toQuery(query: Record<string, QueryValue> | undefined): string {
   return text ? `?${text}` : '';
 }
 
-async function readProblem(response: Response): Promise<Problem> {
+/** The problem a failed response carries, or one made from its status. For callers that read a response themselves, such as a stream. */
+export async function readProblem(response: Response): Promise<Problem> {
   const type = response.headers.get('content-type') ?? '';
   if (type.includes(PROBLEM_CONTENT_TYPE) || type.includes('application/json')) {
     const parsed = Problem.safeParse(await response.json().catch(() => null));

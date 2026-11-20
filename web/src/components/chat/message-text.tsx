@@ -1,0 +1,115 @@
+'use client';
+
+import type { Citation } from '@coal/shared';
+import Link from 'next/link';
+import { cn } from '@/lib/utils';
+
+const TAG = /(\[S\d+\])/;
+
+/** A citation: a small numbered mark that shows the record and its passage on hover and opens it on click. */
+function CitationMark({ citation, onSelect }: { citation: Citation; onSelect?: () => void }) {
+  const mark = cn(
+    'inline-flex size-4 items-center justify-center rounded-full bg-muted text-[10px] font-medium text-muted-foreground',
+    citation.link && 'hover:bg-primary hover:text-primary-foreground',
+  );
+  const number = citation.ref.slice(1);
+  return (
+    <span className="group relative mx-0.5 inline-block align-text-top">
+      {citation.link ? (
+        <Link href={citation.link} className={mark} onClick={onSelect} aria-label={citation.label}>
+          {number}
+        </Link>
+      ) : (
+        <button type="button" className={mark} onClick={onSelect} aria-label={citation.label}>
+          {number}
+        </button>
+      )}
+      <span
+        role="tooltip"
+        className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1 hidden w-64 -translate-x-1/2 rounded-md border bg-popover p-2 text-xs text-popover-foreground shadow-md group-focus-within:block group-hover:block"
+      >
+        <span className="block font-medium">{citation.label}</span>
+        {citation.passage && (
+          <span className="mt-1 block text-muted-foreground">{citation.passage}</span>
+        )}
+      </span>
+    </span>
+  );
+}
+
+function Line({
+  line,
+  citations,
+  streaming,
+  onSelect,
+}: {
+  line: string;
+  citations: Map<string, Citation>;
+  streaming: boolean;
+  onSelect?: (citation: Citation) => void;
+}) {
+  return line.split(TAG).map((piece, i) => {
+    const match = /^\[(S\d+)\]$/.exec(piece);
+    if (!match) return piece;
+    const citation = citations.get(match[1] as string);
+    if (citation) {
+      return <CitationMark key={i} citation={citation} onSelect={() => onSelect?.(citation)} />;
+    }
+    // While the reply is being written its tags aren't matched to records yet.
+    return streaming ? (
+      <sup key={i} className="mx-0.5 text-[10px] text-muted-foreground/60">
+        {(match[1] as string).slice(1)}
+      </sup>
+    ) : null;
+  });
+}
+
+/**
+ * The words of a reply: paragraphs, "- " lists, and citation marks in place of the `[S1]` tags
+ * (docs/workstation-and-ai.md#citations). The assistant writes plain text, so this is all it needs.
+ */
+export function MessageText({
+  text,
+  citations = [],
+  streaming = false,
+  onSelect,
+}: {
+  text: string;
+  citations?: Citation[];
+  streaming?: boolean;
+  onSelect?: (citation: Citation) => void;
+}) {
+  const byRef = new Map(citations.map((c) => [c.ref, c]));
+  const blocks = text.split(/\n{2,}/).filter((b) => b.trim());
+  const line = (value: string) => (
+    <Line line={value} citations={byRef} streaming={streaming} onSelect={onSelect} />
+  );
+  return (
+    <div className="grid gap-2 text-sm leading-relaxed">
+      {blocks.map((block, i) => {
+        // Runs of "- " lines are lists; the lines around them are paragraphs.
+        const parts: { list: boolean; lines: string[] }[] = [];
+        for (const raw of block.split('\n')) {
+          const list = /^\s*-\s+/.test(raw);
+          const last = parts.at(-1);
+          const text = list ? raw.replace(/^\s*-\s+/, '') : raw;
+          if (last && last.list === list) last.lines.push(text);
+          else parts.push({ list, lines: [text] });
+        }
+        return parts.map((part, j) =>
+          part.list ? (
+            <ul key={`${i}-${j}`} className="grid list-disc gap-1 pl-5">
+              {part.lines.map((item, k) => (
+                <li key={k}>{line(item)}</li>
+              ))}
+            </ul>
+          ) : (
+            <p key={`${i}-${j}`} className="whitespace-pre-line">
+              {line(part.lines.join('\n'))}
+            </p>
+          ),
+        );
+      })}
+    </div>
+  );
+}

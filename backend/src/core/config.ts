@@ -5,6 +5,26 @@ import { z } from 'zod';
 const repoEnvFile = fileURLToPath(new URL('../../../.env', import.meta.url));
 if (process.env.NODE_ENV !== 'test' && existsSync(repoEnvFile)) process.loadEnvFile(repoEnvFile);
 
+/** What the AI is asked for; each can use its own model (docs/workstation-and-ai.md#ai-providers). */
+export const AI_PURPOSES = ['chat', 'title', 'draft_write'] as const;
+export type AiPurpose = (typeof AI_PURPOSES)[number];
+export const AI_PROVIDERS = ['anthropic', 'copilot', 'none'] as const;
+export type AiProviderName = (typeof AI_PROVIDERS)[number];
+
+/** Each provider names its models its own way. ⚠ The Anthropic names are unchecked (AI11). */
+const DEFAULT_MODELS: Record<'anthropic' | 'copilot', Record<AiPurpose, string>> = {
+  anthropic: {
+    chat: 'claude-sonnet-5-5',
+    title: 'claude-haiku-5-5',
+    draft_write: 'claude-sonnet-5-5',
+  },
+  copilot: {
+    chat: 'claude-sonnet-5.5',
+    title: 'claude-haiku-5.5',
+    draft_write: 'claude-sonnet-5.5',
+  },
+};
+
 const flag = z.enum(['true', 'false', '1', '0']).transform((v) => v === 'true' || v === '1');
 
 /** The single organisation for now (docs/data-model.md#conventions). */
@@ -46,6 +66,24 @@ const Env = z.object({
    */
   CLAMAV_HOST: z.string().default(''),
   CLAMAV_PORT: z.coerce.number().int().default(3310),
+  /** How long an action card waits to be confirmed before it expires ⚠ (AI9). */
+  PROPOSAL_EXPIRY_HOURS: z.coerce.number().int().positive().default(72),
+  /** Left out: Anthropic when its key is set, otherwise no AI. */
+  AI_PROVIDER: z.enum(AI_PROVIDERS).optional(),
+  ANTHROPIC_API_KEY: z.string().default(''),
+  /** The Anthropic key isn't tied to one workspace, so every call names it. */
+  ANTHROPIC_WORKSPACE_ID: z.string().default(''),
+  /** Temporary stand-in on one laptop (D19): a fine-grained token with the Copilot Requests permission. */
+  COPILOT_GITHUB_TOKEN: z.string().default(''),
+  AI_DAILY_BUDGET_USD: z.coerce.number().positive().default(5),
+  /** The most tools one reply may use. */
+  AI_MAX_TOOL_CALLS: z.coerce.number().int().positive().default(20),
+  AI_TURN_TIMEOUT_MS: z.coerce.number().int().positive().default(120_000),
+  /** How many earlier messages of a chat the AI is shown. */
+  AI_HISTORY_MESSAGES: z.coerce.number().int().min(0).default(20),
+  AI_MODEL_CHAT: z.string().default(''),
+  AI_MODEL_TITLE: z.string().default(''),
+  AI_MODEL_DRAFT_WRITE: z.string().default(''),
 });
 
 export type AppConfig = ReturnType<typeof loadConfig>;
@@ -58,6 +96,16 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
   if (e.NODE_ENV === 'production' && !e.CLAMAV_HOST) {
     throw new Error('Set CLAMAV_HOST so uploads are scanned for viruses in production.');
   }
+  const provider: AiProviderName = e.AI_PROVIDER ?? (e.ANTHROPIC_API_KEY ? 'anthropic' : 'none');
+  if (e.NODE_ENV === 'production' && provider === 'copilot') {
+    throw new Error('The Copilot stand-in is for local development only (D19). Use Anthropic.');
+  }
+  const overrides: Record<AiPurpose, string> = {
+    chat: e.AI_MODEL_CHAT,
+    title: e.AI_MODEL_TITLE,
+    draft_write: e.AI_MODEL_DRAFT_WRITE,
+  };
+  const defaults = provider === 'none' ? DEFAULT_MODELS.anthropic : DEFAULT_MODELS[provider];
   return {
     env: e.NODE_ENV,
     databaseUrl: e.DATABASE_URL,
@@ -84,5 +132,18 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
     outboxPollMs: e.OUTBOX_POLL_MS,
     pdf: { url: e.GOTENBERG_URL, timeoutMs: e.PDF_TIMEOUT_MS },
     scan: e.CLAMAV_HOST ? { host: e.CLAMAV_HOST, port: e.CLAMAV_PORT } : null,
+    proposals: { expiryHours: e.PROPOSAL_EXPIRY_HOURS },
+    ai: {
+      provider,
+      anthropic: { apiKey: e.ANTHROPIC_API_KEY, workspaceId: e.ANTHROPIC_WORKSPACE_ID },
+      copilotToken: e.COPILOT_GITHUB_TOKEN,
+      dailyBudgetUsd: e.AI_DAILY_BUDGET_USD,
+      maxToolCalls: e.AI_MAX_TOOL_CALLS,
+      turnTimeoutMs: e.AI_TURN_TIMEOUT_MS,
+      historyMessages: e.AI_HISTORY_MESSAGES,
+      models: Object.fromEntries(
+        AI_PURPOSES.map((p) => [p, overrides[p] || defaults[p]]),
+      ) as Record<AiPurpose, string>,
+    },
   };
 }

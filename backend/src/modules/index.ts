@@ -1,4 +1,5 @@
 import type { Implementation } from '../core/http/endpoint';
+import { aiRoutes } from './ai/routes';
 import { attachmentsRoutes } from './attachments/routes';
 import { authRoutes } from './auth/routes';
 import { deviationsRoutes } from './deviations/routes';
@@ -7,8 +8,10 @@ import { filesRoutes } from './files/routes';
 import { notificationsRoutes } from './notifications/routes';
 import { orgRoutes } from './org/routes';
 import { processRoutes } from './process/routes';
+import { proposalsRoutes } from './proposals/routes';
 import { rndRoutes } from './rnd/routes';
 import { scheduleRoutes } from './schedule/routes';
+import { searchRoutes } from './search/routes';
 import { tasksRoutes } from './tasks/routes';
 import { templatesRoutes } from './templates/routes';
 import { usersRoutes } from './users/routes';
@@ -33,4 +36,7 @@ export const IMPLEMENTATIONS = [
   ...deviationsRoutes,
   ...notificationsRoutes,
   ...widgetsRoutes,
+  ...proposalsRoutes,
+  ...searchRoutes,
+  ...aiRoutes,
 ] as unknown as Implementation[];

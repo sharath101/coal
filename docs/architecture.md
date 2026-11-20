@@ -23,7 +23,7 @@ flowchart TB
   PG[("PostgreSQL")]
   S3[("File storage (S3)")]
   GOT["Gotenberg: Word to PDF"]
-  LLM["AI providers: Anthropic (Claude) and OpenAI"]
+  LLM["AI provider: Anthropic (Claude)"]
 
   WEB --> API
   BOT -.-> API
@@ -62,7 +62,7 @@ flowchart TB
 | Jobs | pg-boss, a job queue inside PostgreSQL | No extra server to run |
 | Website | Next.js (React), Tailwind, shadcn/ui, TanStack Query; next-intl for the text | Widely known; quick to build dashboards and chat; every piece of text ready for translation |
 | Mobile app | Later: React Native with Expo; TanStack Query | Shares TypeScript and logic with the website; one codebase for iOS and Android |
-| AI | Vercel AI SDK, with the Anthropic and OpenAI providers | One interface for both providers, tool calling and streaming |
+| AI | Vercel AI SDK with the Anthropic provider (D17); the GitHub Copilot SDK as a temporary stand-in on one laptop (D19) | Tool calling and streaming behind one interface, so the provider can change |
 | Passkeys | The last block (D16): SimpleWebAuthn on the backend and website; later, a React Native passkey library in the app | Standard WebAuthn passkeys |
 | Documents | docxtemplater (fills Word templates) and Gotenberg (Word to PDF) | Keeps Jayon's own layouts |
 | Files | S3-compatible storage (MinIO for local development); ClamAV for virus scanning (optional locally, required in production) | Cheap and durable, and uploads are checked before anyone opens them |
@@ -226,16 +226,18 @@ REST and JSON under `/api/v1`. The details and the endpoint list are in [api.md]
 
 The AI lives inside the backend (`backend/src/modules/ai/`) for now. It can be split out later without changing the API.
 
-- **Gateway.** One function picks the provider and model for each purpose from configuration, and calls it through the Vercel AI SDK. Anthropic and OpenAI are both wired up ([workstation-and-ai.md](./workstation-and-ai.md#ai-providers)).
-- **Tools** are thin wrappers over the backend's own services.
-  - Each call carries the user's identity and a "via AI" mark, and goes through the same permission module.
-  - `confirm`-tier services accept "via AI" calls only to create proposals.
-  - `never`-tier services refuse them outright.
-- **Chats** are kept in the database. Replies stream to the client over Server-Sent Events.
-- **Channels.** The chat is channel-neutral. A channel passes in messages and gets back text, citations and action cards, which it shows in its own way. The website is the first channel; WhatsApp and the app come later ([workstation-and-ai.md](./workstation-and-ai.md#channels)).
+- **Gateway** (`provider.ts`, `gateway.ts`). A provider adapter runs one turn: instructions, earlier messages and tools in, streamed words and token counts out. There are three: Anthropic through the Vercel AI SDK (`anthropic.ts`), the Copilot SDK as a temporary development stand-in (`copilot.ts`, [D19](./decisions.md)), and a scripted one for tests. The settings choose one (`AI_PROVIDER`) and a model for each purpose (`pricing.ts` turns tokens into the cost that sets budgets). It is `deps.ai`, null where the AI isn't set up.
+- **The reply** (`turn.ts`). Checks the budget, saves the message, builds the instructions (`prompts/`), runs the model with the person's tools, streams the words, then saves the reply and its logs in one transaction.
+- **Tools** (`tools.ts`, `toolbox.ts`) are thin wrappers over the backend's own endpoints, run through `callEndpoint` (`core/http/call.ts`): the same input checks, session, AI tier, permission and handler as a request.
+  - Each call carries the user's identity and a "via AI" mark.
+  - `confirm`-tier endpoints accept "via AI" calls only to create proposals; `never`-tier ones refuse them outright; the tools are only built on `read` and `auto` endpoints.
+  - Refusals go back to the model as text.
+- **Proposals** (`backend/src/modules/proposals/`) run each action through its endpoint's own handler, as the user, inside one transaction: rolled back for the preview, committed on confirm ([api.md](./api.md#proposals-and-action-cards)).
+- **Chats** are kept in the database. Replies stream to the client over Server-Sent Events from the same endpoint that takes the message. One reply runs at a time per chat, and its stop button reaches only the API copy that is writing it ⚠.
+- **Channels.** The chat is channel-neutral. A channel passes in messages and gets back parts (text with citations, what was looked at, action cards), which it shows in its own way. The website is the first channel; WhatsApp and the app come later ([workstation-and-ai.md](./workstation-and-ai.md#channels)).
 - **Templates.** Drafting always loads the active template from the template library ([documents-and-signing.md](./documents-and-signing.md#the-template-library)).
-- **Search.** The AI finds documents with PostgreSQL full-text search, filtered by permission before ranking. Vector search comes later.
-- **Logged.** Every AI call and tool call is recorded: who, which model, tokens, cost, the tools used and the records returned.
+- **Search.** `GET /search` and the AI find projects, documents, tasks and people with PostgreSQL full-text search (a GIN index on each document version's text), and each kind is filtered by its own permission rule before it is returned. Vector search comes later.
+- **Logged.** Every reply and tool call is recorded: who, which model, tokens, cost, the tools used and the records returned. Logs never hold the person's words or the answers.
 
 ## Sign-in and sessions
 

@@ -1,6 +1,7 @@
-import { and, asc, desc, eq, inArray, isNull, sql, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, ilike, inArray, isNull, or, sql, type SQL } from 'drizzle-orm';
 import type { Executor, Tx } from '../../core/db/client';
 import { msOf } from '../../core/db/columns';
+import { containing, wordsQuery } from '../../core/db/search';
 import { validationFailed } from '../../core/http/errors';
 import { runsByStatus } from '../process/service';
 import { findActiveUsersByRole, findUsersByIds, type UserRow } from '../users/service';
@@ -71,6 +72,58 @@ export async function memberIdsOf(
     .where(and(inArray(projectMembers.projectId, projectIds), isNull(projectMembers.removedAt)));
   for (const row of rows) result.get(row.projectId)?.push(row.userId);
   return result;
+}
+
+/**
+ * Is the person on the team of a project of this product line (of this one project, when given)?
+ * A Lead assigns work to such people; anyone else gets a request.
+ */
+export async function onLineTeam(
+  ex: Executor,
+  orgId: string,
+  userId: string,
+  productLineId: string,
+  projectId?: string,
+): Promise<boolean> {
+  const conditions: SQL[] = [
+    eq(projects.orgId, orgId),
+    eq(projects.productLineId, productLineId),
+    eq(projectMembers.userId, userId),
+    isNull(projectMembers.removedAt),
+  ];
+  if (projectId) conditions.push(eq(projects.id, projectId));
+  const [row] = await ex
+    .select({ id: projects.id })
+    .from(projectMembers)
+    .innerJoin(projects, eq(projects.id, projectMembers.projectId))
+    .where(and(...conditions))
+    .limit(1);
+  return !!row;
+}
+
+/** Projects whose code, name or description match, best first. Status is open to everyone signed in. */
+export async function searchProjects(
+  ex: Executor,
+  orgId: string,
+  q: string,
+  limit: number,
+): Promise<ProjectRow[]> {
+  const words = sql`to_tsvector('english', ${projects.name} || ' ' || ${projects.description})`;
+  return ex
+    .select()
+    .from(projects)
+    .where(
+      and(
+        eq(projects.orgId, orgId),
+        or(
+          sql`${words} @@ ${wordsQuery(q)}`,
+          ilike(projects.code, containing(q)),
+          ilike(projects.name, containing(q)),
+        ),
+      ),
+    )
+    .orderBy(desc(sql`ts_rank(${words}, ${wordsQuery(q)})`), desc(projects.createdAt))
+    .limit(limit);
 }
 
 const encodeCursor = (row: ProjectRow) =>

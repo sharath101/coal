@@ -1,7 +1,9 @@
 'use client';
 
+import { useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
+import { NewTaskDialog } from '@/components/new-task-dialog';
 import { ProblemMessage } from '@/components/problem-message';
 import { TaskRow } from '@/components/task-row';
 import { WaitingSignatures } from '@/components/waiting-signatures';
@@ -9,11 +11,24 @@ import { Button } from '@/components/ui/button';
 import { flatten, useTasks } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 
-/** My tasks: what is assigned to me, and what is waiting in my role's queue. */
+type Scope = 'mine' | 'queue' | 'sent';
+const SCOPES: Scope[] = ['mine', 'queue', 'sent'];
+
 export default function TasksPage() {
+  return (
+    <Suspense fallback={null}>
+      <Tasks />
+    </Suspense>
+  );
+}
+
+/** My tasks: what is assigned to me, what is waiting in my role's queue, and what I gave others. */
+function Tasks() {
   const t = useTranslations('tasks');
-  const [scope, setScope] = useState<'mine' | 'queue'>('mine');
+  const asked = useSearchParams().get('scope') as Scope | null;
+  const [scope, setScope] = useState<Scope>(asked && SCOPES.includes(asked) ? asked : 'mine');
   const [status, setStatus] = useState<'active' | 'closed'>('active');
+  const [creating, setCreating] = useState(false);
   const tasks = useTasks(scope, status);
   const items = flatten(tasks.data?.pages);
 
@@ -25,10 +40,14 @@ export default function TasksPage() {
 
   return (
     <div className="mx-auto grid w-full max-w-3xl gap-6 p-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">{t('title')}</h1>
-        <p className="text-sm text-muted-foreground">{t('intro')}</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">{t('title')}</h1>
+          <p className="text-sm text-muted-foreground">{t('intro')}</p>
+        </div>
+        <Button onClick={() => setCreating(true)}>{t('new')}</Button>
       </div>
+      <NewTaskDialog open={creating} onOpenChange={setCreating} />
 
       <WaitingSignatures />
 
@@ -39,6 +58,9 @@ export default function TasksPage() {
           </button>
           <button className={tab(scope === 'queue')} onClick={() => setScope('queue')}>
             {t('queue')}
+          </button>
+          <button className={tab(scope === 'sent')} onClick={() => setScope('sent')}>
+            {t('sent')}
           </button>
         </div>
         <div className="flex rounded-lg bg-muted p-1">
@@ -59,7 +81,7 @@ export default function TasksPage() {
       )}
       <ul className="grid gap-2">
         {items.map((task) => (
-          <TaskRow key={task.id} task={task} />
+          <TaskRow key={task.id} task={task} sent={scope === 'sent'} />
         ))}
       </ul>
       {tasks.hasNextPage && (

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { defineEndpoint } from '../api/contract';
+import { StepKey } from '../process/definition';
 import { DateOnly, Id, IdParams, PageQuery, Timestamp, pageOf } from './common';
 import { Person, RoleRef } from './projects';
 
@@ -36,13 +37,26 @@ export const Task = z.object({
   daysLate: z.number().int(),
   /** What the task belongs to, such as a project, for linking. */
   subject: z.object({ type: z.string(), id: Id, label: z.string() }).nullable(),
+  /** Made by the route for a step: its dates are on the plan, and a late one needs a deviation. */
+  onPlan: z.boolean(),
+  /** Who gave it or asked for it; empty for work the route made. */
+  assignedBy: Person.nullable(),
+  /** Prepared by the AI in the Workstation, and confirmed by the person who gave it. */
+  viaAi: z.boolean(),
+  /** A request waits for its assignee to accept or decline it. Empty for anything else. */
+  request: z
+    .object({
+      state: z.enum(['pending', 'accepted', 'declined']),
+      declineReason: z.string().nullable(),
+    })
+    .nullable(),
   createdAt: Timestamp,
 });
 export type Task = z.infer<typeof Task>;
 
 export const TasksQuery = PageQuery.extend({
-  /** `mine`: assigned to me. `queue`: waiting in the queue of my role. */
-  scope: z.enum(['mine', 'queue']).default('mine'),
+  /** `mine`: assigned to me. `queue`: waiting in the queue of my role. `sent`: what I gave or asked others for. */
+  scope: z.enum(['mine', 'queue', 'sent']).default('mine'),
   'filter[status]': z.enum(['active', 'closed']).default('active'),
 });
 
@@ -105,5 +119,66 @@ export const reassignTask = defineEndpoint({
   aiTier: 'confirm',
   params: IdParams,
   body: z.object({ assigneeId: Id }),
+  response: Task,
+});
+
+export const CreateTaskBody = z.object({
+  title: z.string().trim().min(3).max(200),
+  body: z.string().trim().max(2000).default(''),
+  /** Who it is for. Left out: me. */
+  assigneeId: Id.optional(),
+  dueOn: DateOnly.optional(),
+  /** The project it belongs to, and optionally its step. Only for people who work on the project. */
+  projectId: Id.optional(),
+  stepKey: StepKey.optional(),
+});
+export type CreateTaskBody = z.infer<typeof CreateTaskBody>;
+
+export const CreatedTask = z.object({
+  saved: z.boolean(),
+  /** Its kind says what it became: `own` for myself, `work` when I may assign it to them, otherwise a `request` (docs/roles-and-access.md#assigning-work-and-making-requests). */
+  task: Task,
+  warnings: z.array(z.string()),
+});
+export type CreatedTask = z.infer<typeof CreatedTask>;
+
+export const createTask = defineEndpoint({
+  id: 'tasks.create',
+  method: 'POST',
+  path: '/tasks',
+  summary:
+    'Make a task for myself, assign work to someone below me on the ladder, or ask anyone else (a request). With ?preview=true, shows which it would be',
+  auth: 'session',
+  permission: 'tasks.create',
+  // The AI makes the user's own tasks directly; work for anyone else goes on an action card.
+  aiTier: 'auto',
+  query: z.object({ preview: z.stringbool().default(false) }),
+  body: CreateTaskBody,
+  response: CreatedTask,
+  status: 201,
+});
+
+export const acceptTask = defineEndpoint({
+  id: 'tasks.accept',
+  method: 'POST',
+  path: '/tasks/{id}/accept',
+  summary: 'Accept a request made of me: it becomes my task',
+  auth: 'session',
+  permission: 'tasks.answer',
+  aiTier: 'confirm',
+  params: IdParams,
+  response: Task,
+});
+
+export const declineTask = defineEndpoint({
+  id: 'tasks.decline',
+  method: 'POST',
+  path: '/tasks/{id}/decline',
+  summary: 'Decline a request made of me, with a reason the person who asked will see',
+  auth: 'session',
+  permission: 'tasks.answer',
+  aiTier: 'confirm',
+  params: IdParams,
+  body: z.object({ reason: z.string().trim().min(3).max(500) }),
   response: Task,
 });

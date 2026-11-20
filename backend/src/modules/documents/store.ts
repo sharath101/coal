@@ -1,5 +1,6 @@
-import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, ilike, inArray, or, sql } from 'drizzle-orm';
 import type { Executor } from '../../core/db/client';
+import { containing, snippetOf, wordsQuery } from '../../core/db/search';
 import { documents, documentVersions, signatureRequests, signatures } from './tables';
 
 export type DocumentRow = typeof documents.$inferSelect;
@@ -237,4 +238,35 @@ export async function versionsById(ex: Executor, ids: string[]): Promise<Map<str
     .from(documentVersions)
     .where(inArray(documentVersions.id, [...new Set(ids)]));
   return new Map(rows.map((r) => [r.id, r]));
+}
+
+/** Versions whose words, or whose document's title or number, match: candidates for search, before any permission check. Best first. */
+export async function matchingVersions(ex: Executor, orgId: string, q: string, limit: number) {
+  const words = sql`to_tsvector('english', ${documentVersions.searchText})`;
+  const rank = sql<number>`ts_rank(${words}, ${wordsQuery(q)})`;
+  return ex
+    .select({
+      documentId: documents.id,
+      runId: documents.runId,
+      stepKey: documents.stepKey,
+      number: documents.number,
+      title: documents.title,
+      versionNo: documentVersions.versionNo,
+      status: documentVersions.status,
+      snippet: sql<string>`${snippetOf(documentVersions.searchText, q)}`,
+    })
+    .from(documentVersions)
+    .innerJoin(documents, eq(documents.id, documentVersions.documentId))
+    .where(
+      and(
+        eq(documents.orgId, orgId),
+        or(
+          sql`${words} @@ ${wordsQuery(q)}`,
+          ilike(documents.title, containing(q)),
+          ilike(documents.number, containing(q)),
+        ),
+      ),
+    )
+    .orderBy(desc(rank), desc(documentVersions.versionNo))
+    .limit(limit);
 }

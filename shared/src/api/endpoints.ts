@@ -13,6 +13,23 @@ import {
 import { changeDates, getTimeline, putPlan } from '../schemas/schedule';
 import { getWidget, listWidgets } from '../schemas/widgets';
 import {
+  confirmProposal,
+  createProposal,
+  getProposal,
+  listProposals,
+  rejectProposal,
+  updateProposal,
+} from '../schemas/proposals';
+import { search } from '../schemas/search';
+import {
+  createChat,
+  getChat,
+  listChats,
+  sendFeedback,
+  sendMessage,
+  stopReply,
+} from '../schemas/ai';
+import {
   createAttachment,
   listAttachments,
   createSource,
@@ -63,7 +80,16 @@ import {
   startStep,
   submitStep,
 } from '../schemas/projects';
-import { claimTask, getTask, listTasks, reassignTask, updateTask } from '../schemas/tasks';
+import {
+  acceptTask,
+  claimTask,
+  createTask,
+  declineTask,
+  getTask,
+  listTasks,
+  reassignTask,
+  updateTask,
+} from '../schemas/tasks';
 import { listProductLines } from '../schemas/rnd';
 import { getMe, getUser, listUsers, signIn, signOut, signUp, updateMe } from '../schemas/users';
 
@@ -111,6 +137,9 @@ export const ENDPOINTS = [
   updateTask,
   claimTask,
   reassignTask,
+  createTask,
+  acceptTask,
+  declineTask,
   listDocumentTypes,
   listTemplates,
   getActiveTemplate,
@@ -144,6 +173,19 @@ export const ENDPOINTS = [
   markAllNotificationsRead,
   listWidgets,
   getWidget,
+  createProposal,
+  listProposals,
+  getProposal,
+  updateProposal,
+  confirmProposal,
+  rejectProposal,
+  search,
+  createChat,
+  listChats,
+  getChat,
+  sendMessage,
+  stopReply,
+  sendFeedback,
 ] as const satisfies readonly EndpointSpec[];
 
 export type Endpoint = (typeof ENDPOINTS)[number];

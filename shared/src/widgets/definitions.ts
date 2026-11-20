@@ -46,6 +46,8 @@ const TASK_EVENTS = [
   'task.done',
   'task.cancelled',
   'task.updated',
+  'task.accepted',
+  'task.declined',
 ] as const;
 const STEP_EVENTS = [
   'step.ready',

@@ -22,14 +22,14 @@ This roadmap gives an **order, not dates**. Madhav's effort estimates and costs 
 | Documents | The template library, with each step's templates as they're provided (stages 1 and 2 first); uploads where there's no template yet; versions; PDFs; pictures and sources; virus scanning | [documents-and-signing.md](./documents-and-signing.md#the-template-library) |
 | Signing | Signature rows; step sign-off records; signed decisions; audit trail. Signing is a confirmed click until the last block adds Face ID or fingerprint passkeys on the website (D16) | [documents-and-signing.md](./documents-and-signing.md#signature-rows) |
 | Dashboard | The widget framework; widgets W1 to W10; the project page; dates, forecast, reminders, deviations; in-app notifications | [dashboard.md](./dashboard.md) |
-| Workstation and AI | Chat by project on the website, built channel-neutral for WhatsApp later; the five AI features, only when asked; action cards; Claude and OpenAI behind one gateway; tests against both | [workstation-and-ai.md](./workstation-and-ai.md) |
+| Workstation and AI | Chat by project on the website, built channel-neutral for WhatsApp later; the five AI features, only when asked; action cards; Claude behind one gateway | [workstation-and-ai.md](./workstation-and-ai.md) |
 | Platform | Backend, website and shared code, built to grow to all of Jayon; local setup; simple demo hosting when needed | [architecture.md](./architecture.md) |
 
 ### Build order
 
 Each block depends on the ones before it. Within a block, the work can run side by side.
 
-**Progress:** blocks 1 (Foundations), 2 (the route), 3 (Documents and signing) and 4 (Dashboard) are done. The Workstation and AI (block 5) is next. Passkey signing is the last block (D16).
+**Progress:** blocks 1 (Foundations), 2 (the route), 3 (Documents and signing) and 4 (Dashboard) are done. The Workstation and AI (block 5) is under way: parts 5a, 5b and 5c are done. Passkey signing is the last block (D16).
 
 1. **Foundations** ✅
    - The monorepo (pnpm workspaces): `backend/`, `web/` and `shared/`; `app/` waits for its phase.
@@ -62,11 +62,12 @@ Each block depends on the ones before it. Within a block, the work can run side 
    - The widget framework and W1 to W10 with each role's default layout and expanded views; the measures (on-time rate, days per task, sign-off turnaround, rework rate, open load); the project page's health, dates and Timeline tab.
    - `seed:demo` makes a Dashboard worth looking at in local work.
    - Left for later: the weekly digest of the exception list (with email), @mentions (with comments on steps), days per stage against plan and trend charts (with daily snapshots), personal layouts, and editing the settings and the calendar on a page (today: rows in `settings` and `work_calendar`).
-5. **Workstation and AI**
-   - The chat screens on the website, on a channel-neutral chat service.
-   - The AI gateway with Anthropic and OpenAI; read tools; proposals and action cards.
-   - The five AI features: questions, idea to project, drafting from the template library, assigning work, explaining documents.
-   - The AI test sets, run against both providers; budgets and logging.
+5. **Workstation and AI**, in five parts:
+   - **5a. Groundwork** ✅ `POST /tasks` (own tasks, assignments and requests by the ladder) with accept and decline, and a "Given by me" list; proposals (action cards) with preview, edit, confirm, `PREVIEW_CHANGED` and expiry; `GET /search` over projects, documents, tasks and people.
+   - **5b. The AI gateway and chat** ✅ the provider adapter (Anthropic; the Copilot SDK on one laptop for now, D19; a scripted stand-in for tests), the AI tables, the tools tied to the tiers, layered instructions, budgets and logging, chats streamed over Server-Sent Events.
+   - **5c. The Workstation page** ✅ three panes, citations, action cards, commands, and "Ask AI" and "Open in Workstation" from other pages.
+   - **5d. The writing features:** drafting from the template library, idea to project, explaining and comparing documents.
+   - **5e. Safety and the test sets:** outside documents, refusals that name who can help, `pnpm eval:ai`, polish.
 6. **Passkey signing** (last, D16)
    - Passkey registration on the website, and the signing intent: Face ID, fingerprint or Windows Hello for every signature, replacing the confirmed click.
    - One prompt signs a step's sign-off record and the step's main document together.
@@ -81,7 +82,7 @@ Each block depends on the ones before it. Within a block, the work can run side 
   - at least one send-back is exercised (13 → 7);
   - both paths of step 15 are exercised.
 - **The Dashboards work.** Every role's Dashboard shows the right live data, and nobody sees content they shouldn't.
-- **The AI works.** With both providers, it:
+- **The AI works.** On Claude, it:
   - answers questions with citations;
   - turns an idea into a previewed project;
   - drafts documents from the active templates in the library (at least stages 1 and 2), and uses a newly activated template version straight away;

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
+import { AskAiLink } from '@/components/ask-ai';
 import { AttachmentsAndSources } from '@/components/attachments-sources';
 import { ComparePanel } from '@/components/compare-panel';
 import { DocumentForm } from '@/components/document-form';
@@ -97,6 +98,7 @@ export default function DocumentPage() {
             {doc.title}
           </h1>
           <DocumentStatusBadge status={doc.status} rev={doc.approvedRev} />
+          {!doc.restricted && <AskAiLink pin={{ projectId, documentId: doc.id }} />}
         </div>
         <p className="text-sm text-muted-foreground">
           {isRecord ? t('signoffRecord') : doc.type.name} ·{' '}

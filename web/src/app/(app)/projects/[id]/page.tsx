@@ -9,6 +9,7 @@ import { HealthBadge } from '@/components/health-badge';
 import { Milestones } from '@/components/milestones';
 import { HealthReasons, LaunchDates, useHealthReasonText } from '@/components/project-health';
 import { ProjectActions } from '@/components/project-actions';
+import { AskAiLink } from '@/components/ask-ai';
 import { ProblemMessage } from '@/components/problem-message';
 import { ProjectStatusBadge } from '@/components/status-badge';
 import { StepCard } from '@/components/step-card';
@@ -82,7 +83,10 @@ function ProjectView() {
             {t('dropReason', { reason: p.dropReason })}
           </p>
         )}
-        <ProjectActions project={p} onChanged={changed} />
+        <div className="flex flex-wrap items-center gap-2">
+          <ProjectActions project={p} onChanged={changed} />
+          <AskAiLink pin={{ projectId: id }} />
+        </div>
       </header>
 
       <Tabs

@@ -1,123 +1,89 @@
 'use client';
 
-import { Plus, SendHorizontal } from 'lucide-react';
-import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import type { ReactNode } from 'react';
-import { Button } from '@/components/ui/button';
-import { ProjectStatusBadge } from '@/components/status-badge';
-import { Input } from '@/components/ui/input';
-import { flatten, useProjects, useTasks } from '@/lib/queries';
+import { Suspense, useState } from 'react';
+import { ChatList } from '@/components/chat/chat-list';
+import { Conversation } from '@/components/chat/conversation';
+import { SourcesPane } from '@/components/chat/sources-pane';
+import { useChat } from '@/lib/queries';
+import { fromParams, workstationHref } from '@/lib/workstation';
+import { cn } from '@/lib/utils';
 
-function Pane({
-  title,
-  children,
-  className,
-}: {
-  title?: string;
-  children: ReactNode;
-  className?: string;
-}) {
+type Pane = 'chats' | 'chat' | 'sources';
+const PANES: Pane[] = ['chats', 'chat', 'sources'];
+
+export default function WorkstationPage() {
   return (
-    <section className={className}>
-      {title && (
-        <h2 className="mb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">
-          {title}
-        </h2>
-      )}
-      {children}
-    </section>
+    <Suspense fallback={null}>
+      <Workstation />
+    </Suspense>
   );
 }
 
 /**
- * The Workstation: tasks and projects, the conversation, and the preview
- * (docs/workstation-and-ai.md#the-workstation). The assistant arrives with the Workstation block.
+ * The Workstation: my tasks and projects with their chats, the conversation, and the sources
+ * behind a reply (docs/workstation-and-ai.md#the-workstation). The address says which chat is
+ * open (`?chat=`), or what a new chat is about (`?project=&step=&document=&task=&widget=`), so
+ * "Ask AI" on other pages is a link. On a narrow screen the three panes are tabs.
  */
-export default function WorkstationPage() {
+function Workstation() {
   const t = useTranslations('workstation');
-  const myTasks = flatten(useTasks('mine', 'active').data?.pages).slice(0, 6);
-  const projects = flatten(useProjects('').data?.pages).slice(0, 8);
+  const router = useRouter();
+  const { chatId, pin } = fromParams(useSearchParams());
+  const [pane, setPane] = useState<Pane>('chat');
+  const [picked, setPicked] = useState<string | null>(null);
+  const chat = useChat(chatId);
+  const messages = chat.data?.messages ?? [];
+  const withSources = messages.filter(
+    (m) =>
+      m.sender === 'assistant' && m.parts.some((p) => p.type === 'text' && p.citations.length > 0),
+  );
+  // The reply the person picked, or the latest one that has sources.
+  const selected =
+    messages.find((m) => m.id === picked) ??
+    withSources.at(-1) ??
+    [...messages].reverse().find((m) => m.sender === 'assistant');
+
+  const show = (which: Pane) => cn(pane === which ? 'flex' : 'hidden', 'lg:flex');
+
   return (
-    <div className="grid flex-1 grid-cols-1 md:grid-cols-[16rem_1fr] lg:grid-cols-[16rem_1fr_20rem]">
-      <aside className="grid content-start gap-6 border-b p-4 md:border-r md:border-b-0">
-        <Pane title={t('myTasks')}>
-          {myTasks.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{t('noTasks')}</p>
-          ) : (
-            <ul className="grid gap-1.5 text-sm">
-              {myTasks.map((task) => (
-                <li key={task.id}>
-                  <Link
-                    href={task.subject ? `/projects/${task.subject.id}` : '/tasks'}
-                    className="hover:underline"
-                  >
-                    {task.title}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-          <Link
-            href="/tasks"
-            className="mt-2 inline-block text-xs text-muted-foreground hover:underline"
+    <div className="flex min-h-0 flex-1 flex-col lg:h-[calc(100dvh-6rem)]">
+      <nav aria-label={t('panes')} className="grid grid-cols-3 gap-1 border-b p-2 lg:hidden">
+        {PANES.map((p) => (
+          <button
+            key={p}
+            type="button"
+            aria-pressed={pane === p}
+            className={cn(
+              'rounded-md px-3 py-1.5 text-sm font-medium',
+              pane === p ? 'bg-muted' : 'text-muted-foreground',
+            )}
+            onClick={() => setPane(p)}
           >
-            {t('allTasks')}
-          </Link>
-        </Pane>
-        <Pane title={t('projects')}>
-          {projects.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{t('noProjects')}</p>
-          ) : (
-            <ul className="grid gap-1.5 text-sm">
-              {projects.map((p) => (
-                <li key={p.id} className="flex items-center justify-between gap-2">
-                  <Link href={`/projects/${p.id}`} className="truncate hover:underline">
-                    {p.code} · {p.name}
-                  </Link>
-                  <ProjectStatusBadge status={p.status} />
-                </li>
-              ))}
-            </ul>
-          )}
-          <Link
-            href="/projects"
-            className="mt-2 inline-block text-xs text-muted-foreground hover:underline"
-          >
-            {t('allProjects')}
-          </Link>
-        </Pane>
-        <Pane title={t('generalChats')}>
-          <Button variant="outline" size="sm" disabled>
-            <Plus aria-hidden />
-            {t('newChat')}
-          </Button>
-        </Pane>
-      </aside>
-
-      <div className="flex min-h-[24rem] flex-col">
-        <div className="flex flex-1 items-center justify-center p-8">
-          <p className="max-w-md text-center text-sm text-muted-foreground">
-            {t('conversationEmpty')}
-          </p>
-        </div>
-        <form className="flex gap-2 border-t p-4" onSubmit={(e) => e.preventDefault()}>
-          <Input placeholder={t('inputPlaceholder')} disabled aria-describedby="assistant-status" />
-          <Button type="submit" size="icon" disabled title={t('send')}>
-            <SendHorizontal aria-hidden />
-            <span className="sr-only">{t('send')}</span>
-          </Button>
-        </form>
-        <p id="assistant-status" className="px-4 pb-3 text-xs text-muted-foreground">
-          {t('notYet')}
-        </p>
+            {t(`tabs.${p}`)}
+          </button>
+        ))}
+      </nav>
+      <div className="grid min-h-0 flex-1 lg:grid-cols-[16rem_minmax(0,1fr)_20rem] lg:grid-rows-1">
+        <aside className={cn(show('chats'), 'min-h-0 flex-col overflow-y-auto border-r p-4')}>
+          <ChatList activeId={chatId} />
+        </aside>
+        <section className={cn(show('chat'), 'min-h-[28rem] min-w-0 flex-col lg:min-h-0')}>
+          <Conversation
+            chatId={chatId}
+            pin={pin}
+            onClearPin={() => router.replace(workstationHref({}))}
+            onChatCreated={(id) => router.replace(`/workstation?chat=${id}`)}
+            selectedMessageId={selected?.id ?? null}
+            onSelectMessage={setPicked}
+            onShowSources={() => setPane('sources')}
+          />
+        </section>
+        <aside className={cn(show('sources'), 'min-h-0 flex-col overflow-y-auto border-l p-4')}>
+          <SourcesPane message={selected} />
+        </aside>
       </div>
-
-      <aside className="hidden border-l p-4 lg:block">
-        <Pane title={t('preview')}>
-          <p className="text-sm text-muted-foreground">{t('previewEmpty')}</p>
-        </Pane>
-      </aside>
     </div>
   );
 }

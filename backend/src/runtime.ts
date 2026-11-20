@@ -2,6 +2,7 @@ import pino from 'pino';
 import { loadConfig } from './core/config';
 import { createDb } from './core/db/client';
 import type { AppDeps } from './core/deps';
+import { createProvider } from './modules/ai/gateway';
 import { GotenbergRenderer } from './modules/documents/pdf';
 import { ClamdScanner } from './modules/files/scanner';
 import { S3FileStorage } from './modules/files/storage';
@@ -21,6 +22,7 @@ export async function createRuntime() {
     storage,
     pdf: new GotenbergRenderer(config.pdf),
     scanner: config.scan ? new ClamdScanner(config.scan) : null,
+    ai: createProvider(config),
     now: () => new Date(),
   };
   return { deps, pool, log };

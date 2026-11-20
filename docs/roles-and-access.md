@@ -117,6 +117,9 @@ Everyone with an account can see the **status** of every project. For now, that 
 | Change the team | Lead (of the product line) or Head |
 | Raise a corrective action | The Lead, while the case study is open ⚠ |
 | Claim a queued task; give a task to someone | Anyone with the role; the VP or Head; the Lead within the project team |
+| Make a task for yourself, assign work or make a request | Anyone: [the ladder](#assigning-work-and-making-requests) decides whether it is assigned or asked. Tying it to a project needs the person to be in the project's scope |
+| Accept or decline a request | The person it was made of |
+| Confirm or discard a proposal (action card) | Only the person it was prepared for, from their own session ([api.md](./api.md#proposals-and-action-cards)) |
 | Record a deviation | The task's assignee, the Lead of the line, the Head |
 | Confirm or correct a deviation | The next role up the ladder, or anyone above, within the project's scope; never the person who recorded it |
 | Comment on a deviation | The person, or anyone holding the role, named as its cause |
@@ -139,11 +142,14 @@ Until there's an org chart, the reporting line comes from the roles ⚠:
 | Board | VP | Request |
 | VP | Anyone in R&D | Request to people outside R&D |
 | R&D Head | Anyone in R&D below the Head | Request |
-| R&D Lead | Team members on their product line's projects | Request to anyone else |
+| R&D Lead | People below them on the team of a project of their product line (of that project, when the work is tied to one) | Request to anyone else |
 | Everyone else | Themselves | Request to anyone |
 
-- **Assigning.** An assigned task lands in the person's task list. It shows who assigned it, and whether it came through the AI.
-- **Requests.** A request asks someone for something. They can accept it (it becomes their task) or decline it, with a reason.
+One pure rule decides it (`howToGive` in `rules.ts`), and `POST /tasks` follows it: the person never picks "assign" or "request" themselves.
+
+- **Assigning.** An assigned task lands in the person's task list. It shows who assigned it, and whether it came through the AI (the Workstation).
+- **Requests.** A request asks someone for something. They can accept it (it becomes their task; starting it also accepts it) or decline it, with a reason. The person who asked is told either way, and sees the reason on the task under "Given by me"; the notification itself never carries it.
+- **Through the AI.** The AI may make the user's own tasks directly. Work for anyone else goes on an action card that the user confirms.
 - **Leave.** Covering someone's signatures while they're away comes later.
 
 ## Who gets a task

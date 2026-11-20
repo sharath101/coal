@@ -60,20 +60,116 @@
   },
   "workstation": {
     "title": "Workstation",
+    "ask": "Ask AI",
+    "openInWorkstation": "Open in Workstation",
+    "panes": "Workstation panes",
+    "tabs": { "chats": "Chats", "chat": "Conversation", "sources": "Sources" },
     "myTasks": "My tasks",
     "noTasks": "No tasks yet.",
+    "askAboutTask": "Open a chat about this task",
+    "allTasks": "All tasks",
     "projects": "Projects",
     "noProjects": "No projects yet.",
-    "generalChats": "General chats",
-    "newChat": "New chat",
-    "conversationEmpty": "Ask a question, draft a document or assign work. The assistant only acts when you ask.",
-    "inputPlaceholder": "Ask, or type / for commands",
-    "send": "Send",
-    "notYet": "The AI assistant isn't switched on yet.",
-    "preview": "Preview",
-    "previewEmpty": "Drafts, tables and routes you work on appear here.",
     "allProjects": "All projects",
-    "allTasks": "All tasks"
+    "newChatAbout": "New chat about {code}",
+    "generalChats": "General chats",
+    "noChats": "No chats yet.",
+    "newChat": "New chat",
+    "untitled": "New chat",
+    "conversationEmpty": "Ask a question, find a document or ask someone to do something. The assistant only acts when you ask, and it sees only what you can see.",
+    "examples": {
+      "one": "What's waiting on me?",
+      "two": "Which projects are late, and why?",
+      "three": "What am I signing, and what changed?"
+    },
+    "pin": {
+      "about": "About",
+      "step": "step {key}",
+      "document": "a document",
+      "task": "a task",
+      "widget": "the {key} widget",
+      "clear": "Start a chat about nothing in particular"
+    },
+    "composer": {
+      "label": "Message",
+      "placeholder": "Ask, or type / for commands",
+      "hint": "Enter sends, Shift+Enter starts a new line. Type @ to find a person, project or document. The assistant can make mistakes: check what matters.",
+      "send": "Send",
+      "stop": "Stop"
+    },
+    "commands": {
+      "title": "Commands",
+      "status": { "help": "the status of a project", "text": "What is the status of " },
+      "assign": { "help": "give work, or ask for something", "text": "Ask " },
+      "brief": {
+        "help": "what am I signing, and what changed?",
+        "text": "What am I signing, and what changed in each document since its previous version?"
+      }
+    },
+    "mention": {
+      "title": "Find a person, project or document",
+      "types": {
+        "person": "Person",
+        "project": "Project",
+        "document": "Document",
+        "task": "Task"
+      }
+    },
+    "message": {
+      "you": "You",
+      "assistant": "Assistant",
+      "working": "Working…",
+      "stopped": "Stopped",
+      "helped": "This helped",
+      "didntHelp": "This didn't help",
+      "sources": "{count, plural, one {# source} other {# sources}}"
+    },
+    "activity": {
+      "looked": "Looked at {count, plural, one {# thing} other {# things}}"
+    },
+    "sources": {
+      "title": "Sources",
+      "empty": "The records the assistant used to answer appear here.",
+      "none": "This answer didn't use any records.",
+      "looked": "What it looked at",
+      "open": "Open {label}",
+      "types": {
+        "project": "Project",
+        "task": "Task",
+        "document": "Document",
+        "deviation": "Delay",
+        "timeline": "Dates",
+        "template": "Template",
+        "person": "Person",
+        "widget": "Dashboard widget"
+      }
+    },
+    "card": {
+      "label": "Action card",
+      "status": {
+        "pending": "Waiting for you",
+        "confirmed": "Done",
+        "rejected": "Cancelled",
+        "expired": "Expired",
+        "failed": "Failed"
+      },
+      "told": "Told: {names}",
+      "expires": "Expires {date}",
+      "confirm": "Confirm",
+      "confirming": "Confirming…",
+      "edit": "Edit",
+      "cancel": "Cancel",
+      "confirmedNote": "Done. Everyone it affects has been told.",
+      "changeText": "Change the card “{title}”: ",
+      "editTitle": "Edit the card",
+      "editIntro": "Changing who, what or when checks the card again. Nothing happens until you confirm.",
+      "fieldTitle": "What needs doing",
+      "fieldPerson": "For",
+      "fieldDue": "Due (optional)",
+      "me": "Me",
+      "save": "Save changes",
+      "cancelEdit": "Cancel"
+    }
   },
   "problems": {
     "NOT_SIGNED_IN": "Your session has ended. Sign in again.",
@@ -100,6 +196,10 @@
     "UPLOAD_INCOMPLETE": "The file wasn't fully uploaded. Try again.",
     "SIGNATURE_REQUIRED": "A signature is needed first.",
     "PREVIEW_CHANGED": "Something changed while you were looking. Check the preview again.",
+    "PROPOSAL_EXPIRED": "This card has expired. Ask again for a new one.",
+    "AI_UNAVAILABLE": "The assistant isn't available just now. Try again in a moment.",
+    "AI_BUDGET_REACHED": "You have used today's assistant budget. It starts again tomorrow.",
+    "CHAT_BUSY": "The assistant is still answering. Wait for it, or stop it first.",
     "upload_type": "That kind of file can't be uploaded. Allowed: {types}.",
     "upload_size": "That file is too big. The limit is {limit}.",
     "upload_empty": "That file is empty.",
@@ -269,9 +369,10 @@
   },
   "tasks": {
     "title": "My tasks",
-    "intro": "What is assigned to you, and what is waiting for your role.",
+    "intro": "What is assigned to you, what is waiting for your role, and what you asked others for.",
     "mine": "Assigned to me",
     "queue": "In my role’s queue",
+    "sent": "Given by me",
     "active": "Open",
     "closed": "Closed",
     "none": "Nothing here.",
@@ -279,6 +380,30 @@
     "start": "Start",
     "done": "Mark done",
     "moreTime": "More time",
+    "accept": "Accept",
+    "decline": "Decline",
+    "from": "From {name}",
+    "fromViaAi": "From {name}, prepared in the Workstation",
+    "to": "To {name}",
+    "requestPending": "Waiting for an answer",
+    "requestAccepted": "Accepted",
+    "declinedBecause": "Declined: {reason}",
+    "declineTitle": "Decline this request",
+    "declineIntro": "Say why. {name} will see it on the task.",
+    "declineReason": "Reason",
+    "cancel": "Cancel",
+    "new": "New task",
+    "newTitle": "Give work, ask for something, or note a task for yourself",
+    "newIntro": "Work for someone below you on the reporting line is assigned to them. Anything else goes as a request they can accept or decline.",
+    "fieldTitle": "What needs doing",
+    "fieldBody": "Details (optional)",
+    "fieldPerson": "For",
+    "me": "Me",
+    "fieldDue": "Due (optional)",
+    "becomesOwn": "This goes on your own task list.",
+    "becomesWork": "This is assigned to {name}.",
+    "becomesRequest": "This goes to {name} as a request.",
+    "send": "Save",
     "due": "Due {date}",
     "daysLate": "{count, plural, one {# day late} other {# days late}}",
     "lateIntro": "This task is past its due date, so it can't be marked done until you say why. Record it, and the task is marked done straight after.",
@@ -697,7 +822,6 @@
   },
   "widgets": {
     "ask": "Ask AI",
-    "askSoon": "Ask AI arrives with the Workstation.",
     "open": "Open",
     "openWidget": "Open {title}",
     "back": "Back",

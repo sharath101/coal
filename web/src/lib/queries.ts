@@ -2,6 +2,7 @@
 
 import {
   getActivity,
+  getChat,
   getDocument,
   getMe,
   getProcess,
@@ -11,6 +12,7 @@ import {
   getTimeline,
   getWidget,
   listAttachments,
+  listChats,
   listDeviations,
   listDocumentTypes,
   listNotifications,
@@ -24,6 +26,7 @@ import {
   listTemplates,
   listUsers,
   listWidgets,
+  search,
   type DocumentDetail,
   type EndpointOutput,
   type ProjectSummary,
@@ -47,6 +50,8 @@ export const queryKeys = {
   step: (id: string, key: string) => ['project', id, 'step', key] as const,
   activity: (id: string) => ['project', id, 'activity'] as const,
   tasks: ['tasks'] as const,
+  chats: ['chats'] as const,
+  chat: (id: string) => ['chats', id] as const,
   people: ['people'] as const,
   // Under the project's key, so refreshing a project also refreshes what hangs on it.
   projectDocuments: (id: string) => ['project', id, 'documents'] as const,
@@ -131,7 +136,7 @@ export function useActivity(id: string) {
   });
 }
 
-export function useTasks(scope: 'mine' | 'queue', status: 'active' | 'closed') {
+export function useTasks(scope: 'mine' | 'queue' | 'sent', status: 'active' | 'closed') {
   return useInfiniteQuery({
     queryKey: [...queryKeys.tasks, scope, status],
     queryFn: ({ pageParam }) =>
@@ -339,4 +344,29 @@ export const useProcess = (key: string) =>
     queryKey: queryKeys.process(key),
     queryFn: () => api(getProcess, { params: { key } }),
     staleTime: Infinity,
+  });
+
+/** My chats, most recently used first. */
+export const useChats = () =>
+  useQuery({
+    queryKey: queryKeys.chats,
+    queryFn: async () => (await api(listChats, { query: { limit: 50 } })).items,
+  });
+
+/** One chat with its messages and action cards. */
+export const useChat = (id: string | null) =>
+  useQuery({
+    queryKey: queryKeys.chat(id ?? ''),
+    queryFn: () => api(getChat, { params: { id: id as string } }),
+    enabled: !!id,
+  });
+
+/** Projects, documents, tasks and people matching some words, for the @ picker. */
+export const useSearch = (q: string) =>
+  useQuery({
+    queryKey: ['search', q] as const,
+    queryFn: async () => (await api(search, { query: { q, limit: 5 } })).items,
+    enabled: q.trim().length >= 2,
+    staleTime: 30_000,
+    placeholderData: keepPreviousData,
   });

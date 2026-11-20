@@ -2,6 +2,7 @@ import { normalizePersonName, type Me, type User } from '@coal/shared';
 import { and, asc, eq, ilike, inArray, sql, type SQL } from 'drizzle-orm';
 import type { Executor, Tx } from '../../core/db/client';
 import { isUniqueViolation } from '../../core/db/errors';
+import { containing } from '../../core/db/search';
 import { AppError, validationFailed } from '../../core/http/errors';
 import { getRole, listRoles } from '../org/service';
 import { getProductLine, listProductLines } from '../rnd/service';
@@ -97,6 +98,23 @@ export async function listActiveUsers(ex: Executor, orgId: string): Promise<User
     .from(users)
     .where(and(eq(users.orgId, orgId), eq(users.status, 'active')))
     .orderBy(sql`lower(${users.name})`, asc(users.id));
+}
+
+/** Active people whose name contains the words, for search: the directory is open to everyone signed in. */
+export async function searchUsers(
+  ex: Executor,
+  orgId: string,
+  q: string,
+  limit: number,
+): Promise<UserRow[]> {
+  return ex
+    .select()
+    .from(users)
+    .where(
+      and(eq(users.orgId, orgId), eq(users.status, 'active'), ilike(users.name, containing(q))),
+    )
+    .orderBy(sql`lower(${users.name})`, asc(users.id))
+    .limit(limit);
 }
 
 export async function findUserByName(ex: Executor, orgId: string, name: string) {

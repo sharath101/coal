@@ -7,6 +7,7 @@ import {
   type EndpointParams,
   type EndpointQuery,
   type EndpointSpec,
+  type Preview,
 } from '@coal/shared';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
@@ -26,18 +27,54 @@ export interface HandlerArgs<E extends EndpointSpec> {
   http: { request: FastifyRequest; reply: FastifyReply };
 }
 
+/** How an action card puts what an action did into plain words (docs/workstation-and-ai.md#action-cards). */
+export interface ActionDescription {
+  summary: string;
+  effects: Preview;
+  notified: { id: string; name: string }[];
+}
+
 export interface Implementation<E extends EndpointSpec = EndpointSpec> {
   endpoint: E;
   handler: (args: HandlerArgs<E>) => Promise<EndpointOutput<E>>;
   rateLimit?: (deps: AppDeps) => { max: number; timeWindow: string };
+  /**
+   * Set on the endpoints that can be proposed on an action card: describes what the action did,
+   * from its result. Only `auto` and `confirm` endpoints may have one.
+   */
+  describe?: (
+    output: EndpointOutput<E>,
+    input: { params: EndpointParams<E>; query: EndpointQuery<E>; body: EndpointBody<E> },
+  ) => ActionDescription;
 }
 
 export function implement<E extends EndpointSpec>(
   endpoint: E,
   handler: Implementation<E>['handler'],
-  options: Pick<Implementation<E>, 'rateLimit'> = {},
+  options: Pick<Implementation<E>, 'rateLimit' | 'describe'> = {},
 ): Implementation<E> {
   return { endpoint, handler, ...options };
+}
+
+/** An empty preview, for actions that open no steps and make no tasks. */
+export const noEffects = (warnings: string[] = []): Preview => ({
+  steps: [],
+  tasks: [],
+  cancelledTasks: 0,
+  team: [],
+  warnings,
+});
+
+const registered = new Map<string, Implementation>();
+
+/** The implementation of an endpoint, once the app has registered them: proposals and the AI's tools run endpoints through it. */
+export function implementationOf(endpointId: string): Implementation | undefined {
+  return registered.get(endpointId);
+}
+
+/** The endpoints that can be put on an action card. */
+export function proposableImplementations(): Implementation[] {
+  return [...registered.values()].filter((i) => i.describe);
 }
 
 /**
@@ -92,6 +129,15 @@ export function registerEndpoints(
   const missing = ENDPOINTS.filter((e) => !byId.has(e.id)).map((e) => e.id);
   if (missing.length > 0)
     throw new Error(`Endpoints without an implementation: ${missing.join(', ')}`);
+  const proposable = implementations.filter(
+    (i) => i.describe && !['auto', 'confirm'].includes(i.endpoint.aiTier),
+  );
+  if (proposable.length > 0) {
+    throw new Error(
+      `Only auto and confirm endpoints can be proposed: ${proposable.map((i) => i.endpoint.id).join(', ')}`,
+    );
+  }
+  for (const [id, impl] of byId) registered.set(id, impl);
 
   for (const impl of implementations) {
     const { endpoint } = impl;
@@ -126,6 +172,8 @@ export function registerEndpoints(
           deps,
           http: { request, reply },
         });
+        // A handler that streams its own reply has taken the connection over.
+        if (reply.sent) return reply;
         reply.code(status);
         return status === 204 ? reply.send() : result;
       },

@@ -29,7 +29,7 @@ export type TestApp = Awaited<ReturnType<typeof createTestApp>>;
 
 export async function createTestApp(
   env: Record<string, string> = {},
-  overrides: Partial<Pick<AppDeps, 'scanner' | 'now'>> = {},
+  overrides: Partial<Pick<AppDeps, 'scanner' | 'now' | 'ai'>> = {},
 ) {
   const database = await createTestDatabase();
   const config = loadConfig({
@@ -49,6 +49,7 @@ export async function createTestApp(
     storage,
     pdf,
     scanner: null,
+    ai: null,
     now: () => new Date(),
     ...overrides,
   };
