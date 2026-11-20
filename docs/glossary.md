@@ -11,9 +11,11 @@
 | **Action card** | How a proposal appears in the Workstation: what will happen, with Confirm, Edit and Cancel |
 | **AI tier** | What the AI may do with an endpoint: `read`, `auto`, `confirm` or `never` ([workstation-and-ai.md](./workstation-and-ai.md#what-the-ai-may-do)) |
 | **Baseline** | The planned dates from the signed Action Plan (step 5), written there for each role and step; the VP's sign-off makes them permanent. The on-time rate is measured against first due dates, and later changes are recorded beside the baseline |
+| **Grounding** | What a draft the assistant saves must rest on: what the person said in the chat, and what the tools returned in that reply. The server checks a draft's numbers and the person's fields against it ([workstation-and-ai.md](./workstation-and-ai.md#drafting-a-document)) |
 | **Boilerplate (BP)** | A company template that new documents start from, such as the Action Plan or the FEA report. In COAL, a template in the template library |
 | **Channel** | Where a person uses the AI chat: the website now; WhatsApp and the mobile app later |
 | **Checkpoint** | A go or no-go step: 4, 12, 18 and 23. Nothing after it starts until it is signed |
+| **Outside chat** | A chat that holds a file from outside the company's records (a sample document, later a lab report). The assistant there can only prepare action cards ([workstation-and-ai.md](./workstation-and-ai.md#safety-basics)) |
 | **Citation** | A link from a statement in an AI answer to the record it came from (`[S1]`). The server keeps only citations that match a record the AI actually read ([workstation-and-ai.md](./workstation-and-ai.md#citations)) |
 | **Content** | What's inside a project's documents and records. Visible on a need-to-know basis (compare *status*) |
 | **Decision** | A signed choice recorded at a step: Go, a checkpoint outcome, "prototypes OK", "pre-clinical study needed", hold, drop |

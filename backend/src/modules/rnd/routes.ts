@@ -13,6 +13,7 @@ import {
   holdProject,
   listProductLines as listProductLinesEndpoint,
   listProjects,
+  previewGo,
   putTeam,
   reassignTask,
   recordMilestone,
@@ -165,6 +166,21 @@ export const rndRoutes = [
       if (query.preview) return { saved: false, preview, project: null };
       const env = await loadEnv(tx, ctx.orgId, actor, project.id);
       return { saved: true, preview, project: await presentProject(tx, env) };
+    }),
+  ),
+
+  implement(previewGo, ({ deps, ctx, actor, body }) =>
+    previewable(deps.db, ctx, true, async (tx, log) => {
+      const { collected, team } = await goProject(tx, log, ctx, actor, body, {
+        deps,
+        preview: true,
+      });
+      return {
+        preview: toPreview(
+          collected,
+          team.map((u) => ({ id: u.id, name: u.name })),
+        ),
+      };
     }),
   ),
 

@@ -12,17 +12,19 @@ import {
   type MessagePart,
 } from '@coal/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Loader2, ThumbsDown, ThumbsUp, X } from 'lucide-react';
+import { FileText, Loader2, ThumbsDown, ThumbsUp, X } from 'lucide-react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { useEffect, useRef, useState } from 'react';
 import { ActionCard } from '@/components/chat/action-card';
 import { Composer } from '@/components/chat/composer';
 import { MessageText } from '@/components/chat/message-text';
+import { DraftCard, IdeaCard } from '@/components/chat/writing-cards';
 import { ProblemMessage } from '@/components/problem-message';
 import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';
 import { streamReply } from '@/lib/chat-stream';
+import { uploadFile } from '@/lib/upload';
 import { queryKeys, useChat, useProject } from '@/lib/queries';
 import { isPinned, type Pin } from '@/lib/workstation';
 import { cn } from '@/lib/utils';
@@ -36,6 +38,7 @@ interface Activity {
 /** A reply being written: what is known so far. */
 interface Live {
   text: string;
+  files: { id: string; name: string }[];
   /** Once saved, the person's message is in the chat too: shown once, from here. */
   userId?: string;
   reply: string;
@@ -140,12 +143,14 @@ function AssistantMessage({
   selected,
   onSelect,
   onAskChange,
+  onPreview,
 }: {
   message: ChatMessage;
   chat: ChatDetail;
   selected: boolean;
   onSelect: () => void;
   onAskChange: (title: string) => void;
+  onPreview: (key: string) => void;
 }) {
   const t = useTranslations('workstation.message');
   const sources = citationsOf(message);
@@ -158,9 +163,26 @@ function AssistantMessage({
             <MessageText key={i} text={part.text} citations={part.citations} onSelect={onSelect} />
           ) : null;
         }
+        if (part.type === 'file') return null;
+        if (part.type === 'draft') {
+          return (
+            <DraftCard
+              key={i}
+              draft={part}
+              onPreview={() => onPreview(`draft:${part.documentId}:${part.versionNo}`)}
+            />
+          );
+        }
+        if (part.type === 'idea') return <IdeaCard key={i} idea={part} />;
         const proposal = chat.proposals.find((p) => p.id === part.proposalId);
         return proposal ? (
-          <ActionCard key={i} proposal={proposal} chatId={chat.id} onAskChange={onAskChange} />
+          <ActionCard
+            key={i}
+            proposal={proposal}
+            chatId={chat.id}
+            onAskChange={onAskChange}
+            onShowSample={(fileId) => onPreview(`file:${fileId}`)}
+          />
         ) : null;
       })}
       <footer className="flex items-center gap-3 text-xs text-muted-foreground">
@@ -180,20 +202,34 @@ function AssistantMessage({
   );
 }
 
-function UserMessage({ text }: { text: string }) {
+function UserMessage({
+  text,
+  files = [],
+}: {
+  text: string;
+  files?: { id: string; name: string }[];
+}) {
   const t = useTranslations('workstation.message');
   return (
     <article
-      className="ml-auto max-w-[85%] rounded-2xl bg-primary px-3.5 py-2 text-sm text-primary-foreground"
+      className="ml-auto grid max-w-[85%] gap-1.5 rounded-2xl bg-primary px-3.5 py-2 text-sm text-primary-foreground"
       aria-label={t('you')}
     >
       <p className="whitespace-pre-line">{text}</p>
+      {files.map((f) => (
+        <p key={f.id} className="flex items-center gap-1.5 text-xs opacity-90">
+          <FileText className="size-3.5" aria-hidden />
+          <span className="truncate">{f.name}</span>
+        </p>
+      ))}
     </article>
   );
 }
 
 const textOfUser = (message: ChatMessage) =>
   message.parts.flatMap((p) => (p.type === 'text' ? [p.text] : [])).join('\n\n');
+const filesOfUser = (message: ChatMessage) =>
+  message.parts.flatMap((p) => (p.type === 'file' ? [{ id: p.fileId, name: p.name }] : []));
 
 interface Props {
   chatId: string | null;
@@ -205,6 +241,8 @@ interface Props {
   onSelectMessage: (id: string) => void;
   /** Show the sources of the reply picked, on a screen where they are a tab of their own. */
   onShowSources: () => void;
+  /** Show a template's sample PDF, or a draft, in the right-hand pane. */
+  onPreview: (key: string) => void;
 }
 
 /** The conversation: messages, the reply as it is written, action cards, and the message box. */
@@ -216,6 +254,7 @@ export function Conversation({
   selectedMessageId,
   onSelectMessage,
   onShowSources,
+  onPreview,
 }: Props) {
   const t = useTranslations('workstation');
   const queryClient = useQueryClient();
@@ -223,6 +262,8 @@ export function Conversation({
   const [input, setInput] = useState('');
   const [live, setLive] = useState<Live | null>(null);
   const [error, setError] = useState<unknown>(null);
+  const [attached, setAttached] = useState<{ id: string; name: string }[]>([]);
+  const [uploading, setUploading] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const endRef = useRef<HTMLDivElement | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -236,6 +277,7 @@ export function Conversation({
       setLive(null);
       setError(null);
       setInput('');
+      setAttached([]);
     }
   }, [chatId]);
   useEffect(() => {
@@ -244,7 +286,9 @@ export function Conversation({
 
   const send = async (text: string) => {
     setError(null);
-    setLive({ text, reply: '', activity: [] });
+    const files = attached;
+    setAttached([]);
+    setLive({ text, files, reply: '', activity: [] });
     const controller = new AbortController();
     abortRef.current = controller;
     sending.current = true;
@@ -258,7 +302,12 @@ export function Conversation({
         onChatCreated(id);
         void queryClient.invalidateQueries({ queryKey: queryKeys.chats });
       }
-      for await (const event of streamReply(id, text, controller.signal)) {
+      for await (const event of streamReply(
+        id,
+        text,
+        controller.signal,
+        files.map((f) => f.id),
+      )) {
         switch (event.type) {
           case 'start':
             started = true;
@@ -279,6 +328,8 @@ export function Conversation({
             );
             break;
           case 'card':
+          case 'draft':
+          case 'idea':
             void queryClient.invalidateQueries({ queryKey: queryKeys.chat(id) });
             break;
           case 'done':
@@ -296,7 +347,10 @@ export function Conversation({
       if (!controller.signal.aborted) setError(e);
     } finally {
       // A message that was refused before it was saved goes back into the box.
-      if (!started) setInput((current) => current || text);
+      if (!started) {
+        setInput((current) => current || text);
+        setAttached((current) => (current.length > 0 ? current : files));
+      }
       if (idRef.current) {
         await queryClient.invalidateQueries({ queryKey: queryKeys.chat(idRef.current) });
       }
@@ -312,6 +366,22 @@ export function Conversation({
     if (!id) return;
     // The reply is kept as far as it got; if the server can't be told, closing the stream stops it.
     api(stopReply, { params: { id } }).catch(() => controller?.abort());
+  };
+
+  // A sample document is uploaded as an outside file, then rides with the next message.
+  const attach = async (file: File) => {
+    setError(null);
+    setUploading(true);
+    try {
+      const stored = await uploadFile(file, 'outside');
+      setAttached((all) => [...all, { id: stored.id, name: stored.name }]);
+      setInput((current) => current || t('composer.templateText'));
+      requestAnimationFrame(() => inputRef.current?.focus());
+    } catch (e) {
+      setError(e);
+    } finally {
+      setUploading(false);
+    }
   };
 
   const askToChange = (title: string) => {
@@ -349,7 +419,7 @@ export function Conversation({
             {chat.data &&
               messages.map((m) =>
                 m.sender === 'user' ? (
-                  <UserMessage key={m.id} text={textOfUser(m)} />
+                  <UserMessage key={m.id} text={textOfUser(m)} files={filesOfUser(m)} />
                 ) : (
                   <AssistantMessage
                     key={m.id}
@@ -361,12 +431,13 @@ export function Conversation({
                       onShowSources();
                     }}
                     onAskChange={askToChange}
+                    onPreview={onPreview}
                   />
                 ),
               )}
             {live && (
               <>
-                <UserMessage text={live.text} />
+                <UserMessage text={live.text} files={live.files} />
                 <article className="grid gap-2" aria-label={t('message.assistant')}>
                   {live.activity.length > 0 && (
                     <ul className="grid gap-0.5 text-xs text-muted-foreground">
@@ -409,6 +480,10 @@ export function Conversation({
             onStop={stop}
             replying={!!live}
             inputRef={inputRef}
+            attached={attached}
+            uploading={uploading}
+            onAttach={(file) => void attach(file)}
+            onDetach={(id) => setAttached((all) => all.filter((f) => f.id !== id))}
           />
           <p className="text-xs text-muted-foreground">{t('composer.hint')}</p>
         </div>

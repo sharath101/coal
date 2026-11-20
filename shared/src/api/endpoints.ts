@@ -49,12 +49,15 @@ import {
 } from '../schemas/documents';
 import {
   activateTemplate,
+  createDocumentType,
   createTemplate,
   getActiveTemplate,
   getTemplate,
   getTemplateLinks,
   listDocumentTypes,
   listTemplates,
+  prepareTemplate,
+  readSample,
 } from '../schemas/templates';
 import { completeUpload, createUpload, getFileLink } from '../schemas/files';
 import { listRoles } from '../schemas/org';
@@ -72,6 +75,7 @@ import {
   getTeam,
   holdProject,
   listProjects,
+  previewGo,
   putTeam,
   recordMilestone,
   resumeProject,
@@ -115,6 +119,7 @@ export const ENDPOINTS = [
   getProcessStep,
   createProject,
   listProjects,
+  previewGo,
   getProject,
   getProjectRoute,
   getTeam,
@@ -147,6 +152,9 @@ export const ENDPOINTS = [
   createTemplate,
   activateTemplate,
   getTemplateLinks,
+  createDocumentType,
+  readSample,
+  prepareTemplate,
   listProjectDocuments,
   createDocument,
   getDocument,

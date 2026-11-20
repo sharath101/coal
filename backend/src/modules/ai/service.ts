@@ -19,6 +19,7 @@ export const presentChat = (row: ChatRow): Chat => ({
   title: row.title,
   channel: row.channel,
   context: row.context,
+  hasOutsideText: row.hasOutsideText,
   createdAt: row.createdAt.toISOString(),
   updatedAt: row.updatedAt.toISOString(),
 });
@@ -142,7 +143,13 @@ export async function saveFeedback(
 /** The text of a message, without the source tags, for showing the model what was said. */
 export const plainText = (parts: MessagePart[]): string =>
   parts
-    .flatMap((p) => (p.type === 'text' ? [p.text] : []))
+    .flatMap((p) =>
+      p.type === 'text'
+        ? [p.text]
+        : p.type === 'file'
+          ? [`[Attached file: ${p.name}, file id ${p.fileId}]`]
+          : [],
+    )
     .join('\n\n')
     .replace(/\s*\[S\d+\]/g, '')
     .trim();
@@ -152,6 +159,11 @@ export async function touchChat(tx: Tx, id: string, title?: string): Promise<voi
     .update(aiChats)
     .set({ updatedAt: new Date(), ...(title && { title }) })
     .where(eq(aiChats.id, id));
+}
+
+/** A file from outside is in the chat: from now on the assistant only prepares action cards. Never unset. */
+export async function markOutsideText(ex: Executor, id: string): Promise<void> {
+  await ex.update(aiChats).set({ hasOutsideText: true }).where(eq(aiChats.id, id));
 }
 
 export async function setTitle(ex: Executor, id: string, title: string): Promise<void> {

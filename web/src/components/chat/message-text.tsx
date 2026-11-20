@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { cn } from '@/lib/utils';
 
 const TAG = /(\[S\d+\])/;
+const BOLD = /(\*\*[^*\n]+\*\*)/;
 
 /** A citation: a small numbered mark that shows the record and its passage on hover and opens it on click. */
 function CitationMark({ citation, onSelect }: { citation: Citation; onSelect?: () => void }) {
@@ -37,7 +38,8 @@ function CitationMark({ citation, onSelect }: { citation: Citation; onSelect?: (
   );
 }
 
-function Line({
+/** One run of words: citation tags become marks. */
+function Words({
   line,
   citations,
   streaming,
@@ -61,6 +63,28 @@ function Line({
         {(match[1] as string).slice(1)}
       </sup>
     ) : null;
+  });
+}
+
+/**
+ * A line of a reply. The assistant is told to write plain text, but some models bold a lead-in
+ * anyway ("**Signing:** …"); that is shown as bold rather than as stray asterisks.
+ */
+function Line(props: {
+  line: string;
+  citations: Map<string, Citation>;
+  streaming: boolean;
+  onSelect?: (citation: Citation) => void;
+}) {
+  return props.line.split(BOLD).map((piece, i) => {
+    const bold = /^\*\*([^*\n]+)\*\*$/.exec(piece);
+    return bold ? (
+      <strong key={i} className="font-semibold">
+        <Words {...props} line={bold[1] as string} />
+      </strong>
+    ) : (
+      <Words key={i} {...props} line={piece} />
+    );
   });
 }
 

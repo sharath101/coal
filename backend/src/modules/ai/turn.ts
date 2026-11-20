@@ -11,6 +11,7 @@ import { AppError } from '../../core/http/errors';
 import { newId } from '../../core/db/columns';
 import { getRole } from '../org/service';
 import { proposalsOfChat } from '../proposals/service';
+import type { FileRow } from '../files/service';
 import { listLatestVersions } from '../process/service';
 import { findProject } from '../rnd/projects';
 import { getProductLine } from '../rnd/service';
@@ -21,6 +22,7 @@ import {
   assertWithinBudget,
   insertMessage,
   logRequest,
+  markOutsideText,
   plainText,
   presentMessage,
   recentMessages,
@@ -99,6 +101,8 @@ export interface TurnArgs {
   actor: Actor;
   chat: ChatRow;
   text: string;
+  /** Files the person attached to this message, already checked. */
+  files: FileRow[];
   emit: (event: ChatStreamEvent) => void;
   /** Aborts the reply, when the person stops it or goes away. */
   controller: AbortController;
@@ -149,12 +153,22 @@ async function run(args: TurnArgs, ai: AppDeps['config']['ai']) {
   const history = (await recentMessages(deps.db, chat.id, ai.historyMessages))
     .map((m) => ({ role: m.sender, text: plainText(m.parts) }))
     .filter((m) => m.text);
+  // A file from outside makes the whole chat "outside" for good (docs/workstation-and-ai.md#safety-basics).
+  const hasFile = chat.hasOutsideText || args.files.length > 0;
+  if (hasFile && !chat.hasOutsideText) await markOutsideText(deps.db, chat.id);
   const userRow = await insertMessage(deps.db, {
     orgId: ctx.orgId,
     chatId: chat.id,
     sender: 'user',
-    parts: [{ type: 'text', text: args.text, citations: [] }],
+    parts: [
+      { type: 'text', text: args.text, citations: [] },
+      ...args.files.map((f) => ({ type: 'file' as const, fileId: f.id, name: f.name })),
+    ],
   });
+  const prompt = [
+    args.text,
+    ...args.files.map((f) => `[Attached file: ${f.name}, file id ${f.id}]`),
+  ].join('\n\n');
   const userMessage = presentMessage(userRow);
   emit({ type: 'start', userMessage });
 
@@ -165,8 +179,9 @@ async function run(args: TurnArgs, ai: AppDeps['config']['ai']) {
     contextLines(deps, ctx.orgId, chat.context),
     proposalsOfChat(deps.db, ctx.orgId, actor.userId, chat.id, deps.now()),
   ]);
+  const today = dateOfInstant(deps.now());
   const system = buildInstructions({
-    today: dateOfInstant(deps.now()),
+    today,
     user: {
       name: actor.name,
       roleKey: actor.roleKey,
@@ -181,6 +196,7 @@ async function run(args: TurnArgs, ai: AppDeps['config']['ai']) {
         (p) =>
           `Card ${p.id} (version ${p.version}): ${p.title}. It would: ${p.preview.actions.map((a) => a.summary).join('; ')}.`,
       ),
+    hasFile,
   });
 
   const toolbox = buildToolbox({
@@ -191,6 +207,9 @@ async function run(args: TurnArgs, ai: AppDeps['config']['ai']) {
     requestId,
     maxToolCalls: ai.maxToolCalls,
     signal: controller.signal,
+    outsideText: hasFile,
+    said: [...history.filter((m) => m.role === 'user').map((m) => m.text), args.text].join('\n'),
+    today,
     emit,
   });
 
@@ -200,10 +219,11 @@ async function run(args: TurnArgs, ai: AppDeps['config']['ai']) {
   let failure: AiProviderError | null = null;
   try {
     outcome = await provider.run({
-      model: ai.models.chat,
+      // Turning a sample into a template is the hardest thing asked of it: the strong model, always.
+      model: hasFile ? ai.models.template : ai.models.chat,
       system,
       history,
-      prompt: args.text,
+      prompt,
       tools: toolbox.tools,
       maxSteps: ai.maxToolCalls + 1,
       signal: controller.signal,
@@ -228,12 +248,20 @@ async function run(args: TurnArgs, ai: AppDeps['config']['ai']) {
   const { text, citations } = withCitations(written, toolbox.citations);
   const parts: MessagePart[] = [];
   if (toolbox.activity.length > 0) parts.push({ type: 'activity', items: toolbox.activity });
-  if (text || (!failure && toolbox.cards.length === 0))
+  if (
+    text ||
+    (!failure &&
+      toolbox.cards.length === 0 &&
+      toolbox.drafts.size === 0 &&
+      toolbox.ideas.length === 0)
+  )
     parts.push({ type: 'text', text, citations });
   for (const proposalId of new Set(toolbox.cards)) parts.push({ type: 'card', proposalId });
+  for (const draft of toolbox.drafts.values()) parts.push({ type: 'draft', ...draft });
+  for (const idea of toolbox.ideas) parts.push({ type: 'idea', ...idea });
 
   const usage = outcome?.usage ?? { calls: 0, inputTokens: 0, outputTokens: 0 };
-  const model = outcome?.model ?? ai.models.chat;
+  const model = outcome?.model ?? (hasFile ? ai.models.template : ai.models.chat);
   const request = {
     id: requestId,
     orgId: ctx.orgId,
@@ -241,7 +269,7 @@ async function run(args: TurnArgs, ai: AppDeps['config']['ai']) {
     userId: actor.userId,
     provider: provider.name,
     model,
-    purpose: 'chat',
+    purpose: hasFile ? 'template' : 'chat',
     promptVersion: PROMPT_VERSION,
     modelCalls: usage.calls,
     toolCalls: toolbox.calls.length,
@@ -254,7 +282,12 @@ async function run(args: TurnArgs, ai: AppDeps['config']['ai']) {
   };
 
   // Nothing to show: the reply failed before it said anything, so only the log is kept.
-  const saveReply = !failure || written.length > 0 || toolbox.cards.length > 0;
+  const saveReply =
+    !failure ||
+    written.length > 0 ||
+    toolbox.cards.length > 0 ||
+    toolbox.drafts.size > 0 ||
+    toolbox.ideas.length > 0;
   let reply: MessageRow | null = null;
   const firstTitle = chat.title ? undefined : args.text.replace(/\s+/g, ' ').slice(0, 60);
   await deps.db.transaction(async (tx) => {

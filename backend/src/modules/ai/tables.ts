@@ -29,6 +29,8 @@ export const aiChats = pgTable(
       .default('website'),
     context: jsonb('context').$type<ChatContext>().notNull(),
     title: text('title').notNull().default(''),
+    /** Set once a file from outside is attached, and never unset: from then on the AI only prepares cards. */
+    hasOutsideText: boolean('has_outside_text').notNull().default(false),
     ...timestamps(),
   },
   (t) => [

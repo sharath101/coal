@@ -1,5 +1,5 @@
 import { checkUpload, type StoredFile } from '@coal/shared';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, desc, eq, inArray } from 'drizzle-orm';
 import { change } from '../../core/db/change';
 import type { Executor } from '../../core/db/client';
 import { newId } from '../../core/db/columns';
@@ -59,12 +59,29 @@ export async function findFiles(ex: Executor, orgId: string, ids: string[]): Pro
     .where(and(eq(files.orgId, orgId), inArray(files.id, [...new Set(ids)])));
 }
 
+/** The newest file made from another, such as the sample PDF of a built template's Word file. */
+export async function findDerivedFile(
+  ex: Executor,
+  orgId: string,
+  fromId: string,
+): Promise<FileRow | null> {
+  const [row] = await ex
+    .select()
+    .from(files)
+    .where(and(eq(files.orgId, orgId), eq(files.derivedFrom, fromId)))
+    .orderBy(desc(files.createdAt))
+    .limit(1);
+  return row ?? null;
+}
+
 export interface GeneratedFile {
   name: string;
   bytes: Buffer;
   contentType: string;
   /** The person it is made for. Null when no person is behind it. */
   userId: string | null;
+  /** The file it was made from, such as the sample a template was built from. */
+  derivedFrom?: string;
 }
 
 /**
@@ -94,6 +111,7 @@ export async function storeGeneratedFile(
       scanStatus: 'clean',
       origin: 'internal',
       uploadedBy: input.userId,
+      derivedFrom: input.derivedFrom ?? null,
     })
     .returning();
   return row as FileRow;

@@ -16,11 +16,12 @@ export async function* streamReply(
   chatId: string,
   text: string,
   signal: AbortSignal,
+  fileIds: string[] = [],
 ): AsyncGenerator<ChatStreamEvent> {
   const response = await fetch(API_BASE_PATH + fillPath(sendMessage.path, { id: chatId }), {
     method: 'POST',
     headers: { accept: 'text/event-stream', 'content-type': 'application/json' },
-    body: JSON.stringify({ text }),
+    body: JSON.stringify({ text, fileIds }),
     credentials: 'include',
     signal,
   });

@@ -19,12 +19,51 @@ export const ProposalAction = z.object({
 });
 export type ProposalAction = z.infer<typeof ProposalAction>;
 
+/** More than a sentence, for the actions whose effect is a record to look over: a template. */
+export const ActionDetail = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('template'),
+    /** `firstOfType`: no template of this kind existed before. */
+    documentType: z.object({ code: z.string(), name: z.string(), firstOfType: z.boolean() }),
+    name: z.string(),
+    steps: z.array(z.string()),
+    version: z.number().int(),
+    /** `rebuilt`: made from a PDF, so the layout is COAL's plain one, not the original's. */
+    layout: z.enum(['kept', 'rebuilt']).nullable(),
+    madeFrom: z.string().nullable(),
+    /** The sample PDF to look at, made from made-up data. */
+    sampleFileId: Id.nullable(),
+    signatureRows: z.array(z.string()),
+    reviewedBy: z.array(z.string()),
+    approvedBy: z.array(z.string()),
+    sections: z.array(
+      z.object({
+        id: z.string(),
+        title: z.string(),
+        kind: z.enum(['fields', 'written']),
+        required: z.boolean(),
+        instructions: z.string().nullable(),
+        fields: z.array(
+          z.object({
+            name: z.string(),
+            label: z.string(),
+            source: z.string(),
+            required: z.boolean(),
+          }),
+        ),
+      }),
+    ),
+  }),
+]);
+export type ActionDetail = z.infer<typeof ActionDetail>;
+
 /** What one action would do, in plain words, with who gets what and who is told. */
 export const ActionPreview = z.object({
   endpoint: z.string(),
   summary: z.string(),
   effects: Preview,
   notified: z.array(Person),
+  detail: ActionDetail.optional(),
 });
 export type ActionPreview = z.infer<typeof ActionPreview>;
 

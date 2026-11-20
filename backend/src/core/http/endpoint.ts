@@ -45,7 +45,9 @@ export interface Implementation<E extends EndpointSpec = EndpointSpec> {
   describe?: (
     output: EndpointOutput<E>,
     input: { params: EndpointParams<E>; query: EndpointQuery<E>; body: EndpointBody<E> },
-  ) => ActionDescription;
+    /** The same connection the action ran on, so a card may look up what it needs to show. */
+    deps: AppDeps,
+  ) => ActionDescription | Promise<ActionDescription>;
 }
 
 export function implement<E extends EndpointSpec>(
@@ -77,6 +79,9 @@ export function proposableImplementations(): Implementation[] {
   return [...registered.values()].filter((i) => i.describe);
 }
 
+/** The `auto` endpoints that stay open in a chat with outside text: they only prepare cards. */
+const OUTSIDE_TEXT_ALLOWED = ['proposals.create', 'proposals.update'];
+
 /**
  * The AI tiers, enforced by the server (docs/workstation-and-ai.md#what-the-ai-may-do).
  * `auto` endpoints confine the AI to the user's own things through their resource rules.
@@ -85,7 +90,17 @@ export function assertAiTier(endpoint: EndpointSpec, ctx: RequestContext): void 
   if (!ctx.viaAi) return;
   switch (endpoint.aiTier) {
     case 'read':
+      return;
     case 'auto':
+      // A file from outside is in the chat: it may hold hidden instructions, so nothing is saved
+      // on its say-so. Action cards are the way through, because a person confirms each one.
+      if (ctx.aiChat?.outsideText && !OUTSIDE_TEXT_ALLOWED.includes(endpoint.id)) {
+        throw new AppError(
+          403,
+          'AI_NOT_ALLOWED',
+          'This chat holds a file from outside the company’s records, so the assistant can only prepare action cards for you to confirm.',
+        );
+      }
       return;
     case 'confirm':
       throw new AppError(

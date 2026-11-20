@@ -32,7 +32,7 @@ export const TABLE_COLUMNS: Readonly<Record<string, readonly string[]>> = {
   'project.team': ['name', 'role'],
 };
 
-const Identifier = z
+export const SpecIdentifier = z
   .string()
   .regex(
     /^[a-z][a-z0-9_]{0,39}$/,
@@ -53,16 +53,16 @@ export type SpecField = z.infer<typeof SpecField>;
 
 const FieldsSection = z
   .object({
-    id: Identifier,
+    id: SpecIdentifier,
     title: z.string().trim().min(1).max(120).optional(),
     kind: z.literal('fields'),
-    fields: z.record(Identifier, SpecField),
+    fields: z.record(SpecIdentifier, SpecField),
   })
   .strict();
 
 const WrittenSection = z
   .object({
-    id: Identifier,
+    id: SpecIdentifier,
     title: z.string().trim().min(1).max(120).optional(),
     kind: z.literal('written'),
     /** What to write. Shown to the author, and given to the AI. */

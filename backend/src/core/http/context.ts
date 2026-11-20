@@ -16,7 +16,13 @@ export interface RequestContext {
   /** Set while the user's confirmed proposal (an action card) is being carried out. */
   proposal?: { id: string; chatId: string | null; preparedByAi: boolean };
   /** Set while the AI answers a message: the chat and the model request its tool calls belong to. */
-  aiChat?: { chatId: string; requestId: string };
+  aiChat?: {
+    chatId: string;
+    requestId: string;
+    outsideText?: boolean;
+    /** What a draft may rest on: what the person said, and what the tools returned in this reply. */
+    grounding?: { said: string; read: () => string };
+  };
 }
 
 export function systemContext(orgId: string, requestId = 'system'): RequestContext {

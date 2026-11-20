@@ -1,5 +1,8 @@
 import {
+  DEFAULT_NUMBERING,
   FIELD_SOURCES,
+  SIGNATURE_ROW_SETS,
+  type CreateDocumentTypeBody,
   type TemplateSpec,
   checkPlaceholders,
   fieldLabel,
@@ -25,6 +28,7 @@ import {
   storeGeneratedFile,
 } from '../files/service';
 import { listRoles } from '../org/service';
+import { listLatestVersions } from '../process/service';
 import { findUsersByIds } from '../users/service';
 import { DOCUMENT_TYPES } from './catalogue';
 import { DocxError, fillDocx, readTags } from './docx';
@@ -140,6 +144,18 @@ export async function activeTemplate(
   return row ?? null;
 }
 
+const presentType = (t: TypeRow, template: TemplateRow | undefined): DocumentTypeView => ({
+  code: t.code,
+  name: t.name,
+  kind: t.kind,
+  sensitivity: t.sensitivity,
+  stepKeys: t.stepKeys,
+  signatureRows: t.signaturePlan.rows,
+  activeTemplate: template
+    ? { id: template.id, version: template.version, name: template.name }
+    : null,
+});
+
 export async function listDocumentTypes(ex: Executor, orgId: string): Promise<DocumentTypeView[]> {
   const types = await ex
     .select()
@@ -151,20 +167,7 @@ export async function listDocumentTypes(ex: Executor, orgId: string): Promise<Do
     .from(templates)
     .where(and(eq(templates.orgId, orgId), eq(templates.status, 'active')));
   const byType = new Map(active.map((t) => [t.documentTypeId, t]));
-  return types.map((t) => {
-    const template = byType.get(t.id);
-    return {
-      code: t.code,
-      name: t.name,
-      kind: t.kind,
-      sensitivity: t.sensitivity,
-      stepKeys: t.stepKeys,
-      signatureRows: t.signaturePlan.rows,
-      activeTemplate: template
-        ? { id: template.id, version: template.version, name: template.name }
-        : null,
-    };
-  });
+  return types.map((t) => presentType(t, byType.get(t.id)));
 }
 
 /** Who a template COAL loaded itself is shown as added by. */
@@ -284,6 +287,58 @@ const checkFailed = (problems: string[]) =>
     errors: problems.map((message) => ({ path: 'docxFileId', message })),
   });
 
+/**
+ * Every check a template must pass: the specification against the document type and the roles, the
+ * placeholders against the specification (both ways), and a fill with made-up data. Returns the
+ * filled sample Word file; a failure lists every problem. `type` is null when the document type is
+ * still to be made, so only what does not need it is checked.
+ */
+export async function checkTemplateFile(
+  deps: AppDeps,
+  orgId: string,
+  input: { code: string; type: TypeRow | null; spec: TemplateSpec; docx: Buffer },
+): Promise<Buffer> {
+  const { code, type, spec } = input;
+  const problems: string[] = [];
+  if (spec.document_type !== code) {
+    problems.push(`The specification is for ${spec.document_type}, not ${code}.`);
+  }
+  const wrongSteps = spec.steps.filter(
+    (s) => type && type.stepKeys.length > 0 && !type.stepKeys.includes(s),
+  );
+  if (type && wrongSteps.length > 0) {
+    problems.push(
+      `${type.name} documents belong to step ${type.stepKeys.join(', ')}, not ${wrongSteps.join(', ')}.`,
+    );
+  }
+  const roleKeys = new Set((await listRoles(deps.db, orgId)).map((r) => r.key));
+  for (const role of [...spec.reviewed_by, ...spec.approved_by]) {
+    if (!roleKeys.has(role)) problems.push(`"${role}" is not a role in COAL.`);
+  }
+
+  let sampleDocxBytes: Buffer | null = null;
+  let tags: ReturnType<typeof readTags> | null = null;
+  try {
+    tags = readTags(input.docx);
+  } catch (error) {
+    if (!(error instanceof DocxError)) throw error;
+    problems.push(...error.problems);
+  }
+  if (tags) {
+    problems.push(...checkPlaceholders(spec, tags).problems);
+    if (problems.length === 0) {
+      try {
+        sampleDocxBytes = fillDocx(input.docx, renderData(sampleContent(spec)));
+      } catch (error) {
+        if (!(error instanceof DocxError)) throw error;
+        problems.push(...error.problems);
+      }
+    }
+  }
+  if (problems.length > 0 || !sampleDocxBytes) throw checkFailed(problems);
+  return sampleDocxBytes;
+}
+
 export interface AddTemplateInput {
   documentType: string;
   /** The Word file's bytes, already read from storage, or made by COAL. */
@@ -314,7 +369,6 @@ export async function addTemplate(
     throw checkFailed(['The Word file is larger than 10 MB.']);
   }
 
-  const problems: string[] = [];
   if (deps.scanner) {
     const verdict = await deps.scanner.scan(input.docx).catch(() => null);
     if (!verdict) {
@@ -341,44 +395,14 @@ export async function addTemplate(
       'spec',
     );
   }
-  if (spec.document_type !== type.code) {
-    problems.push(`The specification is for ${spec.document_type}, not ${type.code}.`);
-  }
-  const wrongSteps = spec.steps.filter(
-    (s) => type.stepKeys.length > 0 && !type.stepKeys.includes(s),
-  );
-  if (wrongSteps.length > 0) {
-    problems.push(
-      `${type.name} documents belong to step ${type.stepKeys.join(', ')}, not ${wrongSteps.join(', ')}.`,
-    );
-  }
-  const roleKeys = new Set((await listRoles(deps.db, orgId)).map((r) => r.key));
-  for (const role of [...spec.reviewed_by, ...spec.approved_by]) {
-    if (!roleKeys.has(role)) problems.push(`"${role}" is not a role in COAL.`);
-  }
+  const sampleDocxBytes = await checkTemplateFile(deps, orgId, {
+    code: type.code,
+    type,
+    spec,
+    docx: input.docx,
+  });
 
-  let sampleDocxBytes: Buffer | null = null;
-  let tags: ReturnType<typeof readTags> | null = null;
-  try {
-    tags = readTags(input.docx);
-  } catch (error) {
-    if (!(error instanceof DocxError)) throw error;
-    problems.push(...error.problems);
-  }
-  if (tags) {
-    problems.push(...checkPlaceholders(spec, tags).problems);
-    if (problems.length === 0) {
-      try {
-        sampleDocxBytes = fillDocx(input.docx, renderData(sampleContent(spec)));
-      } catch (error) {
-        if (!(error instanceof DocxError)) throw error;
-        problems.push(...error.problems);
-      }
-    }
-  }
-  if (problems.length > 0) throw checkFailed(problems);
-
-  const samplePdf = await deps.pdf.fromDocx(sampleDocxBytes as Buffer, `${type.code}-sample.docx`);
+  const samplePdf = await deps.pdf.fromDocx(sampleDocxBytes, `${type.code}-sample.docx`);
 
   return change(deps.db, ctx, async (tx, log) => {
     // One at a time per type, so versions are numbered without gaps or repeats.
@@ -604,4 +628,83 @@ async function activateSample(deps: AppDeps, ctx: RequestContext, id: string): P
       after: { status: 'active', version: row?.version, sample: true },
     });
   });
+}
+
+/**
+ * Adds a kind of document that is made from a template: the steps it belongs to, its numbering and
+ * who signs. The first template of the type follows (docs/workstation-and-ai.md#making-a-template-from-a-sample-document).
+ */
+export async function createDocumentType(
+  deps: AppDeps,
+  ctx: RequestContext,
+  input: CreateDocumentTypeBody,
+): Promise<DocumentTypeView> {
+  const { orgId } = ctx;
+  const problems: { path: string; message: string }[] = [];
+  const numbering = input.numbering ?? DEFAULT_NUMBERING;
+  if (!numbering.includes('{project_code}') || !numbering.includes('{nn}')) {
+    problems.push({
+      path: 'numbering',
+      message: 'The numbering needs {project_code} and {nn}, such as {project_code}-{type}-{nn}.',
+    });
+  }
+  const rows = input.signatureRows.join(',');
+  if (!SIGNATURE_ROW_SETS.some((set) => set.join(',') === rows)) {
+    problems.push({
+      path: 'signatureRows',
+      message: 'Use [prepared], [prepared, approved] or [prepared, reviewed, approved].',
+    });
+  }
+  if (input.signatureRows.includes('reviewed') && input.reviewedBy.length === 0) {
+    problems.push({ path: 'reviewedBy', message: 'Name the roles that review.' });
+  }
+  const roleKeys = new Set((await listRoles(deps.db, orgId)).map((r) => r.key));
+  for (const role of [...input.reviewedBy, ...input.approvedBy]) {
+    if (!roleKeys.has(role))
+      problems.push({ path: 'reviewedBy', message: `"${role}" is not a role in COAL.` });
+  }
+  const stepKeys = new Set(
+    (await listLatestVersions(deps.db, orgId)).flatMap((v) => v.route.steps.map((s) => s.key)),
+  );
+  for (const step of input.steps) {
+    if (!stepKeys.has(step))
+      problems.push({ path: 'steps', message: `There is no step ${step} in the route.` });
+  }
+  if (await findTypeByCode(deps.db, orgId, input.code)) {
+    problems.push({ path: 'code', message: `There is already a document type ${input.code}.` });
+  }
+  if (problems.length > 0) {
+    throw new AppError(400, 'VALIDATION_FAILED', 'Some of the values sent are not valid.', {
+      errors: problems,
+    });
+  }
+  const row = await change(deps.db, ctx, async (tx, log) => {
+    const [inserted] = await tx
+      .insert(documentTypes)
+      .values({
+        orgId,
+        code: input.code,
+        name: input.name,
+        departmentCode: 'RND',
+        kind: 'template',
+        stepKeys: input.steps,
+        numberingPattern: numbering,
+        signaturePlan: {
+          rows: input.signatureRows,
+          reviewedBy: input.reviewedBy,
+          approvedBy: input.approvedBy,
+        },
+      })
+      .returning();
+    const added = inserted as TypeRow;
+    log.audit({
+      action: 'document_type.added',
+      recordType: 'document_type',
+      recordId: added.id,
+      after: { code: added.code, name: added.name, steps: added.stepKeys, numbering },
+    });
+    log.event({ type: 'document_type.added', payload: { documentType: added.code } });
+    return added;
+  });
+  return presentType(row, undefined);
 }

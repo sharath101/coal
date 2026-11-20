@@ -18,6 +18,11 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  EditTemplateDialog,
+  TemplateDetailView,
+  isTemplateCard,
+} from '@/components/chat/template-detail';
 import { api } from '@/lib/api';
 import { formatDate, todayIst } from '@/lib/format';
 import { queryKeys, useMe, usePeople, useRefreshWork } from '@/lib/queries';
@@ -46,11 +51,14 @@ export function ActionCard({
   proposal,
   chatId,
   onAskChange,
+  onShowSample,
 }: {
   proposal: Proposal;
   chatId: string;
   /** For a card that can't be edited on screen: the assistant changes it when asked. */
   onAskChange: (title: string) => void;
+  /** A template card's sample PDF is shown in the right-hand pane. */
+  onShowSample?: (fileId: string) => void;
 }) {
   const t = useTranslations('workstation.card');
   const queryClient = useQueryClient();
@@ -63,6 +71,9 @@ export function ActionCard({
     onSuccess: () => {
       void refreshWork();
       void reload();
+      // A template card adds a draft to the library, and maybe a kind of document.
+      void queryClient.invalidateQueries({ queryKey: queryKeys.templates });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.documentTypes });
     },
     // If it changed, the card is shown again as it stands now.
     onError: () => void reload(),
@@ -99,6 +110,16 @@ export function ActionCard({
               </p>
             ))}
             {action.effects.steps.length > 0 && <PreviewPanel preview={action.effects} />}
+            {action.detail?.kind === 'template' && (
+              <TemplateDetailView
+                detail={action.detail}
+                onShowSample={() =>
+                  action.detail?.kind === 'template' &&
+                  action.detail.sampleFileId &&
+                  onShowSample?.(action.detail.sampleFileId)
+                }
+              />
+            )}
             {action.notified.length > 0 && (
               <p className="text-xs text-muted-foreground">
                 {t('told', { names: action.notified.map((p) => p.name).join(', ') })}
@@ -120,7 +141,9 @@ export function ActionCard({
             variant="outline"
             disabled={busy}
             onClick={() =>
-              editableOnScreen(proposal.actions) ? setEditing(true) : onAskChange(proposal.title)
+              editableOnScreen(proposal.actions) || isTemplateCard(proposal.actions)
+                ? setEditing(true)
+                : onAskChange(proposal.title)
             }
           >
             {t('edit')}
@@ -136,16 +159,26 @@ export function ActionCard({
         <p className="text-xs text-muted-foreground">{t('confirmedNote')}</p>
       ) : null}
 
-      {editing && (
-        <EditCardDialog
-          proposal={proposal}
-          onOpenChange={setEditing}
-          onSaved={() => {
-            setEditing(false);
-            void reload();
-          }}
-        />
-      )}
+      {editing &&
+        (isTemplateCard(proposal.actions) ? (
+          <EditTemplateDialog
+            proposal={proposal}
+            onOpenChange={setEditing}
+            onSaved={() => {
+              setEditing(false);
+              void reload();
+            }}
+          />
+        ) : (
+          <EditCardDialog
+            proposal={proposal}
+            onOpenChange={setEditing}
+            onSaved={() => {
+              setEditing(false);
+              void reload();
+            }}
+          />
+        ))}
     </section>
   );
 }

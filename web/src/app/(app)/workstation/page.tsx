@@ -2,9 +2,11 @@
 
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { Suspense, useState } from 'react';
+import { Suspense, useState, type ReactNode } from 'react';
 import { ChatList } from '@/components/chat/chat-list';
 import { Conversation } from '@/components/chat/conversation';
+import { SamplePdf } from '@/components/chat/template-detail';
+import { DraftPdf } from '@/components/chat/writing-cards';
 import { SourcesPane } from '@/components/chat/sources-pane';
 import { useChat } from '@/lib/queries';
 import { fromParams, workstationHref } from '@/lib/workstation';
@@ -45,6 +47,41 @@ function Workstation() {
     withSources.at(-1) ??
     [...messages].reverse().find((m) => m.sender === 'assistant');
 
+  // What the right-hand pane previews: the sample PDF of a template card, or a draft the assistant
+  // saved. The one asked for, or the latest.
+  const [previewKey, setPreviewKey] = useState<string | null>(null);
+  const previews: { key: string; title: string; node: ReactNode }[] = [
+    ...(chat.data?.proposals ?? [])
+      .filter((p) => p.status === 'pending' || p.status === 'confirmed')
+      .flatMap((p) =>
+        p.preview.actions.flatMap((a) =>
+          a.detail?.kind === 'template' && a.detail.sampleFileId
+            ? [
+                {
+                  key: `file:${a.detail.sampleFileId}`,
+                  title: a.detail.name,
+                  node: <SamplePdf fileId={a.detail.sampleFileId} title={a.detail.name} />,
+                },
+              ]
+            : [],
+        ),
+      ),
+    ...messages.flatMap((m) =>
+      m.parts.flatMap((p) =>
+        p.type === 'draft'
+          ? [
+              {
+                key: `draft:${p.documentId}:${p.versionNo}`,
+                title: p.title,
+                node: <DraftPdf draft={p} />,
+              },
+            ]
+          : [],
+      ),
+    ),
+  ];
+  const preview = previews.find((p) => p.key === previewKey) ?? previews.at(-1);
+
   const show = (which: Pane) => cn(pane === which ? 'flex' : 'hidden', 'lg:flex');
 
   return (
@@ -78,10 +115,17 @@ function Workstation() {
             selectedMessageId={selected?.id ?? null}
             onSelectMessage={setPicked}
             onShowSources={() => setPane('sources')}
+            onPreview={(key) => {
+              setPreviewKey(key);
+              setPane('sources');
+            }}
           />
         </section>
         <aside className={cn(show('sources'), 'min-h-0 flex-col overflow-y-auto border-l p-4')}>
-          <SourcesPane message={selected} />
+          <SourcesPane
+            message={selected}
+            preview={preview && { title: preview.title, node: preview.node }}
+          />
         </aside>
       </div>
     </div>

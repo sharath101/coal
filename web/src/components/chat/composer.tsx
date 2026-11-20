@@ -1,19 +1,22 @@
 'use client';
 
-import { SendHorizontal, Square } from 'lucide-react';
+import { FileText, Loader2, Paperclip, SendHorizontal, Square, X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { useState, type KeyboardEvent, type RefObject } from 'react';
+import { useRef, useState, type KeyboardEvent, type RefObject } from 'react';
 import { Button } from '@/components/ui/button';
 import { useSearch } from '@/lib/queries';
+import { SAMPLE_ACCEPT } from '@/lib/workstation';
 import { cn } from '@/lib/utils';
 
 /**
  * `/` commands: each starts a message the person finishes, or, for /brief, sends it at once
- * (docs/workstation-and-ai.md#the-five-things-the-ai-does). /idea and /draft come with drafting.
+ * (docs/workstation-and-ai.md#what-the-ai-does).
  */
 const COMMANDS = [
   { key: 'status', send: false },
   { key: 'assign', send: false },
+  { key: 'idea', send: false },
+  { key: 'draft', send: false },
   { key: 'brief', send: true },
 ] as const;
 
@@ -31,14 +34,31 @@ interface Props {
   onStop: () => void;
   replying: boolean;
   inputRef: RefObject<HTMLTextAreaElement | null>;
+  /** Files attached to the message about to be sent, such as a sample document for a template. */
+  attached: { id: string; name: string }[];
+  uploading: boolean;
+  onAttach: (file: File) => void;
+  onDetach: (id: string) => void;
 }
 
 /** The message box: Enter sends, `/` lists commands, `@` finds people, projects and documents. */
-export function Composer({ value, onChange, onSend, onStop, replying, inputRef }: Props) {
+export function Composer({
+  value,
+  onChange,
+  onSend,
+  onStop,
+  replying,
+  inputRef,
+  attached,
+  uploading,
+  onAttach,
+  onDetach,
+}: Props) {
   const t = useTranslations('workstation');
   const [caret, setCaret] = useState(0);
   const [active, setActive] = useState(0);
   const [dismissed, setDismissed] = useState('');
+  const fileInput = useRef<HTMLInputElement | null>(null);
 
   const slash = value.startsWith('/') && !value.includes(' ') ? value.slice(1).toLowerCase() : null;
   const commands = slash === null ? [] : COMMANDS.filter((c) => c.key.startsWith(slash));
@@ -87,7 +107,7 @@ export function Composer({ value, onChange, onSend, onStop, replying, inputRef }
   };
   const submit = () => {
     const text = value.trim();
-    if (!text || replying) return;
+    if (!text || replying || uploading) return;
     onChange('');
     onSend(text);
   };
@@ -167,7 +187,58 @@ export function Composer({ value, onChange, onSend, onStop, replying, inputRef }
               ))}
         </ul>
       )}
+      {(attached.length > 0 || uploading) && (
+        <ul className="mb-2 flex flex-wrap gap-2" aria-label={t('composer.attached')}>
+          {attached.map((f) => (
+            <li
+              key={f.id}
+              className="flex items-center gap-1.5 rounded-md border bg-muted/50 py-1 pr-1 pl-2 text-xs"
+            >
+              <FileText className="size-3.5 text-muted-foreground" aria-hidden />
+              <span className="max-w-48 truncate">{f.name}</span>
+              <Button
+                type="button"
+                size="icon-xs"
+                variant="ghost"
+                aria-label={t('composer.detach', { name: f.name })}
+                onClick={() => onDetach(f.id)}
+              >
+                <X aria-hidden />
+              </Button>
+            </li>
+          ))}
+          {uploading && (
+            <li className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Loader2 className="size-3.5 animate-spin" aria-hidden />
+              {t('composer.uploading')}
+            </li>
+          )}
+        </ul>
+      )}
       <div className="flex items-end gap-2">
+        <input
+          ref={fileInput}
+          type="file"
+          hidden
+          accept={SAMPLE_ACCEPT}
+          aria-label={t('composer.attach')}
+          onChange={(e) => {
+            const chosen = e.target.files?.[0];
+            e.target.value = '';
+            if (chosen) onAttach(chosen);
+          }}
+        />
+        <Button
+          type="button"
+          size="icon"
+          variant="outline"
+          disabled={replying || uploading || attached.length >= 3}
+          title={t('composer.attachHelp')}
+          onClick={() => fileInput.current?.click()}
+        >
+          <Paperclip aria-hidden />
+          <span className="sr-only">{t('composer.attach')}</span>
+        </Button>
         <textarea
           ref={inputRef}
           value={value}
@@ -199,7 +270,7 @@ export function Composer({ value, onChange, onSend, onStop, replying, inputRef }
           <Button
             type="button"
             size="icon"
-            disabled={!value.trim()}
+            disabled={!value.trim() || uploading}
             onClick={submit}
             title={t('composer.send')}
           >

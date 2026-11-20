@@ -35,10 +35,11 @@ The Workstation is each person's second page: a chat assistant like ChatGPT or C
 
 - **Left: my tasks and projects.** My tasks sits at the top; each opens a new chat about that task. Below it is a space for each project, holding its chats (a "+" starts a new one about that project), then general chats. Any other project can be opened from the Dashboard or search.
 - **Centre: the conversation.** Answers carry citations: small numbered marks that show the record and its passage on hover and open it on click, numbered in the order the answer uses them. A line under the answer shows what the AI consulted ("Looked at 3 things", opening to the list), and while it works each lookup appears as it happens. Action cards sit in the conversation with Confirm, Edit and Cancel. Each answer has thumbs up and down, and a Stop button replaces Send while it is being written.
-- **Right: sources and preview.** The records the selected answer rests on, with the passage each gave and a link to open it, and what the AI looked at. Document drafts and the Submit and Sign buttons come here with drafting, so reviewing and signing happen in one place ([roadmap.md](./roadmap.md#build-order)).
+- **Right: sources and preview.** The records the selected answer rests on, with the passage each gave and a link to open it, and what the AI looked at. Above the sources is a **preview**: the sample PDF of a template card, or the PDF of the draft the assistant just saved. Submit and Sign buttons come here with passkey signing, so reviewing and signing happen in one place ([roadmap.md](./roadmap.md#build-order)).
 - **Context.** A chat can be pinned to a project, step, document or task, and shows what it is about. The address says what a new chat is about (`/workstation?project=&step=&document=&task=&widget=`), so "Ask AI" on a Dashboard widget, a project, a step and a document, and "Open in Workstation" on a task, are plain links.
-- **Input.** `/` lists commands (`/status`, `/assign`, `/brief`: each starts a message you finish, or for `/brief` sends at once; `/idea` and `/draft` come with drafting). `@` finds people, projects and documents. Enter sends and Shift+Enter starts a new line. Files and photos come with outside documents ([safety](#safety-basics)).
-- **Editing a card.** A card of tasks can be edited on screen (what, who, when), which checks it again as a new version. Any other card is changed by asking the assistant ("make it Monday"), which knows which cards are waiting.
+- **Input.** `/` lists commands (`/status`, `/assign`, `/idea`, `/draft`: each starts a message you finish; `/brief` sends at once). `@` finds people, projects and documents. Enter sends and Shift+Enter starts a new line. A paperclip attaches a Word file or a PDF (up to three) as a sample for a template; the file is uploaded as an outside file, and the message says what it is for ([safety](#safety-basics)). Other files and photos come later.
+- **Editing a card.** A card of tasks can be edited on screen (what, who, when), and a card for a template (its name, steps, who signs, each section's title and instructions, and each field's label, source and whether it is required); each save checks the card again as a new version. Any other card, or a change that moves a field in the document, is made by asking the assistant ("make it Monday"), which knows which cards are waiting.
+- **Drafts and ideas.** A draft the assistant saved shows as a small card in the conversation (its title, version, what is still missing, and buttons to preview and to open and edit it). An idea worked out as a project shows the concept, one box for each person who would get work, and **Review and Go**, which opens the new-project page filled in. Nothing is created until the VP presses Go there.
 - **On a narrow screen,** such as a phone's browser, the three panes become tabs.
 
 ## How the AI works in the first release
@@ -48,7 +49,7 @@ The Workstation is each person's second page: a chat assistant like ChatGPT or C
 - **Through tools.** The AI reads and acts only through tools, and each tool calls the backend's own services. It has no direct database access.
 - **Facts from records.** Numbers, dates, names and statuses come from tool results and are shown with a link to their source. Tables are drawn from the data, not retyped by the AI. If no record answers the question, the AI says it doesn't know, and suggests who might.
 
-### The five things the AI does
+### What the AI does
 
 | # | Feature | Examples | What it writes |
 |---|---|---|---|
@@ -57,6 +58,7 @@ The Workstation is each person's second page: a chat assistant like ChatGPT or C
 | 3 | **Draft a document** from its template | "Draft the PID from the concept" · "Draft the market study" | A draft the user owns ([below](#drafting-a-document)) |
 | 4 | **Assign work and make requests** | "Ask Anil to rerun the FEA by Friday, and tell Priya to update the drawing" | Tasks or requests, after the user confirms ([below](#assigning-work)) |
 | 5 | **Explain and check documents** | "What am I signing, and what changed?" · "Compare draft 2 with draft 3" · "Is anything missing from this Action Plan?" | Nothing |
+| 6 | **Turn a sample document into a template** (VP and R&D Head) | The VP attaches an old Project Initiation Document and says "make this a template" | A draft template, after the user confirms ([below](#making-a-template-from-a-sample-document)) |
 
 Commands for these: `/status`, `/assign`, `/brief` (what am I signing) now; `/idea` and `/draft` with drafting. Asking a question needs no command.
 
@@ -91,12 +93,132 @@ The same mechanism serves bulk actions in the normal screens, for example reassi
 
 ## How a reply is made
 
-1. **The message.** The person sends it in a chat. A chat is private to them, whatever their role, and can be pinned to a project, step, document, task or widget. One reply is written at a time per chat, and the person can stop it ([api.md](./api.md#ai)).
-2. **The budget.** If the person has used today's budget (US$5, Indian time, [D18](./decisions.md)), the message is refused with `AI_BUDGET_REACHED` and nothing is sent to a model.
-3. **The instructions** are built in layers ([below](#how-the-ai-is-told-what-to-do)).
-4. **The model and its tools.** The gateway hands the instructions, the earlier messages and the tools to the provider, which runs the loop: the model asks for a lookup, COAL runs it, the model reads the answer and continues. At most `AI_MAX_TOOL_CALLS` (20) lookups per reply; after that the model is told to answer with what it has.
-5. **The words stream back** to the website as they are written, with a line for each lookup ("Looked at your tasks") as it happens.
-6. **The reply is saved** with its citations, the action cards it prepared, and a record of what it cost and what it looked at ([logged](#what-is-logged)). A new chat gets a short title from the cheaper model.
+This is the whole path of one message, from the person's keyboard to the saved reply. Every box is code in `backend/src/modules/ai/` or the endpoint it calls; the sections after the picture explain each step.
+
+### The path of one message
+
+```mermaid
+flowchart TD
+  P["Person types a message<br/>(optionally attaches a Word file or PDF)"] --> W["Website uploads the file as an outside file,<br/>then POST /ai/chats/ID/messages asking for an event stream"]
+  W --> G1{"Signed in? Their own chat?<br/>Under the rate limit? Files theirs, clean, Word or PDF?"}
+  G1 -- no --> R1["Refused before anything starts<br/>401, 403, 429 or 400"]
+  G1 -- yes --> G2{"Reply already running in this chat?<br/>Today's budget used?"}
+  G2 -- yes --> R2["409 CHAT_BUSY or 429 AI_BUDGET_REACHED<br/>nothing is sent to a model"]
+  G2 -- no --> S["Save the person's message.<br/>A file marks the chat 'outside' for good"]
+  S --> I["Build the instructions in layers:<br/>rules, company and route, role, person, what the chat is about,<br/>waiting cards, writing rules, and file rules if a file is in the chat"]
+  I --> M["Choose the model: the strong template model<br/>if the chat holds a file, else the chat model"]
+  M --> L["Model loop: at most 20 tool calls, 2 minutes"]
+  L --> T{"Does the model ask for a tool?"}
+  T -- "no, it answers" --> F
+  T -- yes --> C["callEndpoint, as the person, marked via AI.<br/>The input is validated first"]
+  C --> K{"The endpoint's own checks, in order:<br/>session, AI tier, outside text,<br/>permission, resource rule, its own rules"}
+  K -- refused --> X["The refusal goes back to the model as text,<br/>with who can help"]
+  K -- allowed --> H["The handler runs: it reads, or saves a draft, a task,<br/>or prepares a card. Writes are audited as 'user via AI'"]
+  H --> O["The result is trimmed to what the model needs.<br/>Records read get tags S1, S2 and are kept as the draft's grounding"]
+  X --> L
+  O --> L
+  F["Words stream back with a line for each tool used"] --> V["Save the reply: text with citations, cards, drafts, ideas.<br/>Log the request and each tool call"]
+  V --> N["A new chat gets a short title from the cheaper model"]
+```
+
+### What each step does
+
+1. **The message.** The website sends it in a chat. A chat is private to the person, whatever their role, and can be pinned to a project, step, document, task or widget. A file is uploaded first, as an outside file (virus-scanned where a scanner runs); the message carries only its id. With `Accept: text/event-stream` the reply streams back; the connection closing, or Stop, aborts it ([api.md](./api.md#ai)).
+2. **The first checks** run before anything is saved: the person is signed in and owns the chat; at most 30 messages a minute; each attached file is the person's own, finished uploading, not infected, and a Word file or a PDF; only one reply runs at a time in a chat (`CHAT_BUSY`); and the person has not used today's budget (US$5, Indian time, [D18](./decisions.md): `AI_BUDGET_REACHED`, with nothing sent to a model). If the assistant is not set up here the answer is `AI_UNAVAILABLE`.
+3. **The message is saved**, with any file as a part of it. A file marks the chat **outside** for good ([safety](#safety-basics)).
+4. **The instructions are built** in layers ([below](#how-the-ai-is-told-what-to-do)), every time, from live data: the route and the person's role come from the database, so nothing is stale.
+5. **The model is chosen.** Everyday chats use the chat model. A chat that holds a file, where the hardest thing asked of the assistant is turning a sample into a template, always uses the strong `template` model ([P89](./decisions.md)). Switching either is configuration.
+6. **The loop.** The gateway hands the instructions, the earlier messages and the tools to the provider. The model asks for a tool, COAL runs it and returns the answer, and the model continues, up to `AI_MAX_TOOL_CALLS` (20) calls and `AI_TURN_TIMEOUT_MS` (2 minutes); after that the model is told to answer with what it has.
+7. **Every tool call goes through `callEndpoint`**, the one function that also runs the actions on an action card. It validates the input, then runs the endpoint's own guard: a signed-in person, the **AI tier** (`confirm`, `never` and `none` endpoints refuse a "via AI" call), the **outside-text rule** (with a file in the chat, `auto` endpoints refuse everything except preparing cards), then the permission and the record's own rule, then the handler. The AI therefore sees and does exactly what the person could, and no more. The server enforces this, not the instructions ([what the AI may do](#what-the-ai-may-do)).
+8. **A refusal is an answer.** It goes back to the model as text (`Not allowed (NOT_ALLOWED): … Who can: …`), so the assistant says so plainly and names who can help. A failed check, such as a draft's number that no source gave or a template that did not pass its checks, comes back as a list of problems to fix, and the model tries again within its limit.
+9. **A result is shaped before the model sees it.** Only what it needs is kept, and the records it read get source tags ([citations](#citations)). The text of everything the tools returned, and what the person said, is also kept for the length of the reply as the **grounding** a draft is checked against.
+10. **The words stream** to the website as they are written, with a line for each lookup as it happens ("Looked at your tasks").
+11. **The reply is saved** with its citations, the action cards, drafts and project ideas it produced, and a record of what it cost and what it looked at ([logged](#what-is-logged)). A new chat gets a short title from the cheaper model.
+
+### The same path with an action card
+
+Anything that affects other people, or that the assistant may not do itself, goes through a card. The model only **prepares** it; confirming is tier `never`, so only the person can.
+
+```mermaid
+sequenceDiagram
+  actor You as The person
+  participant Web as Website
+  participant API as COAL API
+  participant Run as Proposal runner
+  participant DB as PostgreSQL
+  Note over API: The model calls propose (tier auto)
+  API->>Run: preview every action
+  Run->>DB: run each action through its own endpoint, then ROLL BACK
+  Run-->>API: what each would do, who is told, any warnings
+  API-->>Web: the card, version 1 (text, sections or people, warnings)
+  You->>Web: Edit
+  Web->>API: PATCH /proposals/ID, If-Match: version
+  API->>Run: preview again
+  API-->>Web: the card, version 2
+  You->>Web: Confirm
+  Web->>API: POST /proposals/ID/confirm, If-Match: version
+  API->>Run: check permissions again and preview again
+  alt what it would do has changed
+    API-->>Web: 409 PREVIEW_CHANGED, the new card
+  else the same
+    Run->>DB: run every action for real, in ONE transaction
+    DB-->>API: committed, audited as you, with the chat that prepared it
+    API-->>Web: Done
+  end
+```
+
+A card that is not confirmed in 72 hours expires (`PROPOSAL_EXPIRED`). Cancelling it changes nothing.
+
+### The same path with a sample document
+
+```mermaid
+sequenceDiagram
+  actor VP as The VP or the R&D Head
+  participant Web as Website
+  participant API as COAL API
+  participant Model as The strong model
+  VP->>Web: attaches dif.docx and says what it is
+  Web->>API: upload as an outside file, then POST the message with the file id
+  API->>Model: instructions with the file and template rules
+  Model->>API: read_sample, a numbered outline of the file
+  Model->>API: list_document_types and active_template
+  Model->>API: prepare_template with its decisions
+  Note over API: COAL puts the placeholders into the Word file (or builds a plain form from a PDF), checks it like an upload and makes a sample PDF
+  API-->>Model: the problems to fix, or the new file, the sample and the specification
+  Model->>API: propose a card: the type if new, and the template
+  API-->>VP: the card, with the sample PDF in the right-hand pane
+  VP->>API: Confirm
+  Note over API: the type and a draft template are saved. Activating it is a separate step on the Templates page
+```
+
+### The same path for a draft, an idea and an explanation
+
+| | The model uses | What COAL checks | What the person gets |
+|---|---|---|---|
+| **A draft** | `active_template`, `start_draft`, tools that read, `save_draft` | The template is the active one; the person may write on that step; every number in a written section is in a source read in this reply or said by the person; a field the person types is in their own words; COAL's own fields cannot be set; required parts left empty are reported as gaps | A draft version owned by the person, its sections marked as the assistant's until they edit them, with a preview |
+| **An idea** | `list_product_lines`, `preview_project` | Only the VP may preview Go; the route, not the model, decides who gets which task; nothing is created | A card with the concept, one box for each person, and **Review and Go**, which opens the new-project page filled in |
+| **An explanation** | `waiting_signatures`, `read_document`, `compare_versions` | Only what the person may see is read; a restricted document shows only that it exists | Words with citations; nothing is written |
+
+### Where a request can stop
+
+| Check | Where | Code | What the person sees |
+|---|---|---|---|
+| Signed in; their own chat | Every endpoint | `NOT_SIGNED_IN` 401; `NOT_ALLOWED` 403 | Sign in again |
+| Too many messages | `ai.messages.send` | `RATE_LIMITED` 429 | Wait a minute |
+| A file that is not theirs, not finished, infected, or not Word or PDF | `ai.messages.send` | `NOT_ALLOWED` 403; `VALIDATION_FAILED` 400 | The file is refused, with why |
+| One reply at a time | `ai.messages.send` | `CHAT_BUSY` 409 | Wait for the reply, or stop it |
+| Today's budget used | `ai.messages.send` | `AI_BUDGET_REACHED` 429 | It starts again tomorrow |
+| The assistant is not set up | `ai.messages.send` | `AI_UNAVAILABLE` 503 | Ask whoever runs COAL |
+| The model fails, or takes too long | The loop | `AI_UNAVAILABLE` 502 | What was written is kept, marked as stopped |
+| A tool the model may not use | Its AI tier | `AI_NOT_ALLOWED` 403, as text to the model | The assistant says it can only prepare a card, or may not do it |
+| A file is in the chat | The outside-text rule | `AI_NOT_ALLOWED` 403, as text | Everything becomes a card |
+| The person may not do it | Permission and resource rule | `NOT_ALLOWED` 403 with `whoCan`, as text | The assistant says so and names who can |
+| The thing is not possible now | The endpoint's own rules | `STEP_NOT_READY`, `DOCUMENT_LOCKED` and others, as text | The assistant says why |
+| A draft that rests on nothing | Drafting checks | `VALIDATION_FAILED` 400, as text | The model fixes it, or asks the person |
+| A template that does not pass its checks | Template checks | `VALIDATION_FAILED` 400 with every problem, as text | The model fixes the plan and builds again |
+| Too many tool calls | The loop | Said to the model | It answers with what it has and says what is missing |
+| A card the model may not prepare | The card runner | `VALIDATION_FAILED` 400, as text | Signing and deciding are not on any card |
+| Confirming a card | Confirm | `VALIDATION_FAILED` (no `If-Match`), `PREVIEW_CHANGED` 409, `PROPOSAL_EXPIRED` 409 | The card is shown again as it now stands |
 
 ### The tools
 
@@ -110,6 +232,10 @@ Each tool is a thin wrapper over one endpoint, takes that endpoint's AI tier, an
 | `list_deviations` | `GET /deviations` | read | Why work is late |
 | `list_documents`, `read_document`, `compare_versions` | documents | read | What a document says, and what changed |
 | `active_template` | `GET /templates/active` | read | The template in use for a document type (asked for every time) |
+| `list_document_types` | `GET /document-types` | read | Which kinds of document exist, their steps and signers |
+| `read_sample`, `prepare_template` | `GET /templates/sample-outline`, `POST /templates/prepare` | read | A sample document as a numbered outline; turning it into a template without saving one ([the flow](#making-a-template-from-a-sample-document)) |
+| `start_draft`, `save_draft` | `POST /projects/{id}/documents`, `POST /documents/{id}/versions` | auto | Starting a document from its template, and saving the assistant's words as a draft the person owns ([drafting](#drafting-a-document)) |
+| `list_product_lines`, `preview_project` | `GET /product-lines`, `POST /projects/preview` | read | The product lines, and what Go would do for a concept, creating nothing ([idea to project](#idea-to-project)) |
 | `find_person` | `GET /users` | read | Who someone is, and their role |
 | `waiting_signatures` | `GET /signature-requests` | read | What waits for the person's signature |
 | `get_widget` | `GET /widgets/{key}` | read | A Dashboard widget's numbers and rows |
@@ -124,36 +250,65 @@ Every tool result gives the records it read a tag (`[S1]`, `[S2]`…). The AI is
 
 ### What is logged
 
-- **`ai_requests`** (insert-only): for each reply, the provider, model, prompt version, model calls, tool calls, tokens, cost, outcome (completed, stopped, error) and time. The title is a separate row with purpose `title`. The cost is worked out from the tokens at starting prices ⚠ ([AI11](./open-questions.md#ai)): it sets the budget and is never a bill.
+- **`ai_requests`** (insert-only): for each reply, the provider, model, prompt version, model calls, tool calls, tokens, cost, outcome (completed, stopped, error) and time. The title is a separate row with purpose `title`, and a chat that holds a file logs its replies with purpose `template`. The cost is worked out from the tokens at starting prices ⚠ ([AI11](./open-questions.md#ai)): it sets the budget and is never a bill.
 - **`ai_tool_calls`** (insert-only): each tool the AI used, the endpoint and tier, whether it was allowed (and why not), what it asked for (cut short), and the records it got back.
-- **Writes** are in the audit trail as usual: a task the AI made for the person is "user via AI", and a card prepared in a chat records that chat.
+- **Writes** are in the audit trail as usual: a task or a draft the AI made for the person is "user via AI", and a card prepared in a chat records that chat. A draft version also points to the reply that wrote it (`ai_request_id`).
 - Logs never carry the person's words or the AI's answers; those are in the chat itself, which only its owner can read.
 
 ## The main flows
 
 ### Idea to project
 
-1. **Describe.** The VP chooses **New idea** and describes it in their own words.
-2. **Fill gaps.** The AI picks out what it needs: product, product line, where the idea came from (market or the VP's own requirement), the need, key requirements, target markets, any references, priority, and the desired launch. It asks only for what's missing and essential; the product line is required.
-3. **Draft.** The AI drafts the **product concept** and shows it in the preview.
-4. **Preview the project.** The AI asks the backend to preview creating the project. **The process engine, not the AI, decides what happens:** step C completes, steps 1, 2 and 2a open, and their tasks go to the people found by [the routing rules](./roles-and-access.md#who-gets-a-task).
-5. **Show the boxes.** One box per person: their step and task, who they work with, who signs, the due date, and the work message they'll receive.
-6. **Edit and Go.** The VP edits a box or the concept if needed, then presses **Go** and signs with Face ID or a fingerprint. The project is created, everyone gets their task and work message, and every project member gets a project space in their Workstation.
+1. **Describe.** The VP describes the idea in their own words, in the Workstation (`/idea` starts the message).
+2. **Fill gaps.** The assistant picks out what it needs: product, product line (`list_product_lines`; required), where the idea came from (the market or the VP's own requirement), the need, key requirements, target markets, any references, priority and the desired launch. It asks one short question, only for what is missing and essential.
+3. **Concept.** It writes the **product concept** as plain text from the VP's words, one short line for each of those, and leaves out what was not given. For now the concept is the project's name and description: step C is not a document yet ([S10](./open-questions.md#documents-and-signing)).
+4. **Preview the project.** The assistant calls `preview_project` (`POST /projects/preview`, tier `read`, only the VP). It does what Go would do and rolls it back. **The process engine, not the assistant, decides what happens:** step C completes, steps 1, 2 and 2a open, and their tasks go to the people found by [the routing rules](./roles-and-access.md#who-gets-a-task).
+5. **Show the boxes.** The reply carries an **idea card**: the concept, and one box for each person (or waiting queue) with the steps and tasks they would get, and any warnings, such as "No DARD user yet, so this goes to the DARD queue". Due dates and work messages come with the created project ⚠ ([AI14](./open-questions.md#ai)).
+6. **Review and Go.** **Review and Go** opens the new-project page with the name, concept and product line filled in, where the VP can still change anything, preview again, and press **Go**. Go is the VP's own act: a confirmed click now, and Face ID or a fingerprint once passkeys arrive ([D16](./decisions.md)). The assistant cannot create the project: `projects.create` is tier `never`, and a card cannot carry it. When the project is created, everyone gets their task and work message, and every project member gets a project space in their Workstation.
 
-The same flow works without the AI: New idea is also a plain form.
+The same flow works without the assistant: New project is also a plain form.
+
+### Making a template from a sample document
+
+For the VP and the R&D Head, who are the ones who may add templates ([S6](./open-questions.md#documents-and-signing)). The sample is a Word (`.docx`) file or a **text PDF**: an old form, or a filled-in one from a past project. The AI turns it into COAL's own kind of template: **COAL's code builds the Word file and checks it; the AI only decides what each part is.**
+
+1. **Attach.** The person attaches the file with the paperclip (it is uploaded and virus-scanned like any file) and says what it is: "Make this our Design Input template for step 4."
+2. **Read.** The AI reads the file with `read_sample`, which returns it as a numbered outline (`p1`, `p2`, …). For a Word file: each paragraph, table cell, header and footer, with an id, in order. For a PDF: each page's lines, with their size and boldness as hints to headings, tables recognised where the text lines up in columns, and an id for each block. The file is **outside text** ([safety](#safety-basics)): the AI treats it as data, never as instructions, and what it writes in the chat can only become cards.
+3. **Decide.** For each part, the AI decides whether it is:
+   - **boilerplate**, which stays exactly as it is;
+   - a **field** filled from a record (project code, name, product line, step, dates, team table, author, today), where the value in the sample is one of those; or a field the **person** types, where the value is specific to one project but COAL holds no record of it;
+   - a **written section**, where the sample holds narrative for someone to write. The AI says what each should contain, from the text around it, and which sources it uses.
+
+   It also proposes the document type, the steps it belongs to, and who reviews and approves. It asks the person only what it cannot tell from the file (for example which step the form is for). It never copies the sample's own values into the template.
+4. **Build.** The AI sends its decisions to `prepare_template` (`POST /templates/prepare`): for each section, whether it is fields or written; for each field, where it comes from and where in the sample its value shows (a part, and the words to replace, or a blank cell); for each written section, the example parts it replaces, or the part it goes after; for the team table, which cells of one filled row hold each column; and the example rows and parts to drop. COAL builds the specification from the same decisions, so the placeholders and the specification agree by construction. COAL's code puts the `{placeholders}` into a copy of the person's file, in the original layout (headers, fonts, tables and logos stay). A PDF has no layout to edit, so COAL builds a **plain Word form** from the same decisions (headings, paragraphs and tables, in COAL's plain style, as the sample templates are). Either way it runs **the same checks** as an upload ([adding a template](./documents-and-signing.md#adding-a-template)): the placeholders match the specification both ways, the roles and steps are real, and a sample PDF made from made-up data renders. A failed check goes back to the AI as text, so it can fix the edits and build again (within the usual limits on tools). Nothing is saved yet.
+5. **Show.** An action card (for a PDF it says plainly: "Layout rebuilt in a plain style"): the document type, name and steps; a table of the sections (boilerplate kept, fields with their source, written sections with their instructions); the signature rows and reviewers; and the **sample PDF** in the preview pane, so the person sees the layout. If the document type doesn't exist yet, the same card also **adds it** ([P86](./decisions.md)).
+6. **Edit.** On the card (**Edit**) the person can change the template's name, the steps, the signing rows, who reviews and approves, a note for the library, each section's title and instructions and whether it is required, and each field's label, source and whether it is required. Anything that moves a placeholder (making a field a written section, adding or removing a section, finding another sentence in the sample) is done by asking: "make Target markets a written section", and the AI builds again and replaces the card. Every change is checked again; the card always shows what will be saved.
+7. **Confirm.** The person confirms. In one transaction COAL adds the document type, if it is new, and saves a **draft** template version as the person. Each file records the file it was made from (`files.derived_from`: the sample, then the built Word file, then its sample PDF), and the audit trail records the chat that prepared the card. **Activating it is a separate step**, on the Templates page ([P87](./decisions.md)), so a person looks at the sample PDF once more before every new document uses it.
+
+**What a PDF can't do.** It can't keep the original's look (fonts, logos, exact spacing), and tables and reading order are worked out from where the text sits, so the AI is told to be less sure of them and to ask. A scan or a photo has no text, so it is refused with a clear message until a reader for scans is added ([AI13](./open-questions.md#ai)); so is a PDF over 30 pages or 10 MB, or one that won't open. Replacing the layout later is cheap: a Word file in Jayon's real layout, uploaded for the same type, is a new version that reuses the specification.
+
+**The model.** This flow reads a whole document and has to get structure right, so it runs on the strong model (Sonnet by default), not the cheap one: chat replies in a chat that holds a sample file use the `template` model ([P89](./decisions.md)).
 
 ### Drafting a document
 
-1. **Start.** The user asks for a document, or presses "Draft it" on a task.
-2. **Find the template.** Every time, the AI looks up the document type's **active template** in the [template library](./documents-and-signing.md#the-template-library). It never works from memory or an earlier chat, so a changed template applies at once. If there's no template, it says so; it can still write a plain draft, marked "no template".
-3. **Gather.** The template's specification says which sections are **fields** and which are **written**. The AI gathers the inputs with tools: earlier documents, the team, dates. It asks the person for any field COAL doesn't hold.
-4. **Write.** Fields are filled from records or from the person's answers, never by the AI. The AI writes only the written sections, each with citations.
-5. **Check.** Every required section is present, every field has a value or is flagged as a gap, and no written section states a number that isn't in a source.
-6. **Preview.** The draft opens in the preview, with gaps highlighted. The user edits by chatting ("make the scope narrower") or directly.
-7. **Save.** Saving creates a new draft version owned by the user (`auto` tier). Submitting it for signatures goes through an action card. Signing is always the user's own act.
-8. **Record.** Each draft records the template version, model, instructions and sources that produced it. AI-written sections are marked as such until a person edits or approves them.
+1. **Start.** The user asks for a document in the Workstation (`/draft` starts the message). A "Draft it" button on a task comes later.
+2. **Find the template.** Every time, the AI looks up the document type's **active template** in the [template library](./documents-and-signing.md#the-template-library) (`active_template`). It never works from memory or an earlier chat, so a changed template applies at once. If there's no template, it says so, and that the person can upload the document, or the VP or the R&D Head can add the template (a sample document can be turned into one in the chat).
+3. **Start the draft.** `start_draft` makes the document from the template on the step, as draft 1 owned by the person, with the fields COAL holds records for already filled. If a draft exists, the AI works on it instead.
+4. **Gather.** The template's specification says which sections are **fields** and which are **written**. The AI gathers the inputs with tools: earlier documents, the project, the dates. It asks the person, in one short question, for any field only they can give, especially required ones.
+5. **Write.** Fields are filled from records or from the person's answers, never by the AI. The AI writes only the written sections, from what it read. It cites the records in its message, not inside the document.
+6. **Check.** `save_draft` saves a new draft version, and the server checks it first (`draftProblems` in `shared/`):
+   - **Numbers.** Every number in a written section, and in a field, must be in something the tools returned in this reply, or in what the person said. A single digit passes: it is usually a count in words, and a made-up dimension or strength is never one.
+   - **The person's fields** must be in their own words: most of their words must appear in what the person said in this chat.
+   - **COAL's own fields** (project code, dates, the team) cannot be set.
+   - A refusal comes back as text and the AI fixes it. **Gaps** (required sections and fields left empty) are not refusals: they are reported, so the AI can say what is missing and who can give it. The checks are a floor, not a proof ⚠ ([AI14](./open-questions.md#ai)): the person reads and edits the draft.
+7. **Preview and save.** The draft is a new version owned by the person (`auto` tier; nothing is overwritten). The reply carries a **draft card** with its version, what is missing, and buttons to preview its PDF in the right-hand pane and to open and edit it. The person edits by chatting ("make the scope narrower": a new version with only that section changed) or directly. Submitting it for signatures goes through an action card, and signing is always the person's own act.
+8. **Record.** Each version records that the assistant saved it (`via_ai`), the reply that wrote it (`ai_request_id`, whose log gives the model, the instructions' version and every record read), and the written sections it wrote and nobody has changed since (`ai_sections`). The document form marks those sections "Written by the assistant" until a person edits the section or the version is approved.
 
-**Which templates:** every step's documents, as their templates are added to the library, starting with stages 1 and 2. For steps whose data COAL doesn't hold yet, most fields come from the person. The AI can still help with any document as a chat.
+**Which templates:** every step's documents, as their templates are added to the library, starting with stages 1 and 2. For steps whose data COAL doesn't hold yet, most fields come from the person. In a chat that holds an outside file, drafting is closed: it would save on the file's say-so ([safety](#safety-basics)).
+
+### Explaining and checking documents
+
+No new write is needed: the assistant reads. `waiting_signatures` lists what waits for the person; `read_document` returns a version's fields and sections, who signs and has signed, the **gaps** the template still needs and the sections the assistant wrote that nobody has changed; `compare_versions` says what changed, field by field and section by section. The assistant explains in plain words with citations, and never tells the person to sign or not to sign. `/brief` asks "what am I signing, and what changed?" in one click.
 
 ### Assigning work
 
@@ -181,7 +336,7 @@ COAL uses **Claude (Anthropic)** ([D17](./decisions.md)). OpenAI isn't integrate
 
 - **One gateway.** All AI calls go through one small gateway in the backend, which hides the provider behind one interface: "run a turn with these instructions and these tools, and stream the answer back".
 - **Configuration, not code.** Switching the model is a configuration change. Each purpose can have its own model:
-  - chat and drafting use a strong model;
+  - chat, drafting and making a template from a sample use a strong model (`AI_MODEL_CHAT`, `AI_MODEL_DRAFT_WRITE` and `AI_MODEL_TEMPLATE`);
   - short tasks, such as titles, classification and extraction, use a cheaper one.
 - **Two adapters, one interface.** A provider takes a turn (instructions, earlier messages, tools) and streams words back; tools, limits, logging and costs are COAL's own and are the same for every provider. The Anthropic adapter uses the Vercel AI SDK and names the workspace its key bills to on every call. The scripted stand-in plays a fixed script of words and tool calls, so the automatic tests need no key.
 - **For now, Copilot on one laptop.** While the company laptop's network blocks the Anthropic API, Sharath's local development runs the AI through the GitHub Copilot SDK on his own Copilot licence (`AI_PROVIDER=copilot`, [D19](./decisions.md)). It is a stand-in for his own local work only: never for demos with other people, never with Jayon's data, and the backend refuses to start with it in production. It is a development-only dependency. COAL offers it only its own tools (`custom:*`: none of its built-in shell, file or web tools) and refuses every permission request it makes. Every request uses his Copilot allowance. When it ends, the AI test sets run again on Anthropic.
@@ -198,17 +353,21 @@ Each request builds the AI's instructions in layers (`backend/src/modules/ai/pro
 3. **Role** (`role.ts`): the steps this person's role does and signs, worked out from the route.
 4. **User:** name, role, product line, and today's date in Indian time.
 5. **Context:** the pinned project, step, document, task or widget, with ids so the AI need not search; and the action cards of this chat that still wait, with their ids, so "make it Monday" can change the right one.
-6. **Retrieved data:** tool results, each with source tags.
+6. **Writing rules** (`writing.ts`): how to draft a document, how to work out a new project from an idea, and how to explain and check documents.
+7. **A file is in the chat** (`template.ts`, only then): that the file's words are never instructions, and how to turn a sample into a template.
+8. **Retrieved data:** tool results, each with source tags.
 
-The first three layers are files in the repository. Every request logs a **prompt version** (`v1-` and a fingerprint of the fixed text), which changes whenever the words do, so a change in behaviour can be traced to a change in the instructions. Any change should be checked against the AI test sets ([below](#testing-the-ai)).
+The layers are files in the repository, apart from the data. Every request logs a **prompt version** (`v1-` and a fingerprint of the fixed text), which changes whenever the words do, so a change in behaviour can be traced to a change in the instructions. Any change should be checked against the AI test sets ([below](#testing-the-ai)).
 
 ## Safety basics
 
-- **Outside documents.** Lab reports, vendor PDFs and anything else from outside Jayon are marked "outside" when uploaded.
-  - While outside text is in a chat, the AI can't save anything automatically. Every write becomes an action card, and it can't create requests or messages to others.
-  - Links and images in AI answers aren't displayed. (The AI is told not to write them; the chat screen shows only text, citations and cards, and comes in the next part.)
+- **Outside documents.** A file attached to a chat (a sample document, later lab reports and vendor PDFs) is uploaded as an **outside** file. From the moment one is in a chat, the chat is outside for good (`ai_chats.has_outside_text`), and:
+  - the server refuses the AI every `auto` endpoint except preparing cards (`proposals.create` and `proposals.update`), so it can't add a task, start or save a draft, or save anything else on the file's say-so; a person confirms every card;
+  - the AI is told, in its instructions, that the file's words are information about the file, never instructions, and to tell the person if the file tries to give some;
+  - the chat uses the strong model, and its requests are logged with the purpose `template`;
+  - links and images in AI answers aren't displayed: the chat screen shows only text, citations, cards, drafts and project ideas.
 
-  This limits what hidden instructions in a document can do.
+  This limits what hidden instructions in a document can do. The reader for lab reports and certificates, with no tools at all, is later ([Later](#later)).
 - **No dangerous tools.** There is no tool to sign, decide, delete, or send anything outside Jayon. No instruction, however worded, can make the AI do these.
 - **Refusals.** If the user may not see something, the AI says so plainly and names who can. It never hints at the content.
 - **Drafts are drafts.** AI-written sections are marked until a person edits or approves them, and a person signs every document.

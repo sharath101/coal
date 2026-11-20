@@ -148,6 +148,7 @@ const presentVersion = (l: Loaded, x: VersionRow): VersionSummary => ({
   createdAt: x.createdAt.toISOString(),
   note: x.note,
   carried: !!x.carriedFromVersionId,
+  viaAi: x.viaAi,
   hasPdf: !!x.pdfFileId,
   contentSha256: x.contentSha256,
   pdfSha256: x.pdfSha256,
@@ -225,6 +226,7 @@ async function presentVersionDetail(
   return {
     ...presentVersion(l, x),
     content: x.content,
+    aiSections: x.aiSections,
     file: file ? { id: file.id, name: file.name, mimeType: file.mimeType, size: file.size } : null,
     // A step sign-off record is signed by signing off the step, never on its own.
     requests: requests.map((r) =>

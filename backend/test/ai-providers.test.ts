@@ -202,9 +202,16 @@ describe('settings', () => {
       chat: 'claude-sonnet-5-5',
       title: 'claude-haiku-5-5',
       draft_write: 'claude-sonnet-5-5',
+      template: 'claude-sonnet-5-5',
     });
+    // Turning a sample into a template stays on the strong model when the everyday one is made cheaper.
     expect(config({ AI_PROVIDER: 'copilot', AI_MODEL_CHAT: 'claude-haiku-5.5' }).ai.models).toEqual(
-      { chat: 'claude-haiku-5.5', title: 'claude-haiku-5.5', draft_write: 'claude-sonnet-5.5' },
+      {
+        chat: 'claude-haiku-5.5',
+        title: 'claude-haiku-5.5',
+        draft_write: 'claude-sonnet-5.5',
+        template: 'claude-sonnet-5.5',
+      },
     );
   });
 

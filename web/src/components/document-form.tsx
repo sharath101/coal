@@ -72,6 +72,10 @@ export function DocumentForm({
   const [typed, setTyped] = useState<Typed>(initial);
   const [note, setNote] = useState('');
   const editable = doc.can.edit;
+  // The assistant's mark stays until a person changes the section or the version is approved.
+  const open = version.status !== 'approved' && version.status !== 'superseded';
+  const writtenByAssistant = (id: string) =>
+    open && version.aiSections.includes(id) && typed.sections[id] === initial.sections[id];
   const dirty = !same(typed.fields, initial.fields) || !same(typed.sections, initial.sections);
 
   useEffect(() => {
@@ -176,6 +180,9 @@ export function DocumentForm({
               <h3 className="text-sm font-medium">
                 {specTitle(section)} {required(section.required)}
               </h3>
+              {writtenByAssistant(section.id) && (
+                <p className="text-xs text-muted-foreground">{t('writtenByAssistant')}</p>
+              )}
               {editable ? (
                 <>
                   <Label htmlFor={id} className="font-normal text-muted-foreground">

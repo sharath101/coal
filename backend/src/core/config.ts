@@ -6,7 +6,7 @@ const repoEnvFile = fileURLToPath(new URL('../../../.env', import.meta.url));
 if (process.env.NODE_ENV !== 'test' && existsSync(repoEnvFile)) process.loadEnvFile(repoEnvFile);
 
 /** What the AI is asked for; each can use its own model (docs/workstation-and-ai.md#ai-providers). */
-export const AI_PURPOSES = ['chat', 'title', 'draft_write'] as const;
+export const AI_PURPOSES = ['chat', 'title', 'draft_write', 'template'] as const;
 export type AiPurpose = (typeof AI_PURPOSES)[number];
 export const AI_PROVIDERS = ['anthropic', 'copilot', 'none'] as const;
 export type AiProviderName = (typeof AI_PROVIDERS)[number];
@@ -17,11 +17,13 @@ const DEFAULT_MODELS: Record<'anthropic' | 'copilot', Record<AiPurpose, string>>
     chat: 'claude-sonnet-5-5',
     title: 'claude-haiku-5-5',
     draft_write: 'claude-sonnet-5-5',
+    template: 'claude-sonnet-5-5',
   },
   copilot: {
     chat: 'claude-sonnet-5.5',
     title: 'claude-haiku-5.5',
     draft_write: 'claude-sonnet-5.5',
+    template: 'claude-sonnet-5.5',
   },
 };
 
@@ -84,6 +86,7 @@ const Env = z.object({
   AI_MODEL_CHAT: z.string().default(''),
   AI_MODEL_TITLE: z.string().default(''),
   AI_MODEL_DRAFT_WRITE: z.string().default(''),
+  AI_MODEL_TEMPLATE: z.string().default(''),
 });
 
 export type AppConfig = ReturnType<typeof loadConfig>;
@@ -104,6 +107,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
     chat: e.AI_MODEL_CHAT,
     title: e.AI_MODEL_TITLE,
     draft_write: e.AI_MODEL_DRAFT_WRITE,
+    template: e.AI_MODEL_TEMPLATE,
   };
   const defaults = provider === 'none' ? DEFAULT_MODELS.anthropic : DEFAULT_MODELS[provider];
   return {

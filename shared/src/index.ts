@@ -25,6 +25,7 @@ export * from './rules/names';
 export * from './rules/files';
 export * from './rules/templates';
 export * from './rules/documents';
+export * from './rules/drafting';
 export * from './rules/calendar';
 export * from './rules/schedule';
 export * from './rules/measures';

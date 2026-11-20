@@ -3,13 +3,15 @@ import type { RouteDefinition } from '@coal/shared';
 import { COMPANY_FACTS, routeSummary } from './company';
 import { PLATFORM_RULES } from './platform';
 import { roleSummary } from './role';
+import { OUTSIDE_TEXT_RULES, SAMPLE_RULES } from './template';
+import { WRITING_RULES } from './writing';
 
 /**
  * A short fingerprint of the fixed instructions: it changes whenever their text does, and is
  * logged with every model request, so a change in behaviour can be traced to a change in words.
  */
 export const PROMPT_VERSION = `v1-${createHash('sha256')
-  .update(PLATFORM_RULES + COMPANY_FACTS)
+  .update(PLATFORM_RULES + COMPANY_FACTS + WRITING_RULES + OUTSIDE_TEXT_RULES + SAMPLE_RULES)
   .digest('hex')
   .slice(0, 8)}`;
 
@@ -22,6 +24,8 @@ export interface InstructionInputs {
   context: string[];
   /** The action cards of this chat that still wait for the person, in words. */
   cards: string[];
+  /** A file from outside is in the chat: the rules for reading it, and for making a template from it. */
+  hasFile?: boolean;
 }
 
 /** The layers of the AI's instructions, in order (docs/workstation-and-ai.md#how-the-ai-is-told-what-to-do). */
@@ -47,6 +51,9 @@ export function buildInstructions(i: InstructionInputs): string {
     person,
     pinned,
     waiting,
+    WRITING_RULES,
+    i.hasFile ? OUTSIDE_TEXT_RULES : '',
+    i.hasFile ? SAMPLE_RULES : '',
   ]
     .filter(Boolean)
     .join('\n\n');

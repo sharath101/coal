@@ -104,7 +104,7 @@ export async function runActions(
       );
       previews.push({
         endpoint: impl.endpoint.id,
-        ...impl.describe(output as never, input as never),
+        ...(await impl.describe(output as never, input as never, deps)),
       });
       outputs.push(output);
     } catch (error) {

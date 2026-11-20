@@ -16,6 +16,9 @@ export interface NewVersion {
   note: string;
   createdBy: string;
   viaAi?: boolean;
+  /** The reply of the assistant that wrote it, whose log says the model, the instructions and the sources. */
+  aiRequestId?: string | null;
+  aiSections?: string[];
   carriedFromVersionId?: string | null;
   status?: VersionRow['status'];
 }
@@ -44,6 +47,8 @@ export async function insertVersion(tx: Tx, orgId: string, input: NewVersion): P
       note: input.note,
       createdBy: input.createdBy,
       viaAi: input.viaAi ?? false,
+      aiRequestId: input.aiRequestId ?? null,
+      aiSections: input.aiSections ?? [],
       carriedFromVersionId: input.carriedFromVersionId ?? null,
     })
     .returning();

@@ -62,6 +62,8 @@ export const VersionSummary = z.object({
   note: z.string(),
   /** Copied forward from the step's earlier iteration, unchanged. */
   carried: z.boolean(),
+  /** Saved by the assistant on the person's behalf. */
+  viaAi: z.boolean(),
   hasPdf: z.boolean(),
   contentSha256: z.string(),
   pdfSha256: z.string().nullable(),
@@ -70,6 +72,8 @@ export type VersionSummary = z.infer<typeof VersionSummary>;
 
 export const VersionDetail = VersionSummary.extend({
   content: ContentSchema.nullable(),
+  /** The written sections the assistant wrote, that no person has changed since: shown as such until someone edits or approves. */
+  aiSections: z.array(z.string()),
   /** The uploaded file, for an uploaded document. */
   file: z
     .object({ id: Id, name: z.string(), mimeType: z.string(), size: z.number().int() })

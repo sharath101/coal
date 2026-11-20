@@ -79,6 +79,7 @@ Signing is a confirmed click until passkeys arrive in the last block ([D16](./de
 | Endpoint | Purpose | Tier |
 |---|---|---|
 | `POST /projects` | Go: create the project from a concept, with its team and its first tasks. **A confirmed click by the VP, recorded as a signed decision** (passkeys come in the last block). With `?preview=true`: the steps that open, the tasks and who gets them, the team and warnings, and nothing is saved | never |
+| `POST /projects/preview` | What Go would do for a concept (name, description, product line, team), changing nothing: the steps that open and who gets each task. Only those who may press Go. The assistant uses it for an idea | read |
 | `GET /projects`, `GET /projects/{id}` | Every project's status (open to everyone signed in), with `filter[status]`, `filter[productLine]` and cursor paging. The detail also says what the signed-in person may do (`can`: hold, resume, drop, edit the team) | read |
 | `GET /projects/{id}/route` | Each step's state, iteration, doers, signer, what it waits for, its decisions and tasks, and what the signed-in person may do there now (`actions`); the milestones; the open corrective actions. This is the route view | read |
 | `GET /projects/{id}/team`, `PUT /projects/{id}/team` | See or change the project team (Lead or Head). The change is audited, and removed members keep their record | read / confirm |
@@ -132,15 +133,18 @@ Work given by hand (`POST /tasks`) isn't on the route's plan: no step closes or 
 | `GET /templates`, `GET /templates/{id}` | The template library: each version's status, specification and who added and activated it. Everyone sees the active versions; the VP and the R&D Head also see drafts and retired ones | read |
 | `GET /templates/active?documentType=` | The active template for a document type. The AI calls this every time it drafts | read |
 | `GET /templates/{id}/links` | Short-lived links to a template's sample PDF, and its Word file for the VP and the Head | read |
+| `POST /document-types` | Add a kind of document made from a template: code, name, the steps it belongs to, numbering (left out: `{project_code}-{type}-{nn}`) and who signs (VP or R&D Head). A failure lists every problem. It goes on an action card with the first template of the type | confirm |
+| `GET /templates/sample-outline?fileId=` | A sample the person uploaded (a Word file, or a PDF with text) as a numbered outline: every paragraph, table cell, header and footer, with its place. A PDF is read as a plain Word form (`layout: rebuilt`). Refuses a scan, a PDF over 30 pages or 10 MB, a file that is not theirs, and anyone but the VP and the R&D Head. Its text is outside text | read |
+| `POST /templates/prepare` | Turn a sample into a template without saving one: COAL puts the placeholders into the Word file as the plan says (or builds a plain Word form from a PDF), checks it like an upload and makes a sample PDF; both are stored as the person's files, each pointing at the one it was made from. A failure is `400 VALIDATION_FAILED` with every problem | read |
 | `POST /templates` | Add a template version (VP or R&D Head): the Word file, uploaded first, and optionally a specification (left out, the previous version's is reused). COAL checks the file and makes a sample PDF; a failure is `400 VALIDATION_FAILED` with every problem in `errors`. A pass is saved as a draft | — |
 | `POST /templates/{id}/activate` | Make a draft or retired version active; the previous active one is retired (VP or R&D Head) | never |
 | `GET /projects/{id}/documents?step=` | The project's documents the person may see, with whether each is `restricted` to its outcome | read |
 | `POST /projects/{id}/documents` | A new document on a step, from the active template or an upload, as draft 1. `409 NO_TEMPLATE` when the type has no active template | auto |
 | `GET /documents/{id}?version=` | A document, its versions, and one version in full (the latest by default) with its signature rows and signatures | read |
-| `POST /documents/{id}/versions` | Save a new draft version: the fields and written sections that changed (or a new file, for an upload) and a note. Makes the PDF. Saving what is already saved makes no new version | auto |
+| `POST /documents/{id}/versions` | Save a new draft version: the fields and written sections that changed (or a new file, for an upload) and a note. Makes the PDF. Saving what is already saved makes no new version. Saved "via AI", the words must pass the drafting checks (numbers from a source; the person's fields in their own words; COAL's fields untouched), `400 VALIDATION_FAILED` with each problem otherwise; the version records the reply that wrote it and the sections the assistant wrote | auto |
 | `GET /documents/{id}/versions/{n}/links` | Short-lived links to a version's PDF and its uploaded file | read |
 | `GET /documents/{id}/compare?from=&to=` | Compare two versions of a template document | read |
-| `POST /files/upload-url` | Start an upload: checks the type and size, and returns a short-lived link to upload the file to a staging area in storage. The link accepts only the declared size | auto |
+| `POST /files/upload-url` | Start an upload (`origin` `internal` or `outside`; a file attached to a chat is `outside`): checks the type and size, and returns a short-lived link to upload the file to a staging area in storage. The link accepts only the declared size | auto |
 | `POST /files/{id}/complete` | Finish an upload: COAL reads the staged file once, checks its size and records its SHA-256 hash, then moves exactly those bytes to where they're served from, which no upload link can write to, and has it scanned for viruses where a scanner is set up. Safe to repeat | auto |
 | `GET /files/{id}/link` | A short-lived download link, after the permission check: the uploader, or anyone who may see a record that holds the file. An infected file is refused, and so is an unscanned one where a scanner is set up | read |
 | `POST /projects/{id}/attachments`, `GET /projects/{id}/attachments?step=&document=&task=` | Attach files and pictures to a step, document or task; list them | auto / read |
@@ -178,11 +182,11 @@ None of these is available to the AI as a tool (`—`): they are how a person ta
 | `POST /ai/chats` | Start a chat, optionally pinned to a project, a step of it, a document, a task or a widget. What it is pinned to must exist and be something the person may open | — |
 | `GET /ai/chats?filter[project]=` | My chats, most recently used first, or those about one project | — |
 | `GET /ai/chats/{id}` | One of my chats with its messages (the latest 200), my ratings, and its action cards as they stand now | — |
-| `POST /ai/chats/{id}/messages` | Send a message and get the reply. Plain: the finished reply as JSON (`userMessage` and `message`). With `Accept: text/event-stream`: the reply streams as events ([below](#streaming-a-reply)). `409 CHAT_BUSY` while a reply is being written; `429 AI_BUDGET_REACHED` once today's budget is used; `503 AI_UNAVAILABLE` where no provider is set up; `502 AI_UNAVAILABLE` when the model can't be reached. Refusals come back as a normal problem response, before any stream starts | — |
+| `POST /ai/chats/{id}/messages` | Send a message (`text`, and up to three `fileIds`: the person's own finished Word or PDF uploads) and get the reply. Plain: the finished reply as JSON (`userMessage` and `message`). With `Accept: text/event-stream`: the reply streams as events ([below](#streaming-a-reply)). `409 CHAT_BUSY` while a reply is being written; `429 AI_BUDGET_REACHED` once today's budget is used; `503 AI_UNAVAILABLE` where no provider is set up; `502 AI_UNAVAILABLE` when the model can't be reached. Refusals come back as a normal problem response, before any stream starts | — |
 | `POST /ai/chats/{id}/stop` | Stop the reply being written. What was written is kept and marked `stopped`. `{ "stopped": false }` when none is running. It reaches the API copy that is writing it ⚠ | — |
 | `POST /ai/feedback` | Thumbs up or down, with an optional comment, on a reply of mine. Sending again changes the rating | — |
 
-A **message** has `parts` that every channel shows in its own way: `text` (with its `citations`, the records it rests on), `activity` (what the AI looked at, one line each) and `card` (an action card, by proposal id; the card itself is in the chat's `proposals`).
+A **message** has `parts` that every channel shows in its own way: `text` (with its `citations`, the records it rests on), `activity` (what the AI looked at, one line each) and `file` (a file the person attached), `draft` (a version of a document the assistant saved: the document, the version and what is still missing), `idea` (a new project worked out from an idea, with who would get what, to review and Go) and `card` (an action card, by proposal id; the card itself is in the chat's `proposals`).
 
 #### Streaming a reply
 
@@ -194,6 +198,8 @@ The events, in order, each as `event: <type>` and `data: <json>` (the shapes are
 | `text` | Some more of the reply (`delta`). Words that follow a lookup start a new paragraph |
 | `activity` | A lookup started, finished or failed (`id`, `tool`, `label`, `state`) |
 | `card` | An action card was prepared or changed (`proposalId`) |
+| `draft` | The assistant saved a draft of a document (`documentId`, `versionNo`, `title`, `projectId`, `gaps`) |
+| `idea` | The assistant worked out a project from an idea (`name`, `description`, `productLineId`, `teamUserIds`, `preview`) |
 | `done` | The reply is saved (`message`, with citations resolved: tags the AI made up are gone) |
 | `title` | A short title for a new chat |
 | `error` | The reply failed (`code`, `detail`). A reply that was cut short is still saved |

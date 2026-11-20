@@ -4,6 +4,7 @@ import type { ChatMessage } from '@coal/shared';
 import { ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
+import type { ReactNode } from 'react';
 
 const TYPES = [
   'project',
@@ -14,6 +15,7 @@ const TYPES = [
   'template',
   'person',
   'widget',
+  'sample',
 ] as const;
 const isKnownType = (type: string): type is (typeof TYPES)[number] =>
   (TYPES as readonly string[]).includes(type);
@@ -22,16 +24,32 @@ const isKnownType = (type: string): type is (typeof TYPES)[number] =>
  * The right-hand pane: the records the selected reply rests on, with the passage each gave, and
  * what the assistant looked at (docs/workstation-and-ai.md#the-workstation).
  */
-export function SourcesPane({ message }: { message: ChatMessage | undefined }) {
+export function SourcesPane({
+  message,
+  preview,
+}: {
+  message: ChatMessage | undefined;
+  /** A PDF to look at (a template's sample, or a draft), shown above the sources. */
+  preview?: { title: string; node: ReactNode } | undefined;
+}) {
   const t = useTranslations('workstation.sources');
   const citations = (message?.parts ?? []).flatMap((p) => (p.type === 'text' ? p.citations : []));
   const looked = (message?.parts ?? []).flatMap((p) => (p.type === 'activity' ? p.items : []));
 
-  if (!message || (citations.length === 0 && looked.length === 0)) {
+  if (!preview && (!message || (citations.length === 0 && looked.length === 0))) {
     return <p className="text-sm text-muted-foreground">{t('empty')}</p>;
   }
   return (
     <div className="grid gap-5">
+      {preview && (
+        <section className="grid gap-2">
+          <h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+            {t('preview')}
+          </h3>
+          <p className="text-sm font-medium">{preview.title}</p>
+          {preview.node}
+        </section>
+      )}
       <section className="grid gap-2">
         <h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
           {t('title')}

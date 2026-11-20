@@ -3,6 +3,7 @@ import { defineEndpoint } from '../api/contract';
 import { StepKey } from '../process/definition';
 import { WIDGET_KEYS } from '../widgets/definitions';
 import { Id, IdParams, PageQuery, Timestamp, pageOf } from './common';
+import { Preview } from './projects';
 import { Proposal } from './proposals';
 
 /** What a chat is about: a project, and optionally one of its steps, a document, a task or a widget. */
@@ -22,6 +23,8 @@ export const Chat = z.object({
   title: z.string(),
   channel: z.enum(CHAT_CHANNELS),
   context: ChatContext,
+  /** The chat holds a file from outside the company's own records: from then on the AI only prepares action cards. */
+  hasOutsideText: z.boolean(),
   createdAt: Timestamp,
   updatedAt: Timestamp,
 });
@@ -41,6 +44,30 @@ export const Citation = z.object({
 });
 export type Citation = z.infer<typeof Citation>;
 
+/** A draft the assistant saved for the person: a new version of a document, to look at and edit. */
+export const DraftRef = z.object({
+  documentId: Id,
+  versionNo: z.number().int(),
+  title: z.string(),
+  projectId: Id,
+  /** What the template still needs: required sections and fields left empty. */
+  gaps: z.array(z.string()),
+});
+export type DraftRef = z.infer<typeof DraftRef>;
+
+/**
+ * A new project the assistant worked out from an idea, with who would get what. The person reviews
+ * it and presses Go themselves: it opens the new-project page with these values filled in.
+ */
+export const IdeaRef = z.object({
+  name: z.string(),
+  description: z.string(),
+  productLineId: Id,
+  teamUserIds: z.array(Id),
+  preview: Preview,
+});
+export type IdeaRef = z.infer<typeof IdeaRef>;
+
 /**
  * The parts of a message, in a form that every channel shows in its own way: text with the
  * records it cites, what the AI looked at, and action cards (proposals, by id).
@@ -52,6 +79,10 @@ export const MessagePart = z.discriminatedUnion('type', [
     items: z.array(z.object({ tool: z.string(), label: z.string(), ok: z.boolean() })),
   }),
   z.object({ type: z.literal('card'), proposalId: Id }),
+  /** A file the person attached to their message, such as a sample document. */
+  z.object({ type: z.literal('file'), fileId: Id, name: z.string() }),
+  z.object({ type: z.literal('draft') }).extend(DraftRef.shape),
+  z.object({ type: z.literal('idea') }).extend(IdeaRef.shape),
 ]);
 export type MessagePart = z.infer<typeof MessagePart>;
 
@@ -85,6 +116,8 @@ export const ChatStreamEvent = z.discriminatedUnion('type', [
     state: z.enum(['start', 'done', 'error']),
   }),
   z.object({ type: z.literal('card'), proposalId: Id }),
+  z.object({ type: z.literal('draft') }).extend(DraftRef.shape),
+  z.object({ type: z.literal('idea') }).extend(IdeaRef.shape),
   z.object({ type: z.literal('done'), message: ChatMessage }),
   /** A short title for a new chat, once the reply is finished. */
   z.object({ type: z.literal('title'), title: z.string() }),
@@ -129,7 +162,11 @@ export const getChat = defineEndpoint({
   response: ChatDetail,
 });
 
-export const SendMessageBody = z.object({ text: z.string().trim().min(1).max(4000) });
+export const SendMessageBody = z.object({
+  text: z.string().trim().min(1).max(4000),
+  /** Files the person attached: uploaded first, as outside documents (`POST /files/upload-url`). */
+  fileIds: z.array(Id).max(3).default([]),
+});
 
 export const SendMessageResult = z.object({ userMessage: ChatMessage, message: ChatMessage });
 export type SendMessageResult = z.infer<typeof SendMessageResult>;

@@ -134,6 +134,19 @@ export const createProject = defineEndpoint({
   status: 201,
 });
 
+export const previewGo = defineEndpoint({
+  id: 'projects.previewGo',
+  method: 'POST',
+  path: '/projects/preview',
+  summary:
+    'What Go would do for this concept, without doing it: the steps that open, the tasks, and who gets them. Changes nothing, so the assistant may use it',
+  auth: 'session',
+  permission: 'projects.create',
+  aiTier: 'read',
+  body: GoBody,
+  response: z.object({ preview: Preview }),
+});
+
 export const listProjects = defineEndpoint({
   id: 'projects.list',
   method: 'GET',

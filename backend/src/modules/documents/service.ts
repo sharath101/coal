@@ -1,4 +1,5 @@
 import {
+  draftProblems,
   diffText,
   fieldLabel,
   formatDocumentNumber,
@@ -367,6 +368,7 @@ export async function createDocument(
       note: '',
       createdBy: actor.userId,
       viaAi: ctx.viaAi,
+      aiRequestId: ctx.viaAi ? (ctx.aiChat?.requestId ?? null) : null,
     });
     log.audit({
       action: 'document.created',
@@ -395,6 +397,28 @@ export async function createDocument(
     const viewer = await viewerOf(tx, env);
     return presentDocument(tx, viewer, doc);
   });
+}
+
+/**
+ * Which written sections still carry the assistant's mark: the ones it wrote or rewrote in this
+ * save, and the ones it wrote earlier that nobody has changed. A person's edit takes the mark away.
+ */
+function aiSectionsAfter(
+  spec: TemplateSpec,
+  latest: VersionRow,
+  content: DocumentContent,
+  typed: Record<string, string>,
+  viaAi: boolean,
+): string[] {
+  const before = new Set(latest.aiSections);
+  const changed = (id: string) =>
+    (content.sections[id] ?? '') !== (latest.content?.sections[id] ?? '');
+  return spec.sections
+    .filter((s) => s.kind === 'written')
+    .map((s) => s.id)
+    .filter((id) =>
+      viaAi ? (id in typed && changed(id)) || before.has(id) : before.has(id) && !changed(id),
+    );
 }
 
 export async function saveVersion(
@@ -433,6 +457,7 @@ export async function saveVersion(
     let contentSha256: string;
     let pdf: { fileId: string; sha256: string } | null = null;
     let fileId: string | null = null;
+    let aiSections: string[] = [];
 
     if (o.doc.templateId) {
       if (input.fileId) {
@@ -442,12 +467,25 @@ export async function saveVersion(
         );
       }
       const template = (await findTemplate(tx, ctx.orgId, o.doc.templateId)) as TemplateRow;
+      if (ctx.viaAi && ctx.aiChat?.grounding) {
+        // What the assistant writes must rest on what the person said and what the tools returned.
+        const problems = draftProblems(template.spec, input, {
+          said: ctx.aiChat.grounding.said,
+          read: ctx.aiChat.grounding.read(),
+        });
+        if (problems.length > 0) {
+          throw new AppError(400, 'VALIDATION_FAILED', 'The draft did not pass its checks.', {
+            errors: problems.map((message) => ({ path: 'sections', message })),
+          });
+        }
+      }
       content = buildContent(
         template.spec,
         fieldContext(o, o.doc, actor),
         { fields: input.fields, sections: input.sections },
         latest.content,
       );
+      aiSections = aiSectionsAfter(template.spec, latest, content, input.sections, ctx.viaAi);
       contentSha256 = hashContent(content);
       // Saving what is already saved makes no new version.
       if (latest.status === 'draft' && latest.contentSha256 === contentSha256) {
@@ -482,6 +520,8 @@ export async function saveVersion(
       note: input.note,
       createdBy: actor.userId,
       viaAi: ctx.viaAi,
+      aiRequestId: ctx.viaAi ? (ctx.aiChat?.requestId ?? null) : null,
+      aiSections,
     });
     log.audit({
       action: 'document.version_saved',

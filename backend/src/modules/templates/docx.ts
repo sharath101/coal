@@ -15,7 +15,7 @@ const MAX_UNPACKED_BYTES = 60 * 1024 * 1024;
 
 const ZIP_SIGNATURE = Buffer.from([0x50, 0x4b, 0x03, 0x04]);
 
-function open(docx: Buffer): PizZip {
+export function openZip(docx: Buffer): PizZip {
   if (!docx.subarray(0, 4).equals(ZIP_SIGNATURE)) {
     throw new DocxError(['This is not a Word (.docx) file.']);
   }
@@ -39,7 +39,7 @@ function open(docx: Buffer): PizZip {
 }
 
 function compile(docx: Buffer): Docxtemplater {
-  const zip = open(docx);
+  const zip = openZip(docx);
   try {
     return new Docxtemplater(zip, {
       paragraphLoop: true,

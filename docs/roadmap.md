@@ -29,7 +29,7 @@ This roadmap gives an **order, not dates**. Madhav's effort estimates and costs 
 
 Each block depends on the ones before it. Within a block, the work can run side by side.
 
-**Progress:** blocks 1 (Foundations), 2 (the route), 3 (Documents and signing) and 4 (Dashboard) are done. The Workstation and AI (block 5) is under way: parts 5a, 5b and 5c are done. Passkey signing is the last block (D16).
+**Progress:** blocks 1 (Foundations), 2 (the route), 3 (Documents and signing) and 4 (Dashboard) are done. The Workstation and AI (block 5) is under way: parts 5a, 5b, 5c and 5d are done; 5e (safety and the test sets) is left. Passkey signing is the last block (D16).
 
 1. **Foundations** ✅
    - The monorepo (pnpm workspaces): `backend/`, `web/` and `shared/`; `app/` waits for its phase.
@@ -66,7 +66,11 @@ Each block depends on the ones before it. Within a block, the work can run side 
    - **5a. Groundwork** ✅ `POST /tasks` (own tasks, assignments and requests by the ladder) with accept and decline, and a "Given by me" list; proposals (action cards) with preview, edit, confirm, `PREVIEW_CHANGED` and expiry; `GET /search` over projects, documents, tasks and people.
    - **5b. The AI gateway and chat** ✅ the provider adapter (Anthropic; the Copilot SDK on one laptop for now, D19; a scripted stand-in for tests), the AI tables, the tools tied to the tiers, layered instructions, budgets and logging, chats streamed over Server-Sent Events.
    - **5c. The Workstation page** ✅ three panes, citations, action cards, commands, and "Ask AI" and "Open in Workstation" from other pages.
-   - **5d. The writing features:** drafting from the template library, idea to project, explaining and comparing documents.
+   - **5d. The writing features** ✅ in four steps:
+     - **5d-1. Templates from a sample document** ✅ attach a Word file or a text PDF in the chat; the assistant turns it into a template and an action card (editable) saves a draft template, adding the document type if there is none ([the flow](./workstation-and-ai.md#making-a-template-from-a-sample-document)). Built: the paperclip, the numbered-outline reader for Word and PDF, the placeholder editor, the plain-Word builder for PDFs, `prepare_template`, `POST /document-types`, `templates.create` at the `confirm` tier, the template card with its editor, the preview pane, and the outside-chat rule.
+     - **5d-2. Drafting from the template library** ✅ `start_draft` and `save_draft`, the checks on numbers and the person's words, gaps, the marks on sections the assistant wrote, the draft card and the preview.
+     - **5d-3. Idea to project** ✅ `preview_project` (`POST /projects/preview`), the idea card with one box for each person, and Review and Go.
+     - **5d-4. Explaining and comparing documents** ✅ `read_document` reports gaps and the assistant's sections; the rules for `/brief`, comparing versions and completeness checks.
    - **5e. Safety and the test sets:** outside documents, refusals that name who can help, `pnpm eval:ai`, polish.
 6. **Passkey signing** (last, D16)
    - Passkey registration on the website, and the signing intent: Face ID, fingerprint or Windows Hello for every signature, replacing the confirmed click.

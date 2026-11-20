@@ -1,4 +1,4 @@
-import type { ChatStreamEvent, Citation } from '@coal/shared';
+import type { ChatStreamEvent, Citation, DraftRef, IdeaRef } from '@coal/shared';
 import type { AppDeps } from '../../core/deps';
 import { callEndpoint } from '../../core/http/call';
 import type { Actor, RequestContext } from '../../core/http/context';
@@ -20,6 +20,12 @@ export interface ToolboxEnv {
   chatId: string;
   requestId: string;
   maxToolCalls: number;
+  /** A file from outside is in the chat, so nothing is saved without a card. */
+  outsideText?: boolean;
+  /** Everything the person has said in this chat, which a draft may rest on. */
+  said: string;
+  /** Today's date, a source for the dates a draft states. */
+  today: string;
   signal: AbortSignal;
   emit: (event: ChatStreamEvent) => void;
 }
@@ -31,10 +37,17 @@ export interface ToolboxEnv {
  * can tell the person who can help instead of failing.
  */
 export function buildToolbox(env: ToolboxEnv) {
+  /** What the tools returned in this reply: a draft's numbers must come from here or from the person. */
+  const read: string[] = [env.today];
   const ctx: RequestContext = {
     ...env.ctx,
     viaAi: true,
-    aiChat: { chatId: env.chatId, requestId: env.requestId },
+    aiChat: {
+      chatId: env.chatId,
+      requestId: env.requestId,
+      ...(env.outsideText && { outsideText: true }),
+      grounding: { said: env.said, read: () => read.join('\n') },
+    },
   };
   /** The records read in this reply, by the tag the answer cites them with. */
   const citations = new Map<string, Citation>();
@@ -42,6 +55,8 @@ export function buildToolbox(env: ToolboxEnv) {
   const calls: ToolCallLog[] = [];
   const activity: { tool: string; label: string; ok: boolean }[] = [];
   const cards: string[] = [];
+  const drafts = new Map<string, DraftRef>();
+  const ideas: IdeaRef[] = [];
   let used = 0;
 
   function cite(source: ToolSource): string {
@@ -118,9 +133,19 @@ export function buildToolbox(env: ToolboxEnv) {
           cards.push(shaped.proposalId);
           env.emit({ type: 'card', proposalId: shaped.proposalId });
         }
+        if (shaped.draft) {
+          drafts.set(shaped.draft.documentId, shaped.draft);
+          env.emit({ type: 'draft', ...shaped.draft });
+        }
+        if (shaped.idea) {
+          ideas.push(shaped.idea);
+          env.emit({ type: 'idea', ...shaped.idea });
+        }
         text = JSON.stringify({ result: shaped.data, sources: refs });
-        if (text.length > MAX_RESULT_CHARS) {
-          text = `${text.slice(0, MAX_RESULT_CHARS)}\n…[cut: too long. Ask for something narrower.]`;
+        read.push(text);
+        const limit = def.maxChars ?? MAX_RESULT_CHARS;
+        if (text.length > limit) {
+          text = `${text.slice(0, limit)}\n…[cut: too long. Ask for something narrower.]`;
         }
       }
     } catch (error) {
@@ -152,5 +177,5 @@ export function buildToolbox(env: ToolboxEnv) {
     run: (raw) => run(def, raw),
   }));
 
-  return { tools, citations, calls, activity, cards };
+  return { tools, citations, calls, activity, cards, drafts, ideas };
 }

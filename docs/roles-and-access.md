@@ -106,7 +106,7 @@ Everyone with an account can see the **status** of every project. For now, that 
 
 | Action | Who |
 |---|---|
-| Create a project (Go) | VP ⚠ |
+| Create a project (Go), and see what Go would do for a concept (`POST /projects/preview`, which the assistant may use) | VP ⚠. Go itself is never the assistant's |
 | Make or change a step's documents (save versions, submit them for signing) | That step's doers, while the step is open and the project is running |
 | Start or submit a step | Any doer of the step, and the project team where the route names it |
 | Sign a document row (Prepared, Reviewed, Approved) | The person the row names, or anyone holding its role within the project's scope; never Approved by the person who prepared the version ([documents-and-signing.md](./documents-and-signing.md#signature-rows)) |
@@ -128,7 +128,7 @@ Everyone with an account can see the **status** of every project. For now, that 
 | Add pictures, files and sources | The people who do or sign the step, and the project team |
 | Add comments | Anyone who can see the record |
 | Change the R&D route | Not in COAL yet. Developers change it in the repository, with review |
-| Add a template; make a template version active | VP or R&D Head, including their own upload ⚠ ([documents-and-signing.md](./documents-and-signing.md#adding-a-template)) |
+| Add a template; make a template version active | VP or R&D Head, including their own upload ⚠ ([documents-and-signing.md](./documents-and-signing.md#adding-a-template)). The assistant may prepare a template on their behalf, on an action card; activating stays their own act |
 | Read a template | Everyone reads the active ones; the VP and the Head also read drafts and retired versions |
 
 ## Assigning work and making requests

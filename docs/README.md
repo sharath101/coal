@@ -103,6 +103,7 @@ The full log, with reasons, is in [decisions.md](./decisions.md).
 | A database table or migration | [data-model.md](./data-model.md), plus the doc for its area |
 | A Dashboard widget, dates, alerts or notifications | [dashboard.md](./dashboard.md) |
 | The Workstation, the AI, a tool, a prompt or a chat channel | [workstation-and-ai.md](./workstation-and-ai.md) |
+| How a request is processed, step by step, and where it can stop | [workstation-and-ai.md § How a reply is made](./workstation-and-ai.md#how-a-reply-is-made) |
 | A template or the template library | [documents-and-signing.md § The template library](./documents-and-signing.md#the-template-library) |
 | Documents, versions or signing | [documents-and-signing.md](./documents-and-signing.md) |
 | The repo setup, the stack, hosting or security | [architecture.md](./architecture.md) |

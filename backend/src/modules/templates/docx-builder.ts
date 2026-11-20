@@ -17,6 +17,7 @@ export type Block =
   | { type: 'heading'; text: string }
   | { type: 'text'; text: string }
   | { type: 'rows'; rows: [label: string, text: string][] }
+  | { type: 'table'; rows: string[][] }
   | { type: 'loop'; name: string; columns: { header: string; tag: string }[] };
 
 const esc = (s: string) =>
@@ -51,6 +52,16 @@ function blockXml(block: Block): string {
             `<w:tr>${cell(para(label, undefined, '<w:b/>'), 3000, true)}${cell(para(text), 6000)}</w:tr>`,
         ),
       );
+    case 'table': {
+      const columns = Math.max(1, ...block.rows.map((r) => r.length));
+      const width = Math.floor(9000 / columns);
+      return table(
+        block.rows.map(
+          (row) =>
+            `<w:tr>${Array.from({ length: columns }, (_, i) => cell(para(row[i] ?? ''), width)).join('')}</w:tr>`,
+        ),
+      );
+    }
     case 'loop': {
       const width = Math.floor(9000 / block.columns.length);
       const header = `<w:tr>${block.columns.map((c) => cell(para(c.header, undefined, '<w:b/>'), width, true)).join('')}</w:tr>`;

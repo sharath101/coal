@@ -63,7 +63,11 @@
     "ask": "Ask AI",
     "openInWorkstation": "Open in Workstation",
     "panes": "Workstation panes",
-    "tabs": { "chats": "Chats", "chat": "Conversation", "sources": "Sources" },
+    "tabs": {
+      "chats": "Chats",
+      "chat": "Conversation",
+      "sources": "Sources"
+    },
     "myTasks": "My tasks",
     "noTasks": "No tasks yet.",
     "askAboutTask": "Open a chat about this task",
@@ -95,12 +99,32 @@
       "placeholder": "Ask, or type / for commands",
       "hint": "Enter sends, Shift+Enter starts a new line. Type @ to find a person, project or document. The assistant can make mistakes: check what matters.",
       "send": "Send",
-      "stop": "Stop"
+      "stop": "Stop",
+      "attach": "Attach a file",
+      "attachHelp": "Attach a Word file or a PDF, such as a sample document to make a template from",
+      "attached": "Attached files",
+      "detach": "Remove {name}",
+      "uploading": "Uploading…",
+      "templateText": "Make this a template."
     },
     "commands": {
       "title": "Commands",
-      "status": { "help": "the status of a project", "text": "What is the status of " },
-      "assign": { "help": "give work, or ask for something", "text": "Ask " },
+      "status": {
+        "help": "the status of a project",
+        "text": "What is the status of "
+      },
+      "assign": {
+        "help": "give work, or ask for something",
+        "text": "Ask "
+      },
+      "idea": {
+        "help": "an idea for a new product",
+        "text": "I have an idea for a new product: "
+      },
+      "draft": {
+        "help": "write a document from its template",
+        "text": "Draft the "
+      },
       "brief": {
         "help": "what am I signing, and what changed?",
         "text": "What am I signing, and what changed in each document since its previous version?"
@@ -141,8 +165,10 @@
         "timeline": "Dates",
         "template": "Template",
         "person": "Person",
-        "widget": "Dashboard widget"
-      }
+        "widget": "Dashboard widget",
+        "sample": "Attached file"
+      },
+      "preview": "Preview"
     },
     "card": {
       "label": "Action card",
@@ -168,7 +194,76 @@
       "fieldDue": "Due (optional)",
       "me": "Me",
       "save": "Save changes",
-      "cancelEdit": "Cancel"
+      "cancelEdit": "Cancel",
+      "template": {
+        "kind": "Kind of document",
+        "first": "The first template of this kind",
+        "steps": "Steps",
+        "signed": "Signed",
+        "madeFrom": "Made from",
+        "layoutLabel": "Layout",
+        "layout": {
+          "kept": "Your Word file's layout is kept.",
+          "rebuilt": "Layout rebuilt in a plain style: a PDF has none to keep."
+        },
+        "written": "Written section",
+        "fields": "Fields",
+        "required": "required",
+        "row": {
+          "prepared": "Prepared",
+          "reviewed": "Reviewed",
+          "approved": "Approved"
+        },
+        "source": {
+          "project_code": "from the project's code",
+          "project_name": "from the project's name",
+          "project_description": "from the project's description",
+          "project_product_line": "from the project's product line",
+          "project_stage": "from the project's stage",
+          "project_team": "table of the project team",
+          "step_key": "from the step's number",
+          "step_name": "from the step's name",
+          "document_number": "from the document's number",
+          "document_title": "from the document's title",
+          "author_name": "from the author's name",
+          "today": "today's date",
+          "person": "typed by the person"
+        },
+        "showSample": "Look at the sample PDF",
+        "sampleNote": "Made from made-up data, so you can see the layout.",
+        "loadingSample": "Loading the sample…",
+        "draftNote": "Saved as a draft. Make it active on the Templates page when you are happy with it.",
+        "editTitle": "Edit the template",
+        "editIntro": "Change the words of the template: its name, who signs and each section. Checking happens again. To move a field or a section in the document, ask the assistant.",
+        "fieldName": "Template name",
+        "fieldSteps": "Steps (separated by commas)",
+        "fieldRows": "Signed in",
+        "fieldReviewedBy": "Who reviews",
+        "fieldApprovedBy": "Who approves",
+        "approvedByHelp": "Leave empty for the step's own signer.",
+        "fieldSectionTitle": "Title",
+        "fieldInstructions": "What to write",
+        "fieldRequired": "Required before submitting",
+        "fieldLabel": "Label",
+        "fieldSource": "Comes from",
+        "fieldNotes": "Note for the library",
+        "fieldTypeName": "Name of the kind of document"
+      }
+    },
+    "draft": {
+      "label": "Draft",
+      "version": "Version {no}, saved as a draft",
+      "gaps": "Still missing: {list}",
+      "note": "Saved for you to read and edit. Nothing is submitted: that is yours to do.",
+      "preview": "Preview",
+      "open": "Open and edit"
+    },
+    "idea": {
+      "label": "New project",
+      "whoGetsWhat": "Who would get what",
+      "nobody": "Nobody yet",
+      "review": "Review and Go",
+      "note": "Nothing is created until you press Go."
     }
   },
   "problems": {
@@ -634,7 +729,8 @@
     "record_submitted_on": "Submitted on",
     "record_deviations": "Deviations",
     "record_outputs": "Outputs",
-    "record_decisions": "Decisions"
+    "record_decisions": "Decisions",
+    "writtenByAssistant": "Written by the assistant: read it, and edit anything that isn't right."
   },
   "signing": {
     "notice": "Signing is a confirmed click for now; Face ID / fingerprint signing comes later.",

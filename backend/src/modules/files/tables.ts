@@ -19,5 +19,7 @@ export const files = pgTable('files', {
   origin: text('origin', { enum: ['internal', 'outside'] }).notNull(),
   /** Null for files COAL made itself with no person behind them, such as a sample template's PDF. */
   uploadedBy: uuid('uploaded_by').references(() => users.id),
+  /** The file this one was made from: a built template's Word file points at the sample it came from. */
+  derivedFrom: uuid('derived_from'),
   ...timestamps(),
 });

@@ -98,7 +98,7 @@ docxtemplater fills the Word template, Gotenberg turns it into a PDF, and people
 
 Only the **VP** and the **R&D Head** add and activate templates ⚠ (S6). They do it on the **Templates** page of the website, which is linked from the top bar and the Dashboard for them.
 
-1. **Add.** Choose the document type and upload a new Word (`.docx`) file, with an optional note. A new version **reuses the previous version's specification**, so a new Word file is all the VP or the Head needs. (A type's first template, or a change to its specification, is prepared with the AI coding assistant from Jayon's sample documents, and loaded with the import command below.)
+1. **Add.** Choose the document type and upload a new Word (`.docx`) file, with an optional note. A new version **reuses the previous version's specification**, so a new Word file is all the VP or the Head needs. (A type's first template, or a change to its specification, is prepared from Jayon's sample document: by the assistant in the Workstation, which puts the placeholders into the person's own Word file and shows an action card ([the flow](./workstation-and-ai.md#making-a-template-from-a-sample-document)), or by the AI coding assistant for a whole folder at once and the import command below. The checks, and the draft status, are the same.)
 2. **Check.** COAL refuses the file, listing every problem to fix, unless:
    - it is a real Word file, no larger than 10 MB;
    - the virus scan finds nothing, where a scanner is set up;
@@ -124,6 +124,7 @@ COAL ships **made-up sample templates** for every document type that uses a temp
 
 ### Template versions and the AI
 
+- **The assistant writes only what it read, and says so.** A draft it saves is checked (numbers from a source, the person's fields in their own words), and the sections it wrote are marked "Written by the assistant" until a person edits them or the version is approved ([drafting](./workstation-and-ai.md#drafting-a-document)).
 - **The AI checks every time.** When asked for a document, the AI loads the document type's active template at that moment, never from memory or an earlier chat ([workstation-and-ai.md](./workstation-and-ai.md#drafting-a-document)). A newly activated version is used straight away. If there's no template, the AI says so.
 - **Documents keep their version.** A new template version applies to new documents. Each document records the template version it was made from, and its signature rows are fixed when it is made, so a later template change can't alter them.
 

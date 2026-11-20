@@ -2,9 +2,9 @@
 
 import { createProject, type EndpointOutput } from '@coal/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import { PreviewPanel } from '@/components/preview-panel';
 import { ProblemMessage } from '@/components/problem-message';
 import { selectClass } from '@/components/role-fields';
@@ -17,18 +17,32 @@ import { queryKeys, useMe, usePeople, useProductLines } from '@/lib/queries';
 
 type GoResult = EndpointOutput<typeof createProject>;
 
-/** Go: the VP turns a concept into a project. Preview first, then create (docs/workflow.md#decisions-recorded-at-steps). */
 export default function NewProjectPage() {
+  return (
+    <Suspense fallback={null}>
+      <NewProject />
+    </Suspense>
+  );
+}
+
+/**
+ * Go: the VP turns a concept into a project. Preview first, then create (docs/workflow.md#decisions-recorded-at-steps).
+ * An idea the assistant worked out in the Workstation arrives filled in, from the address, to review.
+ */
+function NewProject() {
   const t = useTranslations('newProject');
   const router = useRouter();
+  const params = useSearchParams();
   const queryClient = useQueryClient();
   const { data: me } = useMe();
   const productLines = useProductLines();
   const people = usePeople();
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [productLineId, setProductLineId] = useState('');
-  const [team, setTeam] = useState<string[]>([]);
+  const [name, setName] = useState(() => params.get('name') ?? '');
+  const [description, setDescription] = useState(() => params.get('description') ?? '');
+  const [productLineId, setProductLineId] = useState(() => params.get('productLineId') ?? '');
+  const [team, setTeam] = useState<string[]>(
+    () => params.get('team')?.split(',').filter(Boolean) ?? [],
+  );
   const [preview, setPreview] = useState<GoResult | null>(null);
 
   const body = { name, description, productLineId, teamUserIds: team };
