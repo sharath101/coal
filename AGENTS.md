@@ -63,4 +63,5 @@ Node 22 and pnpm 10 (see `.nvmrc` and `packageManager`). Docker runs the local s
 - **Step effects on documents** (sign-off records, carrying documents forward, signed decisions): `backend/src/modules/documents/signoff.ts`, called from `backend/src/modules/rnd/actions.ts`. Who may read a document is one pure rule, `documentAccess` in `permissions/rules.ts`.
 - **A table:** in the owning module's `tables.ts`, then `db:generate`. Changes go through `change()` in `backend/src/core/db/change.ts`, so the audit entry and events are written in the same transaction.
 - **Website text:** in `web/messages/en.json`, never in a component. Lint fails on text written straight into JSX.
+- **A button that changes something shared** (starts, submits, approves, marks done, hands work on): it asks first. A workflow action with `?preview=true` uses `ActionConfirm` (the API's preview, then a yes); anything else uses `ConfirmDialog` ([P107](docs/decisions.md)).
 - **Lint rules that keep the parts apart:** `eslint-plugin-coal.mjs` (`coal/part-boundaries`, `coal/module-tables`).

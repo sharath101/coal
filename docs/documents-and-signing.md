@@ -186,6 +186,16 @@ The record is signed **Prepared** by the person who submitted, and **Approved** 
 
 This gives every sign-off something concrete to sign, including steps that produce no named document, such as steps 6 and 9. One approval of the step signs the record; a separate click signs a step's main document, until passkeys make one prompt sign both.
 
+### Before a step is submitted
+
+A step is never submitted with nothing to sign. For each **template** document type that belongs to the step (PID at step 1, MRS at 2, the regulatory plan at 2a, Project Planning and the Project Approval Form at 3, the Action Plan at 5; [document types](#document-types)), the step needs at least one document of that type, **made from the template or uploaded**, and a document made from a template must have every required section and field filled in ([`missingRequired`](../shared/src/rules/documents.ts)), so a blank template is never what the signer receives. Otherwise submitting is refused with `409 DOCUMENTS_NEEDED`, in the preview and for real, and the step page lists what is missing and keeps the button off.
+
+- **Approval is not needed.** The documents can still be with their own signers (S7); the preview warns, and the sign-off record lists their status.
+- **The budget annex is not asked for.** It is need-to-know, and the whole team sees what a step is missing, so a missing annex would reveal that it exists ([roles-and-access.md](./roles-and-access.md#content-is-need-to-know)). It is signed on its own.
+- **Steps with no document type yet** (all after step 5, until their templates arrive) ask for nothing, and the confirmation says no documents are attached ⚠ (S12).
+- **The preview.** The website never submits on one click: it shows the preview and asks "are you sure" every time ([workflow.md](./workflow.md#sign-offs)).
+- **The code:** `backend/src/modules/documents/needs.ts`, called by the route's submit in `rnd/actions.ts` and by the route view for the step page.
+
 ## Signing with Face ID or fingerprint
 
 **Built last** ([D16](./decisions.md)): after the Workstation and AI, as the final block of the build. Until then a signature is a **confirmed click** by the right person. Everything around the signature is already in place: the rows, who may sign each, the hashes, the insert-only record (its `method` is `click`), and the sign-off records. The website says "Signing is a confirmed click for now" wherever someone signs. Adding passkeys changes how a signature is *made* (a device prompt, with the server checking the answer), not what a signature *is*.

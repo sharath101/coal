@@ -16,13 +16,14 @@ import {
 import { useMutation } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 import { useEffect, useRef, useState } from 'react';
+import { ActionConfirm } from '@/components/action-confirm';
 import { AskAiLink } from '@/components/ask-ai';
 import { useConditionText } from '@/components/condition-text';
 import { RecordDeviationDialog } from '@/components/deviation-dialog';
 import { StepHealthBadge } from '@/components/health-badge';
 import { PreviewPanel } from '@/components/preview-panel';
 import { ProblemMessage } from '@/components/problem-message';
-import { StepStatusBadge } from '@/components/status-badge';
+import { DocumentStatusBadge, StepStatusBadge } from '@/components/status-badge';
 import { StepDocuments } from '@/components/step-documents';
 import { selectClass } from '@/components/role-fields';
 import { Button } from '@/components/ui/button';
@@ -39,6 +40,11 @@ const OPEN = ['ready', 'in_progress', 'in_review', 'returned'];
 const OPEN_TASK = ['open', 'in_progress', 'waiting'];
 
 type Panel = 'return' | 'sendBack' | 'corrective' | null;
+
+/** What the person asked for, waiting for their yes. */
+type Ask =
+  | { kind: 'start' | 'submit' | 'approve' }
+  | { kind: 'decide'; decision: string; value: string; name: string; answer: string };
 
 interface Props {
   projectId: string;
@@ -59,6 +65,7 @@ export function StepCard({ projectId, step, route, documents, focused = false, o
   const [text, setText] = useState('');
   const [target, setTarget] = useState(step.actions.sendBack[0] ?? '');
   const [preview, setPreview] = useState<ActionResult | null>(null);
+  const [asked, setAsked] = useState<{ what: Ask; result: ActionResult } | null>(null);
   const [deviationFor, setDeviationFor] = useState<'banner' | 'submit' | null>(null);
   const card = useRef<HTMLLIElement>(null);
 
@@ -70,25 +77,58 @@ export function StepCard({ projectId, step, route, documents, focused = false, o
     setPanel(null);
     setText('');
     setPreview(null);
+    setAsked(null);
     onChanged();
   };
-  const start = useMutation({ mutationFn: () => api(startStep, { params }), onSuccess: done });
-  const submit = useMutation({
-    mutationFn: () => api(submitStep, { params }),
-    onSuccess: done,
-    // A late step can't go on until someone says why: ask now, then try again.
-    onError: (error) => {
-      if (isDeviationRequired(error)) setDeviationFor('submit');
+  // Start, submit, approve and answering a decision are never done by one click: the API says what
+  // would happen, and the person confirms. A late step can't be submitted until someone says why,
+  // so that is asked first, then the preview is shown again.
+  const askWhyIfLate = (error: unknown) => {
+    setAsked(null);
+    if (isDeviationRequired(error)) setDeviationFor('submit');
+  };
+  const previewAsk = useMutation({
+    mutationFn: (what: Ask) => {
+      const query = { preview: 'true' } as const;
+      switch (what.kind) {
+        case 'start':
+          return api(startStep, { params, query });
+        case 'submit':
+          return api(submitStep, { params, query });
+        case 'approve':
+          return api(approveStep, { params, query });
+        case 'decide':
+          return api(decideStep, {
+            params,
+            query,
+            body: { decision: what.decision, value: what.value },
+          });
+      }
     },
+    onSuccess: (result, what) => setAsked({ what, result }),
+    onError: askWhyIfLate,
   });
-  const approve = useMutation({ mutationFn: () => api(approveStep, { params }), onSuccess: done });
+  const confirmAsk = useMutation({
+    mutationFn: (what: Ask) => {
+      switch (what.kind) {
+        case 'start':
+          return api(startStep, { params });
+        case 'submit':
+          return api(submitStep, { params });
+        case 'approve':
+          return api(approveStep, { params });
+        case 'decide':
+          return api(decideStep, {
+            params,
+            body: { decision: what.decision, value: what.value },
+          });
+      }
+    },
+    onSuccess: done,
+    onError: askWhyIfLate,
+  });
   const giveBack = useMutation({
     mutationFn: () => api(returnStep, { params, body: { comment: text } }),
-    onSuccess: done,
-  });
-  const decide = useMutation({
-    mutationFn: (input: { decision: string; value: string }) =>
-      api(decideStep, { params, body: input }),
     onSuccess: done,
   });
   const sendBackBody = { to: target, reason: text };
@@ -106,21 +146,19 @@ export function StepCard({ projectId, step, route, documents, focused = false, o
     onSuccess: done,
   });
 
-  const mutations = [
-    start,
-    submit,
-    approve,
-    giveBack,
-    decide,
-    previewSendBack,
-    sendBack,
-    corrective,
-  ];
+  const mutations = [previewAsk, confirmAsk, giveBack, previewSendBack, sendBack, corrective];
   const error = mutations.map((m) => m.error).find(Boolean);
   const busy = mutations.some((m) => m.isPending);
   const a = step.actions;
   const isOpen = OPEN.includes(step.status);
-  const needs = [...(step.status === 'in_review' ? step.approveNeeds : step.submitNeeds)];
+  const inReview = step.status === 'in_review';
+  const needs = [
+    ...(inReview ? step.approveNeeds : step.submitNeeds).map(conditionText),
+    ...(inReview ? [] : step.documentNeeds),
+  ];
+  // The sign-off record is COAL's own, so what is handed in is the step's other documents.
+  const handedIn = documents.filter((d) => d.type.kind !== 'record');
+  const confirmText = asked ? wordsFor(asked.what, step, t) : { title: '', text: '', yes: '' };
   const stepName = (key: string) => route.steps.find((s) => s.key === key)?.name ?? key;
   const hasButtons =
     a.start || a.submit || a.approve || a.return || a.sendBack.length > 0 || a.correctiveActions;
@@ -253,8 +291,8 @@ export function StepCard({ projectId, step, route, documents, focused = false, o
             <div className="grid gap-1 rounded-md bg-warning p-3 text-warning-foreground">
               <h4 className="text-xs font-medium tracking-wide uppercase">{t('needs')}</h4>
               <ul className="list-disc pl-4">
-                {needs.map((c) => (
-                  <li key={conditionText(c)}>{conditionText(c)}</li>
+                {needs.map((text) => (
+                  <li key={text}>{text}</li>
                 ))}
               </ul>
             </div>
@@ -286,7 +324,15 @@ export function StepCard({ projectId, step, route, documents, focused = false, o
                           size="sm"
                           variant={o.value === d.answer ? 'default' : 'outline'}
                           disabled={busy}
-                          onClick={() => decide.mutate({ decision: d.key, value: o.value })}
+                          onClick={() =>
+                            previewAsk.mutate({
+                              kind: 'decide',
+                              decision: d.key,
+                              value: o.value,
+                              name: d.name,
+                              answer: o.name,
+                            })
+                          }
                         >
                           {o.name}
                         </Button>
@@ -329,17 +375,30 @@ export function StepCard({ projectId, step, route, documents, focused = false, o
           {hasButtons && (
             <div className="flex flex-wrap gap-2">
               {a.start && (
-                <Button size="sm" variant="outline" disabled={busy} onClick={() => start.mutate()}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={busy}
+                  onClick={() => previewAsk.mutate({ kind: 'start' })}
+                >
                   {t('start')}
                 </Button>
               )}
               {a.submit && (
-                <Button size="sm" disabled={busy} onClick={() => submit.mutate()}>
+                <Button
+                  size="sm"
+                  disabled={busy || step.documentNeeds.length > 0}
+                  onClick={() => previewAsk.mutate({ kind: 'submit' })}
+                >
                   {step.signer ? t('submit') : t('markDone')}
                 </Button>
               )}
               {a.approve && (
-                <Button size="sm" disabled={busy} onClick={() => approve.mutate()}>
+                <Button
+                  size="sm"
+                  disabled={busy}
+                  onClick={() => previewAsk.mutate({ kind: 'approve' })}
+                >
                   {t('approve')}
                 </Button>
               )}
@@ -374,6 +433,40 @@ export function StepCard({ projectId, step, route, documents, focused = false, o
                 </Button>
               )}
             </div>
+          )}
+
+          {asked && (
+            <ActionConfirm
+              title={confirmText.title}
+              text={confirmText.text}
+              confirmLabel={confirmText.yes}
+              preview={asked.result.preview}
+              signs={asked.what.kind === 'approve' || asked.what.kind === 'decide'}
+              busy={busy}
+              onConfirm={() => confirmAsk.mutate(asked.what)}
+              onCancel={() => setAsked(null)}
+            >
+              {asked.what.kind === 'submit' && (
+                <div className="grid gap-1">
+                  <h5 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                    {t('handedIn')}
+                  </h5>
+                  {handedIn.length === 0 ? (
+                    <p className="text-muted-foreground">{t('handedInNone')}</p>
+                  ) : (
+                    <ul className="grid gap-0.5">
+                      {handedIn.map((doc) => (
+                        <li key={doc.id} className="flex flex-wrap items-center gap-2">
+                          <span className="font-mono text-xs">{doc.number}</span>
+                          <span>{doc.title}</span>
+                          <DocumentStatusBadge status={doc.status} rev={doc.approvedRev} />
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+            </ActionConfirm>
           )}
 
           {panel === 'return' && (
@@ -502,11 +595,51 @@ export function StepCard({ projectId, step, route, documents, focused = false, o
         intro={deviationFor === 'submit' ? t('lateBeforeSubmit') : undefined}
         onRecorded={() => {
           onChanged();
-          if (deviationFor === 'submit') submit.mutate();
+          if (deviationFor === 'submit') previewAsk.mutate({ kind: 'submit' });
         }}
       />
     </li>
   );
+}
+
+/** What the confirmation says for each thing a person can ask of a step. */
+function wordsFor(
+  what: Ask,
+  step: StepView,
+  t: ReturnType<typeof useTranslations<'step'>>,
+): { title: string; text: string; yes: string } {
+  switch (what.kind) {
+    case 'start':
+      return {
+        title: t('startConfirmTitle', { key: step.key }),
+        text: t('startConfirmText'),
+        yes: t('confirmStart'),
+      };
+    case 'submit':
+      return step.signer
+        ? {
+            title: t('submitConfirmTitle', { key: step.key }),
+            text: t('submitConfirmText', { signer: step.signer.name }),
+            yes: t('confirmSubmit'),
+          }
+        : {
+            title: t('doneConfirmTitle', { key: step.key }),
+            text: t('doneConfirmText'),
+            yes: t('confirmDone'),
+          };
+    case 'approve':
+      return {
+        title: t('approveConfirmTitle', { key: step.key }),
+        text: t('approveConfirmText'),
+        yes: t('confirmApprove'),
+      };
+    case 'decide':
+      return {
+        title: t('decideConfirmTitle', { name: what.name }),
+        text: t('decideConfirmText', { answer: what.answer }),
+        yes: t('confirmDecide', { answer: what.answer }),
+      };
+  }
 }
 
 /** Earlier iterations are history: never edited, with the reason a send-back closed each. */

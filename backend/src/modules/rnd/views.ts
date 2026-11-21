@@ -22,6 +22,7 @@ import { loadCalendar } from '../schedule/calendar';
 import { activeTasksOfRun, presentTasks } from '../tasks/service';
 import { findUsersByIds, present } from '../users/service';
 import type { Env } from './actions';
+import { documentNeedsOfSteps } from '../documents/needs';
 import { visibleDocuments } from '../documents/service';
 import { canSeeProjectContent, may, viewerOf } from './env';
 import { activeMembers, type ProjectRow } from './projects';
@@ -117,6 +118,12 @@ export async function presentRoute(
     explainedSteps(ex, [...stepIds.values()], dateOfInstant(now)),
   ]);
   const rowOf = new Map(stepRows.map((r) => [r.stepKey, r]));
+  const documentNeeds = await documentNeedsOfSteps(
+    ex,
+    env.orgId,
+    run.id,
+    route.steps.filter((s) => stepActions(route, state, s.key).submit).map((s) => s.key),
+  );
   const today = dateOfInstant(now);
   const tasksByStep = new Map<string, typeof tasks>();
   taskRows.forEach((row, i) => {
@@ -172,6 +179,7 @@ export async function presentRoute(
       waitsFor: s.status === 'locked' && !step.done_at_go ? waitsFor(route, state, step.key) : [],
       submitNeeds: a.submitNeeds,
       approveNeeds: a.approveNeeds,
+      documentNeeds: documentNeeds.get(step.key) ?? [],
       approvedBy: s.approvedBy.map((id) => ({ id, name: approverName.get(id) ?? 'Unknown' })),
       decisions: step.decisions.map((d) => ({
         key: d.key,

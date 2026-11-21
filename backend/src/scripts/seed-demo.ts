@@ -116,12 +116,41 @@ const stepOf = async (id: string, key: string) =>
 
 async function submit(id: string, key: string, line: 'SPN' | 'TRM') {
   const step = await stepOf(id, key);
-  await call(
-    'POST',
-    `/projects/${id}/steps/${key}/submit`,
-    COOKIE_OF_ROLE[step.doers[0].key]!(line),
-  );
+  const as = COOKIE_OF_ROLE[step.doers[0].key]!(line);
+  await attach(id, key, as);
+  await call('POST', `/projects/${id}/steps/${key}/submit`, as);
   return step;
+}
+
+// The documents each of these steps needs before it can be submitted (docs/documents-and-signing.md).
+const DOCUMENTS_OF_STEP: Record<string, string[]> = {
+  '1': ['PID'],
+  '2': ['MRS'],
+  '2a': ['REG_PLAN'],
+  '3': ['PROJECT_PLANNING', 'APPROVAL_FORM'],
+  '5': ['ACTION_PLAN'],
+};
+
+/** Uploads a made-up PDF as each document the step needs, as the person who submits it. */
+async function attach(id: string, key: string, as: Key) {
+  for (const code of DOCUMENTS_OF_STEP[key] ?? []) {
+    const bytes = new TextEncoder().encode(`%PDF-1.4 made-up ${code} for step ${key}`);
+    const { file, upload } = (
+      await call('POST', '/files/upload-url', as, {
+        name: `${code}.pdf`,
+        size: bytes.length,
+        origin: 'internal',
+      })
+    ).body;
+    const put = await fetch(upload.url, { method: 'PUT', headers: upload.headers, body: bytes });
+    if (!put.ok) throw new Error(`Upload failed: ${put.status}`);
+    await call('POST', `/files/${file.id}/complete`, as);
+    await call('POST', `/projects/${id}/documents`, as, {
+      stepKey: key,
+      documentType: code,
+      fileId: file.id,
+    });
+  }
 }
 
 async function approve(id: string, key: string, line: 'SPN' | 'TRM') {

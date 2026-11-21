@@ -142,6 +142,7 @@ describe('what needs me now', () => {
   it('keeps the doers’ tasks waiting while the step is with its signer, and not late', async () => {
     daysAhead = 0;
     const id = await w.go(fresh('Waiting'));
+    await w.attach(id, '2');
     const task = (await w.stepOf(id, '2')).tasks[0];
     await ok(call('POST', `/projects/${id}/steps/2/submit`, 'ops'));
     expect((await w.stepOf(id, '2')).tasks.find((x: any) => x.id === task.id).status).toBe(
@@ -171,6 +172,7 @@ describe('what needs me now', () => {
 
   it('lists what waits for my signature, oldest first', async () => {
     const id = await w.go(fresh('Signatures widget'));
+    await w.attach(id, '2');
     await ok(call('POST', `/projects/${id}/steps/2/submit`, 'ops'));
     const compact = await widget('waiting-signature', 'vp');
     const row = rowsOf(compact)
@@ -365,6 +367,7 @@ describe('how we are doing', () => {
   it('does not count the signer’s wait against the person who handed the work in', async () => {
     daysAhead = 0;
     const id = await w.go(fresh('Signer wait'));
+    await w.attach(id, '2');
     await ok(call('POST', `/projects/${id}/steps/2/submit`, 'ops'));
     // The VP signs weeks later: the work was handed in on time.
     daysAhead = 40;

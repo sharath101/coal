@@ -4,6 +4,7 @@ import { verifyAuditChain } from '../src/modules/audit/service';
 import { auditEvents } from '../src/modules/audit/tables';
 import { decisions, milestones, processRuns, sendBacks } from '../src/modules/process/tables';
 import { createTestApp, productLineId, signUp, type SignedIn, type TestApp } from './helpers';
+import { documentCalls } from './world';
 
 let t: TestApp;
 let spine: string;
@@ -76,6 +77,7 @@ async function go(name: string, teamUserIds = team()): Promise<string> {
 }
 
 const route = (id: string, as = 'vp') => ok(call('GET', `/projects/${id}/route`, as));
+const { attach } = documentCalls(call, ok);
 const stepOf = async (id: string, key: string, as = 'vp') =>
   (await route(id, as)).steps.find((s: { key: string }) => s.key === key);
 
@@ -93,6 +95,7 @@ const COOKIE_OF_ROLE: Record<string, string> = {
 
 /** Submits a step as its first doer, then signs it off as its signer (both Board members at 4 and 23). */
 async function finish(id: string, key: string) {
+  await attach(id, key);
   const step = await stepOf(id, key);
   await ok(call('POST', `/projects/${id}/steps/${key}/submit`, COOKIE_OF_ROLE[step.doers[0].key]!));
   if (!step.signer) return;
@@ -347,6 +350,7 @@ describe('a whole project, from Go to launch', () => {
 
   it('refuses sign-off by anyone who is not the signer, and names who can', async () => {
     const id = await go('Sign-off rules');
+    await attach(id, '1');
     await ok(call('POST', `/projects/${id}/steps/1/submit`, 'head'));
     const wrong = await call('POST', `/projects/${id}/steps/1/approve`, 'head');
     expect(wrong.status).toBe(403);
@@ -706,6 +710,7 @@ describe('hold, resume and drop', () => {
 
     await ok(call('POST', `/projects/${id}/resume`, 'vp', { reason: 'Budget approved' }));
     expect((await ok(call('GET', `/projects/${id}`, 'vp'))).status).toBe('active');
+    await attach(id, '1');
     await ok(call('POST', `/projects/${id}/steps/1/submit`, 'head'));
 
     const dropped = await ok(
@@ -850,6 +855,7 @@ describe('role queues, claims and reassigning', () => {
     expect((await myTasks('ops')).find((x: any) => x.id === task.id).status).toBe('in_progress');
 
     // Handing the step in makes them wait for the signer, who then holds the sign-off task.
+    await attach(id, '2');
     await ok(call('POST', `/projects/${id}/steps/2/submit`, 'ops'));
     expect((await stepOf(id, '2')).status).toBe('in_review');
     expect((await myTasks('ops')).find((x: any) => x.id === task.id).status).toBe('waiting');
@@ -941,6 +947,7 @@ describe('previews', () => {
     expect(start.saved).toBe(false);
     expect((await stepOf(id, '1')).status).toBe('ready');
     const comment = { comment: 'Not yet please' };
+    await attach(id, '1');
     await ok(call('POST', `/projects/${id}/steps/1/submit`, 'head'));
     const returned = await ok(
       call('POST', `/projects/${id}/steps/1/return?preview=true`, 'vp', comment),

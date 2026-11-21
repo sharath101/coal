@@ -333,6 +333,28 @@ describe('proposals (action cards)', () => {
     expect((await w.stepOf(project, '2')).status).toBe('in_progress');
   });
 
+  it('puts a step on a card for submitting only once its documents are in, and asks before it is sent', async () => {
+    const project = await w.go(fresh('Submit by card'));
+    const submitCard = (as: string) =>
+      propose(as, 'Submit the inception', [
+        { endpoint: 'steps.submit', params: { id: project, key: '1' } },
+      ]);
+    const refused = await submitCard('head');
+    expect(refused.status).toBe(409);
+    expect(refused.body.code).toBe('DOCUMENTS_NEEDED');
+    expect((await w.stepOf(project, '1')).status).toBe('ready');
+
+    await w.attach(project, '1');
+    const card = await ok(submitCard('head'));
+    expect(card.preview.actions[0]).toMatchObject({
+      summary: 'Submit for sign-off: step 1, Project inception',
+    });
+    // Nothing is handed in until the person confirms the card.
+    expect((await w.stepOf(project, '1')).status).toBe('ready');
+    expect((await confirm(card.id, 'head', 1)).status).toBe(200);
+    expect((await w.stepOf(project, '1')).status).toBe('in_review');
+  });
+
   it('shows the card again when what it would do has changed, and does nothing', async () => {
     const project = await w.go(fresh('Changed'));
     const title = fresh('Draw rev C');

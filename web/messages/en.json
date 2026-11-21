@@ -303,6 +303,7 @@
     "PDF_UNAVAILABLE": "The PDF couldn't be made just now. Try again in a moment.",
     "FILE_NOT_SCANNED": "This file hasn't been checked for viruses yet. Try again in a moment.",
     "DEVIATION_REQUIRED": "This is past its due date. Record why it is late, and the new date, first.",
+    "DOCUMENTS_NEEDED": "This step's documents aren't ready, so it can't be submitted yet:",
     "UPLOAD_NOT_ALLOWED": "That file can't be uploaded. Check its type and size.",
     "UPLOAD_INCOMPLETE": "The file wasn't fully uploaded. Try again.",
     "SIGNATURE_REQUIRED": "A signature is needed first.",
@@ -318,6 +319,41 @@
     "generic": "Something went wrong. Try again.",
     "USE_THE_STEP": "This task belongs to a step, so it follows the step. Start the step and submit it for sign-off from the step, and the task closes when the step is signed off.",
     "SOURCE_UNAVAILABLE": "A public source didn't answer. Try again later."
+  },
+  "confirm": {
+    "cancel": "Cancel",
+    "task": {
+      "claimTitle": "Claim this task?",
+      "claimText": "“{title}” moves from your role's queue to you. If you aren't on the project's team yet, you join it.",
+      "claimYes": "Yes, claim it",
+      "acceptTitle": "Accept this request?",
+      "acceptText": "“{title}” becomes your task, and the person who asked is told.",
+      "acceptYes": "Yes, accept",
+      "startTitle": "Start this task?",
+      "startText": "“{title}” is marked as in progress.",
+      "startYes": "Yes, start",
+      "doneTitle": "Mark this task done?",
+      "doneText": "“{title}” is closed as finished. Check that the work is complete before you confirm.",
+      "doneYes": "Yes, mark done"
+    },
+    "milestone": {
+      "title": "Record “{name}”?",
+      "text": "It is recorded under your name with the time, and the steps that wait for it can open.",
+      "yes": "Yes, record it"
+    },
+    "source": {
+      "offTitle": "Switch off {name}?",
+      "offText": "Research runs stop searching it until it is switched on again.",
+      "offYes": "Yes, switch off",
+      "onTitle": "Switch on {name}?",
+      "onText": "Research runs can search it again.",
+      "onYes": "Yes, switch on"
+    },
+    "research": {
+      "stopTitle": "Stop this research?",
+      "stopText": "The run stops where it is. You can start a new one later.",
+      "stopYes": "Yes, stop it"
+    }
   },
   "status": {
     "active": "Active",
@@ -471,7 +507,24 @@
     "daysLate": "{count, plural, one {# working day late} other {# working days late}}",
     "needsDeviation": "{count, plural, =0 {This step is past its planned end} one {This step is # working day late} other {This step is # working days late}}, and nobody has said why. Record why before it is submitted.",
     "recordWhy": "Record why",
-    "lateBeforeSubmit": "This step is late, so it can't be submitted until you say why. Record it, and the step is submitted straight after."
+    "lateBeforeSubmit": "This step is late, so it can't be submitted until you say why. Record it, and you can then submit the step.",
+    "submitConfirmTitle": "Submit step {key} for sign-off?",
+    "submitConfirmText": "{signer} is asked to sign it off. While it waits, its documents can't be changed, and only {signer} can return it to you.",
+    "doneConfirmTitle": "Mark step {key} done?",
+    "doneConfirmText": "This step has no sign-off, so it is done at once and the steps after it open.",
+    "handedIn": "Documents handed in with it",
+    "handedInNone": "No documents are attached to this step.",
+    "confirmSubmit": "Yes, submit for sign-off",
+    "confirmDone": "Yes, mark done",
+    "startConfirmTitle": "Start step {key}?",
+    "startConfirmText": "The step is marked in progress and its tasks start.",
+    "confirmStart": "Yes, start",
+    "approveConfirmTitle": "Approve step {key}?",
+    "approveConfirmText": "You sign off this step. Your name, role and the time are recorded against its sign-off record, and the steps that wait for it can open.",
+    "confirmApprove": "Yes, approve",
+    "decideConfirmTitle": "Record your answer to “{name}”?",
+    "decideConfirmText": "Your answer, “{answer}”, is signed with your name and the time. Check it before you confirm.",
+    "confirmDecide": "Yes, answer “{answer}”"
   },
   "conditions": {
     "step_approved": "Step {step} approved",

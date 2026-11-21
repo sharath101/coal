@@ -65,6 +65,7 @@ describe('work messages', () => {
 
   it('asks the signer to sign, and tells the doers when work is returned', async () => {
     const id = await w.go(fresh('Sign and return'));
+    await w.attach(id, '2');
     await ok(call('POST', `/projects/${id}/steps/2/submit`, 'ops'));
     await drain();
     expect(
@@ -235,6 +236,7 @@ describe('reminders and escalation', () => {
 
   it('reminds a signer, and tells the people who asked when a VP signature is overdue', async () => {
     const id = await w.go(fresh('Signature wait'));
+    await w.attach(id, '2');
     await ok(call('POST', `/projects/${id}/steps/2/submit`, 'ops'));
     const signTask = (await ok(call('GET', '/tasks?limit=100', 'vp'))).items.find(
       (x: any) => x.kind === 'sign' && x.subject?.id === id,

@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { Fragment, useId, useState, type ReactNode } from 'react';
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { ProblemMessage } from '@/components/problem-message';
 import { selectClass } from '@/components/role-fields';
 import { RESEARCH_TONE } from '@/components/research/research-card';
@@ -54,11 +55,16 @@ function withRefs(text: string, known: Set<string>): ReactNode[] {
 export default function ResearchRunPage() {
   const { id } = useParams<{ id: string }>();
   const t = useTranslations('research');
+  const tConfirm = useTranslations('confirm.research');
   const run = useResearchRun(id);
   const queryClient = useQueryClient();
+  const [confirmingStop, setConfirmingStop] = useState(false);
   const stop = useMutation({
     mutationFn: () => api(stopResearch, { params: { id } }),
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: queryKeys.research }),
+    onSuccess: () => {
+      setConfirmingStop(false);
+      void queryClient.invalidateQueries({ queryKey: queryKeys.research });
+    },
   });
 
   if (run.isPending) return <p className="p-6 text-sm text-muted-foreground">{t('loading')}</p>;
@@ -128,11 +134,24 @@ export default function ResearchRunPage() {
             <Button
               size="sm"
               variant="outline"
-              onClick={() => stop.mutate()}
+              onClick={() => {
+                stop.reset();
+                setConfirmingStop(true);
+              }}
               disabled={stop.isPending}
             >
               {stop.isPending ? t('stopping') : t('stop')}
             </Button>
+            <ConfirmDialog
+              open={confirmingStop}
+              onOpenChange={setConfirmingStop}
+              title={tConfirm('stopTitle')}
+              text={tConfirm('stopText')}
+              confirmLabel={tConfirm('stopYes')}
+              pending={stop.isPending}
+              error={stop.error}
+              onConfirm={() => stop.mutate()}
+            />
           </div>
         )}
         {r.error && (
@@ -140,7 +159,7 @@ export default function ResearchRunPage() {
             {r.error}
           </p>
         )}
-        <ProblemMessage error={stop.error} />
+        {!confirmingStop && <ProblemMessage error={stop.error} />}
       </header>
 
       {r.links.length > 0 && (

@@ -9,6 +9,7 @@ import { AskAiLink } from '@/components/ask-ai';
 import { RecordDeviationDialog } from '@/components/deviation-dialog';
 import { ProblemMessage } from '@/components/problem-message';
 import { Pill } from '@/components/status-badge';
+import { TaskConfirm, type TaskAction } from '@/components/task-confirm';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
@@ -31,23 +32,48 @@ export function TaskRow({ task, sent = false }: { task: Task; sent?: boolean }) 
   const refreshWork = useRefreshWork();
   const [deviation, setDeviation] = useState<'late' | 'time' | null>(null);
   const [declining, setDeclining] = useState(false);
+  const [confirming, setConfirming] = useState<TaskAction | null>(null);
   const refresh = () => queryClient.invalidateQueries({ queryKey: queryKeys.tasks });
   const claim = useMutation({
     mutationFn: () => api(claimTask, { params: { id: task.id } }),
-    onSuccess: refresh,
+    onSuccess: () => {
+      setConfirming(null);
+      void refresh();
+    },
   });
   const accept = useMutation({
     mutationFn: () => api(acceptTask, { params: { id: task.id } }),
-    onSuccess: () => void refreshWork(),
+    onSuccess: () => {
+      setConfirming(null);
+      void refreshWork();
+    },
   });
   const update = useMutation({
     mutationFn: (status: 'in_progress' | 'done') =>
       api(updateTask, { params: { id: task.id }, body: { status } }),
-    onSuccess: () => void refreshWork(),
+    onSuccess: () => {
+      setConfirming(null);
+      void refreshWork();
+    },
     onError: (error, status) => {
-      if (status === 'done' && isDeviationRequired(error)) setDeviation('late');
+      // A late task can't be closed until someone says why: ask now, then confirm again.
+      if (status === 'done' && isDeviationRequired(error)) {
+        setConfirming(null);
+        setDeviation('late');
+      }
     },
   });
+  const confirmed = (action: TaskAction) => {
+    if (action === 'claim') claim.mutate();
+    else if (action === 'accept') accept.mutate();
+    else update.mutate(action === 'start' ? 'in_progress' : 'done');
+  };
+  const closeConfirm = () => {
+    setConfirming(null);
+    claim.reset();
+    accept.reset();
+    update.reset();
+  };
   const error = claim.error ?? accept.error ?? update.error;
   const queued = !task.assignee && task.queueRole;
   const open = ['open', 'in_progress', 'waiting'].includes(task.status);
@@ -124,7 +150,7 @@ export function TaskRow({ task, sent = false }: { task: Task; sent?: boolean }) 
               label={tWorkstation('openInWorkstation')}
             />
             {queued && open && (
-              <Button size="sm" onClick={() => claim.mutate()} disabled={claim.isPending}>
+              <Button size="sm" onClick={() => setConfirming('claim')} disabled={claim.isPending}>
                 {t('claim')}
               </Button>
             )}
@@ -138,7 +164,7 @@ export function TaskRow({ task, sent = false }: { task: Task; sent?: boolean }) 
                 >
                   {t('decline')}
                 </Button>
-                <Button size="sm" onClick={() => accept.mutate()} disabled={busy}>
+                <Button size="sm" onClick={() => setConfirming('accept')} disabled={busy}>
                   {t('accept')}
                 </Button>
               </>
@@ -172,7 +198,7 @@ export function TaskRow({ task, sent = false }: { task: Task; sent?: boolean }) 
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => update.mutate('in_progress')}
+                    onClick={() => setConfirming('start')}
                     disabled={busy}
                   >
                     {t('start')}
@@ -188,7 +214,7 @@ export function TaskRow({ task, sent = false }: { task: Task; sent?: boolean }) 
                     {t('moreTime')}
                   </Button>
                 )}
-                <Button size="sm" onClick={() => update.mutate('done')} disabled={busy}>
+                <Button size="sm" onClick={() => setConfirming('done')} disabled={busy}>
                   {t('done')}
                 </Button>
               </>
@@ -196,14 +222,22 @@ export function TaskRow({ task, sent = false }: { task: Task; sent?: boolean }) 
           </div>
         )}
       </div>
-      <ProblemMessage error={deviation === 'late' ? null : error} />
+      <ProblemMessage error={deviation === 'late' || confirming ? null : error} />
+      <TaskConfirm
+        action={confirming}
+        title={task.title}
+        pending={claim.isPending || accept.isPending || update.isPending}
+        error={error}
+        onConfirm={confirmed}
+        onClose={closeConfirm}
+      />
       <RecordDeviationDialog
         open={deviation !== null}
         onOpenChange={(next) => !next && setDeviation(null)}
         tasks={[{ id: task.id, title: task.title }]}
         intro={deviation === 'late' ? t('lateIntro') : undefined}
         onRecorded={() => {
-          if (deviation === 'late') update.mutate('done');
+          if (deviation === 'late') setConfirming('done');
         }}
       />
       <DeclineDialog task={task} open={declining} onOpenChange={setDeclining} />

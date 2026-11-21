@@ -662,15 +662,20 @@ describe('step sign-off records', () => {
 
   it('goes back to the authors when the signer returns the step, and a new one is made on resubmitting', async () => {
     const id = await w.go('Plate R');
+    await w.attach(id, '1');
     await ok(call('POST', `/projects/${id}/steps/1/submit`, 'head'));
     await ok(
       call('POST', `/projects/${id}/steps/1/return`, 'vp', { comment: 'The team is missing.' }),
     );
-    const [record] = (await ok(call('GET', `/projects/${id}/documents?step=1`, 'head'))).items;
+    const recordOf = async () =>
+      (await ok(call('GET', `/projects/${id}/documents?step=1`, 'head'))).items.find(
+        (d: any) => d.type.code === 'STEP_SIGNOFF',
+      );
+    const record = await recordOf();
     expect(record).toMatchObject({ status: 'returned', latestVersionNo: 1 });
 
     await ok(call('POST', `/projects/${id}/steps/1/submit`, 'head'));
-    const [again] = (await ok(call('GET', `/projects/${id}/documents?step=1`, 'head'))).items;
+    const again = await recordOf();
     expect(again).toMatchObject({ id: record.id, status: 'in_review', latestVersionNo: 2 });
     await ok(call('POST', `/projects/${id}/steps/1/approve`, 'vp'));
     const done = await ok(open(record.id, 'vp'));
@@ -705,6 +710,68 @@ describe('step sign-off records', () => {
     ]);
     await ok(call('POST', `/projects/${id}/steps/4/approve`, 'ceo'));
     expect(await ok(open(record.id, 'vp'))).toMatchObject({ status: 'approved' });
+  });
+});
+
+describe('a step needs its documents before it is submitted', () => {
+  const stepView = async (id: string, key: string) => w.stepOf(id, key, 'head');
+  const records = async (id: string, key: string) =>
+    (await ok(call('GET', `/projects/${id}/documents?step=${key}`, 'head'))).items.filter(
+      (d: any) => d.type.code === 'STEP_SIGNOFF',
+    );
+
+  it('refuses a step with no document, and makes no sign-off record', async () => {
+    const id = await w.go('Plate DN1');
+    expect((await stepView(id, '1')).documentNeeds).toEqual([
+      'Project Initiation Document: not made or uploaded yet.',
+    ]);
+    for (const url of [
+      `/projects/${id}/steps/1/submit`,
+      `/projects/${id}/steps/1/submit?preview=true`,
+    ]) {
+      const refused = await call('POST', url, 'head');
+      expect(refused.status).toBe(409);
+      expect(refused.body.code).toBe('DOCUMENTS_NEEDED');
+      expect(refused.body.errors[0].message).toContain('Project Initiation Document');
+    }
+    expect((await stepView(id, '1')).status).toBe('ready');
+    expect(await records(id, '1')).toEqual([]);
+  });
+
+  it('refuses a template that is still blank, and accepts it once it is filled in', async () => {
+    const id = await w.go('Plate DN2');
+    const code = await projectCode(id);
+    const pid = await makePid(id);
+    const blank = await call('POST', `/projects/${id}/steps/1/submit`, 'head');
+    expect(blank.body.code).toBe('DOCUMENTS_NEEDED');
+    expect(blank.body.errors[0].message).toContain(`${code}-PID-01`);
+    expect((await stepView(id, '1')).documentNeeds).toHaveLength(1);
+
+    await ok(save(pid.id, 'head', { fields: FIELDS, sections: SECTIONS }));
+    expect((await stepView(id, '1')).documentNeeds).toEqual([]);
+    // It needn't be signed yet: the preview only warns (S7).
+    const preview = await ok(call('POST', `/projects/${id}/steps/1/submit?preview=true`, 'head'));
+    expect(preview.saved).toBe(false);
+    expect(preview.preview.warnings[0]).toContain('is not approved yet');
+    expect(await records(id, '1')).toEqual([]);
+    await ok(call('POST', `/projects/${id}/steps/1/submit`, 'head'));
+    expect(await records(id, '1')).toHaveLength(1);
+  });
+
+  it('takes an upload for a document, and does not ask for the need-to-know budget annex', async () => {
+    const id = await w.go('Plate DN3');
+    await w.advance(id, '4');
+    const step = await stepView(id, '5');
+    expect(step.documentNeeds).toEqual(['Action Plan: not made or uploaded yet.']);
+    await w.attach(id, '5');
+    expect((await stepView(id, '5')).documentNeeds).toEqual([]);
+    await ok(call('POST', `/projects/${id}/steps/5/submit`, 'lead'));
+  });
+
+  it('asks for nothing at a step whose documents have no type yet', async () => {
+    const id = await w.go('Plate DN4');
+    await w.advance(id, '5');
+    expect((await stepView(id, '6')).documentNeeds).toEqual([]);
   });
 });
 
@@ -889,7 +956,8 @@ describe('need-to-know', () => {
       makeDoc(id, 'lead', { stepKey: '5', documentType: 'BUDGET_ANNEX', title: 'Secret costs' }),
     );
     await ok(save(budget.id, 'lead', { fields: { material_cost: '1', total_budget: '2' } }));
-    await ok(makeDoc(id, 'head', { stepKey: '5', documentType: 'ACTION_PLAN' }));
+    const plan = await ok(makeDoc(id, 'head', { stepKey: '5', documentType: 'ACTION_PLAN' }));
+    await ok(save(plan.id, 'head', { fields: { material: 'Titanium' } }));
 
     const feed = async (as: string) =>
       (await ok(call('GET', `/projects/${id}/activity?limit=100`, as))).items.filter((e: any) =>

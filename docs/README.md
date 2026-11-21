@@ -50,7 +50,7 @@ It acts as you, sees only what you can see, and anything that affects other peop
 
 These hold everywhere. If a change breaks one, raise it first.
 
-1. **People decide; the AI prepares.** The AI never signs, decides, or sends anything outside Jayon on its own: research sends only the general search words a person confirms on a card ([P97](./decisions.md)). Changes that affect others need a person's confirmation.
+1. **People decide; the AI prepares.** The AI never signs, decides, or sends anything outside Jayon on its own: research sends only the general search words a person confirms on a card ([P97](./decisions.md)). Changes that affect others need a person's confirmation, on the website as well as on a card: no click changes something by itself ([P107](./decisions.md)).
 2. **Facts come from records.** Numbers, dates, names and statuses come from the database, with their source, never from the AI.
 3. **The backend enforces the rules.** Permissions, AI tiers and signatures are checked in the backend, never only in a client or in the AI's instructions.
 4. **Processes are data.** Jayon's processes, starting with the R&D route, live in versioned definitions, not in code. Projects stay on the version they started with.

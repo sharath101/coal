@@ -8,6 +8,7 @@ import { useState } from 'react';
 import { RecordDeviationDialog } from '@/components/deviation-dialog';
 import { ProblemMessage } from '@/components/problem-message';
 import { ReturnRequestDialog, SignRequestDialog } from '@/components/row-signing-dialogs';
+import { TaskConfirm } from '@/components/task-confirm';
 import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';
 import { isDeviationRequired } from '@/lib/deviation';
@@ -22,7 +23,8 @@ export function rowHasActions(row: WidgetRow): boolean {
 
 /**
  * What the viewer may do with one row, as small buttons: the actions the API lists for the row,
- * where the row carries what the action needs. Marking a late task done asks why it is late first.
+ * where the row carries what the action needs. Starting and marking done ask first, and marking a
+ * late task done asks why it is late before that.
  */
 export function RowActions({ row }: { row: WidgetRow }) {
   const t = useTranslations('widgets');
@@ -33,12 +35,26 @@ export function RowActions({ row }: { row: WidgetRow }) {
 
   const setStatus = (status: 'in_progress' | 'done') =>
     api(updateTask, { params: { id: taskId ?? '' }, body: { status } });
-  const start = useMutation({ mutationFn: () => setStatus('in_progress'), onSuccess: refresh });
+  const [confirming, setConfirming] = useState<'start' | 'done' | null>(null);
+  const start = useMutation({
+    mutationFn: () => setStatus('in_progress'),
+    onSuccess: () => {
+      setConfirming(null);
+      void refresh();
+    },
+  });
   const done = useMutation({
     mutationFn: () => setStatus('done'),
-    onSuccess: refresh,
+    onSuccess: () => {
+      setConfirming(null);
+      void refresh();
+    },
     onError: (error) => {
-      if (isDeviationRequired(error)) setDialog('late');
+      // A late task can't be closed until someone says why: ask now, then confirm again.
+      if (isDeviationRequired(error)) {
+        setConfirming(null);
+        setDialog('late');
+      }
     },
   });
   const read = useMutation({
@@ -47,19 +63,24 @@ export function RowActions({ row }: { row: WidgetRow }) {
   });
   const busy = start.isPending || done.isPending || read.isPending;
   const error = start.error ?? done.error ?? read.error;
-  const hideError = dialog === 'late' && isDeviationRequired(done.error);
+  const hideError = confirming !== null || (dialog === 'late' && isDeviationRequired(done.error));
+  const closeConfirm = () => {
+    setConfirming(null);
+    start.reset();
+    done.reset();
+  };
 
   const small = { size: 'xs', variant: 'outline' } as const;
   return (
     <div className="grid gap-1">
       <div className="flex flex-wrap gap-1">
         {taskId && has('start') && (
-          <Button {...small} disabled={busy} onClick={() => start.mutate()}>
+          <Button {...small} disabled={busy} onClick={() => setConfirming('start')}>
             {t('actions.start')}
           </Button>
         )}
         {taskId && has('done') && (
-          <Button {...small} disabled={busy} onClick={() => done.mutate()}>
+          <Button {...small} disabled={busy} onClick={() => setConfirming('done')}>
             {t('actions.done')}
           </Button>
         )}
@@ -92,15 +113,25 @@ export function RowActions({ row }: { row: WidgetRow }) {
       {!hideError && <ProblemMessage error={error} />}
 
       {taskId && (
-        <RecordDeviationDialog
-          open={dialog === 'late' || dialog === 'time'}
-          onOpenChange={(open) => !open && setDialog(null)}
-          tasks={[{ id: taskId, title: row.title }]}
-          intro={dialog === 'late' ? t('lateIntro') : undefined}
-          onRecorded={() => {
-            if (dialog === 'late') done.mutate();
-          }}
-        />
+        <>
+          <TaskConfirm
+            action={confirming}
+            title={row.title}
+            pending={start.isPending || done.isPending}
+            error={start.error ?? done.error}
+            onConfirm={(action) => (action === 'start' ? start.mutate() : done.mutate())}
+            onClose={closeConfirm}
+          />
+          <RecordDeviationDialog
+            open={dialog === 'late' || dialog === 'time'}
+            onOpenChange={(open) => !open && setDialog(null)}
+            tasks={[{ id: taskId, title: row.title }]}
+            intro={dialog === 'late' ? t('lateIntro') : undefined}
+            onRecorded={() => {
+              if (dialog === 'late') setConfirming('done');
+            }}
+          />
+        </>
       )}
       {requestId && (
         <>

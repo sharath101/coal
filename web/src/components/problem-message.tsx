@@ -38,7 +38,7 @@ export function ProblemMessage({
     text = t(code && t.has(code as ProblemKey) ? (code as ProblemKey) : 'generic', { who: '' });
   }
   const details =
-    code === 'VALIDATION_FAILED' && error instanceof ApiError
+    (code === 'VALIDATION_FAILED' || code === 'DOCUMENTS_NEEDED') && error instanceof ApiError
       ? [...new Set((error.problem.errors ?? []).map((e) => e.message))]
       : [];
   return (

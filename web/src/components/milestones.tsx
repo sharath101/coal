@@ -1,9 +1,10 @@
 'use client';
 
-import { recordMilestone, type RouteView } from '@coal/shared';
+import { recordMilestone, type ActionResult, type RouteView } from '@coal/shared';
 import { useMutation } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
+import { ActionConfirm } from '@/components/action-confirm';
 import { ProblemMessage } from '@/components/problem-message';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,15 +22,23 @@ function MilestoneRow({
   onChanged: () => void;
 }) {
   const t = useTranslations('project');
+  const tConfirm = useTranslations('confirm.milestone');
   const [note, setNote] = useState('');
+  const [asked, setAsked] = useState<ActionResult | null>(null);
+  const request = {
+    params: { id: projectId },
+    body: { milestone: milestone.key, ...(note.trim() && { note: note.trim() }) },
+  };
+  // Recording changes what the route waits for, so the API says what would happen and the person confirms.
+  const previewIt = useMutation({
+    mutationFn: () => api(recordMilestone, { ...request, query: { preview: 'true' } }),
+    onSuccess: setAsked,
+  });
   const mutation = useMutation({
-    mutationFn: () =>
-      api(recordMilestone, {
-        params: { id: projectId },
-        body: { milestone: milestone.key, ...(note.trim() && { note: note.trim() }) },
-      }),
+    mutationFn: () => api(recordMilestone, request),
     onSuccess: () => {
       setNote('');
+      setAsked(null);
       onChanged();
     },
   });
@@ -55,7 +64,7 @@ function MilestoneRow({
           className="flex flex-wrap gap-2"
           onSubmit={(e) => {
             e.preventDefault();
-            mutation.mutate();
+            previewIt.mutate();
           }}
         >
           <Input
@@ -63,15 +72,29 @@ function MilestoneRow({
             placeholder={t('note')}
             maxLength={1000}
             value={note}
-            onChange={(e) => setNote(e.target.value)}
+            onChange={(e) => {
+              setNote(e.target.value);
+              setAsked(null);
+            }}
             className="max-w-sm"
           />
-          <Button type="submit" size="sm" disabled={mutation.isPending}>
+          <Button type="submit" size="sm" disabled={previewIt.isPending || mutation.isPending}>
             {t('record')}
           </Button>
         </form>
       )}
-      <ProblemMessage error={mutation.error} />
+      {asked && (
+        <ActionConfirm
+          title={tConfirm('title', { name: milestone.name })}
+          text={tConfirm('text')}
+          confirmLabel={tConfirm('yes')}
+          preview={asked.preview}
+          busy={mutation.isPending}
+          onConfirm={() => mutation.mutate()}
+          onCancel={() => setAsked(null)}
+        />
+      )}
+      <ProblemMessage error={previewIt.error ?? mutation.error} />
     </li>
   );
 }

@@ -36,6 +36,70 @@ const COOKIE_OF_ROLE: Record<string, string> = {
   qc_inspector: 'qc',
 };
 
+/** The documents a step needs before it can be submitted: its normal template types. */
+const STEP_DOCUMENTS: Record<string, string[]> = {
+  '1': ['PID'],
+  '2': ['MRS'],
+  '2a': ['REG_PLAN'],
+  '3': ['PROJECT_PLANNING', 'APPROVAL_FORM'],
+  '5': ['ACTION_PLAN'],
+};
+
+type Call = (
+  method: 'GET' | 'POST',
+  url: string,
+  as: string | null,
+  payload?: unknown,
+) => Promise<Res>;
+
+/**
+ * Calls the tests share for documents: a finished upload, as COAL sees it (made through the real
+ * upload flow), and `attach`, which uploads a made-up file as each document a step still needs
+ * before it can be submitted, as the step's first doer.
+ */
+export function documentCalls(call: Call, ok: (res: Promise<Res>) => Promise<any>) {
+  async function upload(
+    as: string,
+    name: string,
+    bytes: Uint8Array,
+    origin: 'internal' | 'outside' = 'internal',
+  ): Promise<string> {
+    const start = await ok(
+      call('POST', '/files/upload-url', as, { name, size: bytes.length, origin }),
+    );
+    const put = await fetch(start.upload.url, {
+      method: 'PUT',
+      headers: start.upload.headers,
+      body: bytes,
+    });
+    if (!put.ok) throw new Error(`Upload failed: ${put.status}`);
+    await ok(call('POST', `/files/${start.file.id}/complete`, as));
+    return start.file.id;
+  }
+
+  async function attach(id: string, key: string) {
+    const route = await ok(call('GET', `/projects/${id}/route`, 'vp'));
+    const step = route.steps.find((s: { key: string }) => s.key === key);
+    if (step.documentNeeds.length === 0) return;
+    const as = COOKIE_OF_ROLE[step.doers[0].key]!;
+    const made = await ok(call('GET', `/projects/${id}/documents?step=${key}`, as));
+    const have = made.items.map((d: { type: { code: string } }) => d.type.code);
+    for (const code of (STEP_DOCUMENTS[key] ?? []).filter((c) => !have.includes(c))) {
+      const bytes = new TextEncoder().encode(`%PDF-1.4 made-up ${code} for step ${key} of ${id}`);
+      const fileId = await upload(as, `${code}.pdf`, bytes);
+      await ok(
+        call('POST', `/projects/${id}/documents`, as, {
+          stepKey: key,
+          documentType: code,
+          fileId,
+        }),
+      );
+    }
+  }
+
+  return { upload, attach };
+}
+
 const ORDER = [
   '1',
   '2',
@@ -107,8 +171,11 @@ export async function createWorld(t: TestApp) {
   const stepOf = async (id: string, key: string, as = 'vp') =>
     (await route(id, as)).steps.find((s: { key: string }) => s.key === key);
 
+  const { upload, attach } = documentCalls(call, ok);
+
   /** Submits a step as its first doer, then signs it off as its signer (both Board members at 4 and 23). */
   async function finish(id: string, key: string) {
+    await attach(id, key);
     const step = await stepOf(id, key);
     await ok(
       call('POST', `/projects/${id}/steps/${key}/submit`, COOKIE_OF_ROLE[step.doers[0].key]!),
@@ -148,26 +215,6 @@ export async function createWorld(t: TestApp) {
     }
   }
 
-  /** A finished upload, as COAL sees it: made through the real upload flow. */
-  async function upload(
-    as: string,
-    name: string,
-    bytes: Uint8Array,
-    origin: 'internal' | 'outside' = 'internal',
-  ): Promise<string> {
-    const start = await ok(
-      call('POST', '/files/upload-url', as, { name, size: bytes.length, origin }),
-    );
-    const put = await fetch(start.upload.url, {
-      method: 'PUT',
-      headers: start.upload.headers,
-      body: bytes,
-    });
-    if (!put.ok) throw new Error(`Upload failed: ${put.status}`);
-    await ok(call('POST', `/files/${start.file.id}/complete`, as));
-    return start.file.id;
-  }
-
   return {
     who,
     spine,
@@ -183,6 +230,7 @@ export async function createWorld(t: TestApp) {
     decide,
     advance,
     upload,
+    attach,
   };
 }
 

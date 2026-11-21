@@ -15,6 +15,7 @@ import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { useId, useState } from 'react';
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { ProblemMessage } from '@/components/problem-message';
 import { selectClass } from '@/components/role-fields';
 import { Pill } from '@/components/status-badge';
@@ -110,13 +111,19 @@ function SourceRow({
   onEdit: () => void;
 }) {
   const t = useTranslations('sourceLibrary');
+  const tConfirm = useTranslations('confirm.source');
   const settingsText = useSettingsText();
   const queryClient = useQueryClient();
+  const [confirmingToggle, setConfirmingToggle] = useState(false);
   const toggle = useMutation({
     mutationFn: () =>
       api(updateResearchSource, { params: { id: source.id }, body: { enabled: !source.enabled } }),
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: queryKeys.researchSources }),
+    onSuccess: () => {
+      setConfirmingToggle(false);
+      void queryClient.invalidateQueries({ queryKey: queryKeys.researchSources });
+    },
   });
+  const turning = source.enabled ? 'off' : 'on';
 
   return (
     <li className="grid gap-1 rounded-xl border p-4 text-sm">
@@ -140,11 +147,24 @@ function SourceRow({
             <Button
               size="sm"
               variant="ghost"
-              onClick={() => toggle.mutate()}
+              onClick={() => {
+                toggle.reset();
+                setConfirmingToggle(true);
+              }}
               disabled={toggle.isPending}
             >
               {source.enabled ? t('switchOff') : t('switchOn')}
             </Button>
+            <ConfirmDialog
+              open={confirmingToggle}
+              onOpenChange={setConfirmingToggle}
+              title={tConfirm(`${turning}Title`, { name: source.name })}
+              text={tConfirm(`${turning}Text`)}
+              confirmLabel={tConfirm(`${turning}Yes`)}
+              pending={toggle.isPending}
+              error={toggle.error}
+              onConfirm={() => toggle.mutate()}
+            />
           </span>
         )}
       </div>

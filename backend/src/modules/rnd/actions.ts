@@ -25,6 +25,7 @@ import {
   signDecision,
   type HookContext,
 } from '../documents/signoff';
+import { assertStepDocuments } from '../documents/needs';
 import {
   createRun,
   findRunStep,
@@ -620,8 +621,10 @@ export async function performAction(
     if (error instanceof EngineError) throw fromEngineError(error);
     throw error;
   }
-  // Work that is late can't be handed in until someone says why (docs/dashboard.md#deviations).
   if (action.type === 'submit') {
+    // What goes to the signer is the step's documents, never an empty step or a blank template.
+    await assertStepDocuments(tx, env.orgId, loaded.run.id, action.step);
+    // Work that is late can't be handed in until someone says why (docs/dashboard.md#deviations).
     const runStepId = loaded.stepIds.get(action.step);
     if (runStepId) await assertDelayExplained(tx, runStepId, now);
   }

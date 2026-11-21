@@ -71,11 +71,12 @@
 | S4 | May someone sign on another's behalf during leave? | Not for now | VP |
 | S5 | What is the policy on AI-drafted documents that will be signed? Should "AI-assisted" be printed on the PDF? | Allowed, as drafts that people review and sign; marked in the record only | Company QA |
 | S6 | Who adds templates and makes a version active: company QA, the R&D Head, or both? Must templates go through Jayon's document control? | The VP or the R&D Head adds and activates (founders, 19 Nov 2026), including their own upload. No document-control step, and no two-person rule | Company QA |
-| S7 | Must a step's documents be approved before the step can be submitted for sign-off? | No. The website warns, and the sign-off record lists each output with its status and hash | VP, company QA |
+| S7 | Must a step's documents be *approved* before the step can be submitted for sign-off? | No. The website warns, and the sign-off record lists each output with its status and hash. (They must be made or uploaded, and filled in: S12.) | VP, company QA |
 | S8 | Should a signed PDF show its signatures (names, meanings, dates)? | Not yet. Signatures are shown on screen and tied to the PDF's hash. A signature block and a company seal on the PDF come with the "sealed PDFs" item in [documents-and-signing.md](./documents-and-signing.md#later) | Company QA |
 | S9 | Should activating a template need a second person, so nobody activates their own upload? | No (S6). It is a one-line change if wanted | VP, company QA |
 | S10 | Is the product concept at step C a document, with its own template, and who writes it? | No document yet: Go records the idea's name and description, and that is the concept. A template can be added as a document type later | VP |
 | S11 | May the assistant add a new **document type** from a sample (for a step whose forms aren't in COAL yet), and who decides its numbering and who signs? | Yes, on the same card, for the VP and the R&D Head. The card proposes `{project_code}-ABC-nn` numbering and Prepared, Reviewed and Approved rows, to correct before confirming ⚠ | VP, R&D Head |
+| S12 | Which documents must a step have before it can be submitted? | Each template document type of the step in [the table](./documents-and-signing.md#document-types), except the budget annex: made or uploaded, and with its required parts filled in if it comes from a template. Steps with no document type yet ask for nothing. Whether a step needs *several* documents of one type, or an annex, or a document that isn't a template type is open | VP, R&D Head |
 
 ## AI
 

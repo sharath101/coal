@@ -76,6 +76,7 @@ describe('when work is late', () => {
   it('turns a step overdue, asks for a reason before submitting, and moves the forecast', async () => {
     travel(0);
     const id = await w.go('Late step');
+    await w.attach(id, '1');
     const before = await timeline(id);
 
     travel(20);
@@ -113,6 +114,7 @@ describe('when work is late', () => {
   it('refuses to hand in a late step until its deviation is recorded', async () => {
     travel(0);
     const id = await w.go('Late task');
+    await w.attach(id, '2');
     const task = (await w.stepOf(id, '2')).tasks[0];
     travel(30);
     // The step's task can't be closed by hand: handing in the step is how it closes.
@@ -143,6 +145,7 @@ describe('when work is late', () => {
   it('asks again when the new date is missed too, and when a step is late again', async () => {
     travel(0);
     const id = await w.go('Late twice');
+    await w.attach(id, '2');
     const task = (await w.stepOf(id, '2')).tasks[0];
     const explain = (newDate: string) =>
       call('POST', '/deviations', 'ops', {
@@ -196,6 +199,7 @@ describe('when work is late', () => {
     expect(step(await timeline(id), '1').forecastEnd).toBe(far);
 
     // Once the step is handed in, no task holds the forecast back: the signer's window does.
+    await w.attach(id, '1');
     await ok(call('POST', `/projects/${id}/steps/1/submit`, 'head'));
     expect(step(await timeline(id), '1').forecastEnd).toBe(addWorkingDays(cal, today(), 3));
   });
@@ -203,6 +207,7 @@ describe('when work is late', () => {
   it('is judged by the signer’s wait, not the doers’, once a step is handed in', async () => {
     travel(0);
     const id = await w.go('Handed in');
+    await w.attach(id, '2');
     await ok(call('POST', `/projects/${id}/steps/2/submit`, 'ops'));
     const waited = await timeline(id);
     expect(step(waited, '2').health).toBe('ok');
@@ -288,6 +293,7 @@ describe('the Action Plan sets the baseline', () => {
     expect(draft.can.editPlan).toBe(true);
 
     // Submitting a plan with no dates warns; this one has some.
+    await w.attach(id, '5');
     const preview = await ok(call('POST', `/projects/${id}/steps/5/submit?preview=true`, 'lead'));
     expect(preview.preview.warnings.join(' ')).not.toContain('No dates are written');
 
@@ -315,6 +321,7 @@ describe('the Action Plan sets the baseline', () => {
   it('warns when step 5 is submitted with no dates written', async () => {
     const id = await w.go('No plan');
     await w.advance(id, '4');
+    await w.attach(id, '5');
     const preview = await ok(call('POST', `/projects/${id}/steps/5/submit?preview=true`, 'lead'));
     expect(preview.preview.warnings.join(' ')).toContain('No dates are written');
     // Writing a plan is only allowed while step 5 is open.

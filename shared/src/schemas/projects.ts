@@ -219,6 +219,8 @@ export const StepView = z.object({
   /** What submitting or approving still needs. */
   submitNeeds: z.array(Condition),
   approveNeeds: z.array(Condition),
+  /** The step's documents that are not made, uploaded or filled in yet: submitting waits for them. */
+  documentNeeds: z.array(z.string()),
   approvedBy: z.array(Person),
   decisions: z.array(DecisionView),
   tasks: z.array(StepTask),
