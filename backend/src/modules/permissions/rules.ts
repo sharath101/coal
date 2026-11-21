@@ -357,6 +357,14 @@ export interface ChatResource {
 const ownChat = (actor: Actor, c: ChatResource): Decision =>
   c.userId === actor.userId ? allow : deny('The person who started the chat');
 
+/** A research run is private to the person who ran it, like a chat: its results are outside material until kept. */
+export interface ResearchRunResource {
+  userId: string;
+}
+
+const ownRun = (actor: Actor, r: ResearchRunResource): Decision =>
+  r.userId === actor.userId ? allow : deny('The person who ran it');
+
 export const RULES = {
   'auth.signUp': { endpoint: anyone },
   'auth.signIn': { endpoint: anyone },
@@ -434,6 +442,13 @@ export const RULES = {
   'ai.chats.read': { endpoint: signedIn, resource: ownChat },
   'ai.chats.write': { endpoint: signedIn, resource: ownChat },
   'ai.feedback': { endpoint: signedIn, resource: ownChat },
+  'research.sources.read': { endpoint: signedIn },
+  // ⚠ The VP, the R&D Head and the R&D Leads keep the source library (A11).
+  'research.sources.write': { endpoint: onlyRoles('vp', 'rd_head', 'rd_lead') },
+  // ⚠ The people of steps C, 1 and 2 research: the VP, the R&D Head, the R&D Leads and R&D Ops (A11).
+  'research.run': { endpoint: onlyRoles('vp', 'rd_head', 'rd_lead', 'rd_ops') },
+  'research.read': { endpoint: signedIn, resource: ownRun },
+  'research.write': { endpoint: signedIn, resource: ownRun },
 } satisfies Record<
   PermissionKey,
   | Rule<never>

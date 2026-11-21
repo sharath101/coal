@@ -2,6 +2,7 @@ import { index, pgTable, text, uuid } from 'drizzle-orm/pg-core';
 import { idColumn, orgIdColumn, timestamptz } from '../../core/db/columns';
 import { files } from '../files/tables';
 import { processRuns } from '../process/tables';
+import { researchResults } from '../research/tables';
 
 /** Files and pictures on a step, a document or a task of a project. */
 export const attachments = pgTable(
@@ -42,6 +43,8 @@ export const sources = pgTable(
     url: text('url'),
     fileId: uuid('file_id').references(() => files.id),
     note: text('note').notNull().default(''),
+    /** Kept from a research run (docs/workstation-and-ai.md#researching-what-already-exists). */
+    researchResultId: uuid('research_result_id').references(() => researchResults.id),
     addedBy: uuid('added_by').notNull(),
     createdAt: timestamptz('created_at').notNull().defaultNow(),
   },

@@ -120,7 +120,7 @@ Departments, roles and product lines are reference data. Their rows are listed i
 | `signatures` *(insert-only)* | Each signature, on a document version or a decision | request_id (empty for a decision), subject_type (document_version, decision), subject_id, content_sha256, pdf_sha256, user_id, printed_name, role_key, role_name, meaning (prepared, reviewed, approved, decision), decision, reason, method (`click` until passkeys), signed_at. *The passkey columns (intent, authenticator data, client data, assertion) come with passkeys* |
 | `files` | Every stored file | storage_key, name, mime_type (from the file extension), size, sha256 (recorded when the upload completes), status (pending, uploaded), uploaded_by (empty for a file COAL made with no person behind it), scan_status (not scanned, clean, infected), origin (internal, outside), derived_from (the file it was made from: a built template's Word file points at its sample, and its sample PDF at the Word file) |
 | `attachments` | Files and pictures on a step, document or task | run_id, step_key, document_id, task_id (exactly one of the last three), file_id, caption, added_by |
-| `sources` | Sources added to a step, document or task | run_id, step_key, document_id, task_id, kind (link, file, citation), title, url, file_id, note, added_by |
+| `sources` | Sources added to a step, document or task | run_id, step_key, document_id, task_id, kind (link, file, citation), title, url, file_id, note, research_result_id (kept from a research run), added_by |
 
 **Guards in the database** (migration 0005): `signatures` is insert-only. `document_versions` rows can't be deleted, and an update may change only a version's status and revision letter, forwards: content, files, hashes, step iteration, author and the assistant's marks (`via_ai`, `ai_request_id`, `ai_sections`; migration 0012) never change, an approved version can only become superseded, and a revision letter once given stays.
 
@@ -132,10 +132,20 @@ The step sign-off record is a document of type `STEP_SIGNOFF`, so it needs no ta
 |---|---|---|
 | `ai_chats` | Each chat in someone's Workstation. Private to its owner | user_id, run_id (the run of the project it is about), channel (website; later WhatsApp and the app), context (JSON: project, step, document, task or widget), title, has_outside_text (a file from outside was attached: from then on the assistant only prepares action cards) |
 | `ai_messages` | Each message the person sent and each reply | chat_id, sender (user, assistant), parts (JSON: text with its citations, what the AI looked at, action cards by proposal id), request_id (the request that wrote a reply), stopped. Tool calls are not messages: they are in `ai_tool_calls` |
-| `ai_requests` *(insert-only)* | One for each reply the AI wrote, and one for the title of a new chat | chat_id, user_id, provider, model, purpose (chat, title, draft_write), prompt_version, model_calls, tool_calls, input_tokens, output_tokens, cost_usd (worked out from the tokens: an estimate that sets the budget), outcome (completed, stopped, error), error_code, duration_ms |
-| `ai_tool_calls` *(insert-only)* | Each tool the AI used | request_id, tool, endpoint, tier, allowed, denial_reason, input (what it asked for, cut short), records_returned (type, id, version), proposal_id, duration_ms |
+| `ai_requests` *(insert-only)* | One for each reply the AI wrote, and one for the title of a new chat | chat_id, user_id, provider, model, purpose (chat, title, template, research), prompt_version, model_calls, tool_calls, input_tokens, output_tokens, cost_usd (worked out from the tokens: an estimate that sets the budget), outcome (completed, stopped, error), error_code, duration_ms |
+| `ai_tool_calls` *(insert-only)* | Each tool the AI used, and each search a research run sent (endpoint `outside:<kind>`, tier `outside`) | request_id, tool, endpoint, tier, allowed, denial_reason, input (what it asked for, cut short), records_returned (type, id, version), proposal_id, duration_ms |
 | `proposals` | Actions waiting for confirmation ([api.md](./api.md#proposals-and-action-cards)) | for_user_id, chat_id (the AI chat that prepared it), prepared_by_ai, version, title, actions (JSON: endpoint calls), preview (JSON: each action's summary, effects and who is told), status (pending, confirmed, rejected, expired, failed), expires_at, confirmed_at, result (what each action returned) |
 | `ai_feedback` | Thumbs up or down; one per person and message, which a later rating replaces | message_id, user_id, rating, comment |
+
+### Research
+
+Research in public sources ([workstation-and-ai.md](./workstation-and-ai.md#researching-what-already-exists)), in the platform module `research`.
+
+| Table | Holds | Key columns |
+|---|---|---|
+| `research_sources` | The source library: the places COAL may search. The defaults are reference data, loaded by a seed key that never adds one twice or undoes a change | seed_key (empty for those added on the page), name (unique), kind (pubmed, europepmc, clinicaltrials, openfda, journal, website, link), settings (JSON, by kind: openFDA parts, ISSN, websites, a search address), note (when to use it), enabled, added_by |
+| `research_runs` | One run: what was asked, the confirmed terms and the brief. Private to its owner | user_id, question, terms (JSON: the only words that left COAL), source_ids, since, project_id and step_key (where results are meant to be kept), proposal_id and chat_id (the card that started it), status (queued, running, done, failed, stopped), stop_asked, brief, searches (JSON: each query sent, its source, how many found, when), error, request_id (the `ai_requests` row), started_at, finished_at |
+| `research_results` | What a run found, one row per result | run_id, ref (`R1`, unique in the run), source_id, kind (article, trial, clearance, classification, adverse_event, recall, device, web), external_id (the source's own id, unique per source in the run), title, detail, year, url (built by COAL), snippet, kept_at |
 
 ### Notifications and platform
 

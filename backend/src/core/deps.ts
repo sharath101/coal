@@ -17,4 +17,9 @@ export interface AppDeps {
   ai: AiProvider | null;
   /** The time, in one place so tests can move it forward (due dates and reminders depend on today). */
   now: () => Date;
+  /**
+   * How COAL reaches the public sources research searches (docs/workstation-and-ai.md#researching-what-already-exists).
+   * Tests put a stand-in here, so they never reach the internet.
+   */
+  fetchOutside: typeof fetch;
 }

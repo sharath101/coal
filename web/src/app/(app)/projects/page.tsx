@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { formatDate } from '@/lib/format';
 import { flatten, useMe, useProjects } from '@/lib/queries';
+import { canManageTemplates } from '@/lib/roles';
 
 /** Every project's status is open to everyone signed in (docs/roles-and-access.md#what-people-can-see). */
 export default function ProjectsPage() {
@@ -30,11 +31,19 @@ export default function ProjectsPage() {
           <h1 className="text-2xl font-semibold tracking-tight">{t('title')}</h1>
           <p className="text-sm text-muted-foreground">{t('intro')}</p>
         </div>
-        {isVp && (
-          <Button asChild>
-            <Link href="/projects/new">{t('start')}</Link>
-          </Button>
-        )}
+        <div className="flex flex-wrap gap-2">
+          {/* The library is rarely changed, so it lives here and not in the top bar. */}
+          {me && canManageTemplates(me.role.key) && (
+            <Button asChild variant="outline">
+              <Link href="/templates">{t('templates')}</Link>
+            </Button>
+          )}
+          {isVp && (
+            <Button asChild>
+              <Link href="/projects/new">{t('start')}</Link>
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="grid max-w-xs gap-2">

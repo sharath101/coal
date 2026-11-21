@@ -174,6 +174,7 @@ async function presentSources(
       file: file ? present(file) : null,
       note: r.note,
       target: targetOf(r),
+      researchResultId: r.researchResultId,
       addedBy: personOf(names, r.addedBy),
       addedAt: r.createdAt.toISOString(),
     };
@@ -297,6 +298,73 @@ export async function createSource(
       payload: { sourceId: added.id, ...target },
     });
     return (await presentSources(tx, ctx.orgId, [added]))[0] as SourceView;
+  });
+}
+
+/** A result of a research run, kept as a link on a project step. */
+export interface KeptResult {
+  title: string;
+  url: string;
+  note: string;
+  researchResultId: string;
+}
+
+/**
+ * Keeps research results as sources on a step, in one transaction, under the same rule as adding
+ * a source by hand: the people who do or sign the step, and the project team. `then` runs in the
+ * same transaction, so the run marks its results kept only if the sources were added.
+ */
+export async function keepSources(
+  deps: AppDeps,
+  ctx: RequestContext,
+  actor: Actor,
+  projectId: string,
+  stepKey: string,
+  items: KeptResult[],
+  then: (tx: Executor) => Promise<void>,
+): Promise<SourceView[]> {
+  return change(deps.db, ctx, async (tx, log) => {
+    const env = await loadEnv(tx, ctx.orgId, actor, projectId);
+    const target = await resolveTarget(deps, tx, ctx, actor, env, { stepKey });
+    assertMay(env, 'sources.write', rolesFor(env, target.stepKey));
+    const rows: SourceRow[] = await tx
+      .insert(sources)
+      .values(
+        items.map((item) => ({
+          orgId: ctx.orgId,
+          runId: env.loaded.run.id,
+          ...target,
+          kind: 'link' as const,
+          title: item.title,
+          url: item.url,
+          note: item.note,
+          researchResultId: item.researchResultId,
+          addedBy: actor.userId,
+        })),
+      )
+      .returning();
+    for (const added of rows) {
+      log.audit({
+        action: 'source.added',
+        recordType: 'source',
+        recordId: added.id,
+        after: {
+          ...target,
+          kind: added.kind,
+          title: added.title,
+          url: added.url,
+          researchResultId: added.researchResultId,
+        },
+      });
+      log.event({
+        type: 'source.added',
+        projectId,
+        stepKey: target.stepKey,
+        payload: { sourceId: added.id, ...target },
+      });
+    }
+    await then(tx);
+    return presentSources(tx, ctx.orgId, rows);
   });
 }
 

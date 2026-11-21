@@ -17,6 +17,7 @@ const COMMANDS = [
   { key: 'assign', send: false },
   { key: 'idea', send: false },
   { key: 'draft', send: false },
+  { key: 'research', send: false },
   { key: 'brief', send: true },
 ] as const;
 

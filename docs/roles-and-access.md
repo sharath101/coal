@@ -83,6 +83,7 @@ Everyone with an account can see the **status** of every project. For now, that 
 | Who caused a delay (by name) | — | All | All | People below them | Themselves | — | — |
 | Productivity measures | Department totals | Own and people below | Own and people below | Own and people below | Own | Own | Own |
 | AI chats | Owner only | Owner only | Owner only | Owner only | Owner only | Owner only | Owner only |
+| Research runs (the brief and results not yet kept) | Owner only | Owner only | Owner only | Owner only | Owner only | Owner only | Owner only |
 
 **Rules on top of the table**
 
@@ -130,6 +131,9 @@ Everyone with an account can see the **status** of every project. For now, that 
 | Change the R&D route | Not in COAL yet. Developers change it in the repository, with review |
 | Add a template; make a template version active | VP or R&D Head, including their own upload ⚠ ([documents-and-signing.md](./documents-and-signing.md#adding-a-template)). The assistant may prepare a template on their behalf, on an action card; activating stays their own act |
 | Read a template | Everyone reads the active ones; the VP and the Head also read drafts and retired versions |
+| Add, change or switch off a place in the source library | VP, R&D Head, R&D Leads ⚠ ([A11](./open-questions.md#people-and-access)). Everyone reads the library |
+| Research in public sources | VP, R&D Head, R&D Leads, R&D Ops: the people of steps C, 1 and 2 ⚠ ([A11](./open-questions.md#people-and-access)). The assistant prepares the card; the person confirms the search words |
+| Keep research results as sources of a step | The person who ran the research, into a step they may add sources to (above) |
 
 ## Assigning work and making requests
 

@@ -7,6 +7,8 @@ import { systemContext } from '../core/http/context';
 import { verifyAuditChain } from '../modules/audit/service';
 import { scanPending } from '../modules/files/service';
 import { runReminders } from '../modules/notifications/reminders';
+import { runResearch } from '../modules/research/assistant';
+import { sweepResearch } from '../modules/research/jobs';
 import { recomputeAll } from '../modules/schedule/nightly';
 
 /**
@@ -18,6 +20,8 @@ export const JOBS = {
   scanPendingFiles: 'files.scan-pending',
   recomputeSchedules: 'schedule.recompute',
   sendReminders: 'notifications.reminders',
+  runResearch: 'research.run',
+  sweepResearch: 'research.sweep',
 } as const;
 
 export async function runAuditChainCheck(db: Db, log: Logger) {
@@ -25,6 +29,11 @@ export async function runAuditChainCheck(db: Db, log: Logger) {
   if (result.ok) log.info({ checked: result.checked }, 'audit chain intact');
   else log.error(result, 'AUDIT CHAIN BROKEN');
   return result;
+}
+
+/** Queues a research run once: a second send for the same run is dropped. */
+export async function sendResearch(boss: PgBoss, runId: string): Promise<void> {
+  await boss.send(JOBS.runResearch, { runId }, { singletonKey: runId });
 }
 
 export async function startJobs(deps: AppDeps, log: Logger) {
@@ -40,6 +49,12 @@ export async function startJobs(deps: AppDeps, log: Logger) {
   await boss.createQueue(JOBS.scanPendingFiles);
   await boss.createQueue(JOBS.recomputeSchedules);
   await boss.createQueue(JOBS.sendReminders);
+  // A research run is taken only while it is queued, so a repeat does nothing.
+  await boss.createQueue(JOBS.runResearch, {
+    retryLimit: 0,
+    expireInSeconds: Math.ceil(deps.config.research.timeoutMs / 1000) + 120,
+  });
+  await boss.createQueue(JOBS.sweepResearch);
   await boss.schedule(JOBS.auditChainCheck, '30 2 * * *', null, { tz: 'Asia/Kolkata' });
   await boss.schedule(JOBS.idempotencyCleanup, '0 * * * *', null, { tz: 'Asia/Kolkata' });
   // Uploads whose scan didn't finish (the scanner was down) are tried again.
@@ -48,6 +63,7 @@ export async function startJobs(deps: AppDeps, log: Logger) {
   // the day's reminders go out at the start of the working day.
   await boss.schedule(JOBS.recomputeSchedules, '10 0 * * *', null, { tz: 'Asia/Kolkata' });
   await boss.schedule(JOBS.sendReminders, '30 8 * * *', null, { tz: 'Asia/Kolkata' });
+  await boss.schedule(JOBS.sweepResearch, '* * * * *', null, { tz: 'Asia/Kolkata' });
 
   await boss.work(JOBS.auditChainCheck, async () => {
     await runAuditChainCheck(deps.db, log);
@@ -68,6 +84,16 @@ export async function startJobs(deps: AppDeps, log: Logger) {
     await recomputeAll(deps, deps.config.orgId);
     const sent = await runReminders(deps, deps.config.orgId);
     if (sent > 0) log.info({ sent }, 'sent reminders');
+  });
+  await boss.work<{ runId: string }>(JOBS.runResearch, { localConcurrency: 2 }, async (jobs) => {
+    for (const job of jobs) {
+      const status = await runResearch(deps, job.data.runId);
+      log.info({ runId: job.data.runId, status }, 'research run ended');
+    }
+  });
+  await boss.work(JOBS.sweepResearch, async () => {
+    const swept = await sweepResearch(deps, (runId) => sendResearch(boss, runId));
+    if (swept.resent + swept.abandoned > 0) log.info(swept, 'swept research runs');
   });
 
   // Starting up also makes up for a missed midnight run.

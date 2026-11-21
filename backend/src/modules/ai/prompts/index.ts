@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import type { RouteDefinition } from '@coal/shared';
 import { COMPANY_FACTS, routeSummary } from './company';
 import { PLATFORM_RULES } from './platform';
+import { RESEARCH_RULES } from './research';
 import { roleSummary } from './role';
 import { OUTSIDE_TEXT_RULES, SAMPLE_RULES } from './template';
 import { WRITING_RULES } from './writing';
@@ -11,7 +12,14 @@ import { WRITING_RULES } from './writing';
  * logged with every model request, so a change in behaviour can be traced to a change in words.
  */
 export const PROMPT_VERSION = `v1-${createHash('sha256')
-  .update(PLATFORM_RULES + COMPANY_FACTS + WRITING_RULES + OUTSIDE_TEXT_RULES + SAMPLE_RULES)
+  .update(
+    PLATFORM_RULES +
+      COMPANY_FACTS +
+      WRITING_RULES +
+      RESEARCH_RULES +
+      OUTSIDE_TEXT_RULES +
+      SAMPLE_RULES,
+  )
   .digest('hex')
   .slice(0, 8)}`;
 
@@ -52,6 +60,7 @@ export function buildInstructions(i: InstructionInputs): string {
     pinned,
     waiting,
     WRITING_RULES,
+    RESEARCH_RULES,
     i.hasFile ? OUTSIDE_TEXT_RULES : '',
     i.hasFile ? SAMPLE_RULES : '',
   ]

@@ -97,6 +97,12 @@ const ENDPOINT_TABLE: Record<PermissionKey, Who[]> = {
   'ai.chats.read': SIGNED_IN,
   'ai.chats.write': SIGNED_IN,
   'ai.feedback': SIGNED_IN,
+  'research.sources.read': SIGNED_IN,
+  // ⚠ The VP, the Head and the Leads keep the source library; the people of steps C, 1 and 2 research (A11).
+  'research.sources.write': ['vp', 'rd_head', 'rd_lead'],
+  'research.run': ['vp', 'rd_head', 'rd_lead', 'rd_ops'],
+  'research.read': SIGNED_IN,
+  'research.write': SIGNED_IN,
 };
 
 /** Rules that need a project and the roles the route allows right now. */
@@ -400,6 +406,23 @@ describe('chat rules', () => {
           allowed: false,
           code: 'NOT_ALLOWED',
           whoCan: ['The person who started the chat'],
+        });
+      }
+    },
+  );
+});
+
+describe('research run rules', () => {
+  it.each(['research.read', 'research.write'] as const)(
+    '%s: only the person who ran it, whatever their role',
+    (permission) => {
+      for (const who of ROLE_KEYS) {
+        const actor = actorFor(who) as Actor;
+        expect(canAccess(permission, actor, { userId: 'user-1' }).allowed).toBe(true);
+        expect(canAccess(permission, actor, { userId: 'user-2' })).toEqual({
+          allowed: false,
+          code: 'NOT_ALLOWED',
+          whoCan: ['The person who ran it'],
         });
       }
     },

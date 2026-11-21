@@ -37,7 +37,31 @@ export interface TurnOutcome {
 export interface AiProvider {
   readonly name: 'anthropic' | 'copilot' | 'scripted';
   run(turn: ModelTurn): Promise<TurnOutcome>;
+  /**
+   * Searches the web on the given websites only, for the research assistant
+   * (docs/workstation-and-ai.md#researching-what-already-exists). Only some providers can: without
+   * it, a website in the source library is a link the person opens.
+   */
+  searchWeb?(search: WebSearch): Promise<WebSearchOutcome>;
   close?(): Promise<void>;
+}
+
+export interface WebSearch {
+  model: string;
+  /** Made only of the words the person approved. */
+  query: string;
+  domains: string[];
+  maxSearches: number;
+  signal: AbortSignal;
+  timeoutMs: number;
+}
+
+export interface WebSearchOutcome {
+  /** Pages the search returned, each with a line on what it says. Only addresses the search gave. */
+  pages: { url: string; title: string; summary: string }[];
+  /** The queries the provider sent, as it sent them. */
+  queries: string[];
+  usage: TurnOutcome['usage'];
 }
 
 /** The provider can't be reached or refused the call. The text is safe to show. */

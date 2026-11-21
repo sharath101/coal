@@ -94,6 +94,16 @@ import {
   reassignTask,
   updateTask,
 } from '../schemas/tasks';
+import {
+  createResearchSource,
+  getResearch,
+  keepResearch,
+  listResearch,
+  listResearchSources,
+  startResearch,
+  stopResearch,
+  updateResearchSource,
+} from '../schemas/research';
 import { listProductLines } from '../schemas/rnd';
 import { getMe, getUser, listUsers, signIn, signOut, signUp, updateMe } from '../schemas/users';
 
@@ -169,6 +179,14 @@ export const ENDPOINTS = [
   listAttachments,
   createSource,
   listSources,
+  listResearchSources,
+  createResearchSource,
+  updateResearchSource,
+  startResearch,
+  listResearch,
+  getResearch,
+  stopResearch,
+  keepResearch,
   getTimeline,
   putPlan,
   changeDates,

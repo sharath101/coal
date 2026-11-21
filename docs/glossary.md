@@ -42,6 +42,7 @@
 | **Project team** | The people on a project, named in its PID (step 1) |
 | **Proposal** | One or more actions with a preview of their effects, waiting for the user to confirm. The AI creates proposals for anything that affects other people |
 | **Queue** | Where a task waits when no one person is assigned. Anyone with the role can claim it |
+| **Research run** | One search of the source library for what already exists, started from a card that shows the words that leave COAL. The research assistant writes a **brief** citing its **results** (`[R1]`); a result becomes a record only when the person keeps it as a source of a step |
 | **Request** | A task asked of someone you can't assign work to ([the ladder](./roles-and-access.md#assigning-work-and-making-requests)). They can accept or decline it, with a reason |
 | **Route** | A process's steps, who does and signs each one, and how work moves. Stored as a versioned definition. Jayon's R&D route has 28 steps |
 | **Send back** | Returning work to an earlier step after a failure or a rejected checkpoint |
@@ -51,6 +52,7 @@
 | **Stage** | One of the six groups of steps: idea and go-ahead; plan, design and source; make the prototype; test and gather feedback; clinical trials; release and launch |
 | **Status** | Where a project stands: its stage, step states, owners, dates and health. Visible to everyone (compare *content*) |
 | **Step** | One step of the route: C, 1 to 23, 2a, 24a, 24b and 25 |
+| **Source library** | The public places COAL may search for research (PubMed, ClinicalTrials.gov, openFDA, journals, websites, links), each with a note on when to use it. Kept by the VP, the R&D Head and the R&D Leads |
 | **Specification** | The part of a template that says which sections are fields and which are written, where each field comes from, and the signature rows |
 | **Step sign-off record** | A record COAL generates when a step is submitted, listing its outputs and their hashes. The signer signs it by approving the step |
 | **Task** | One person's piece of work. Kinds: work, review, sign, decision, corrective action, request, own |

@@ -96,7 +96,7 @@ docxtemplater fills the Word template, Gotenberg turns it into a PDF, and people
 
 ### Adding a template
 
-Only the **VP** and the **R&D Head** add and activate templates ⚠ (S6). They do it on the **Templates** page of the website, which is linked from the top bar and the Dashboard for them.
+Only the **VP** and the **R&D Head** add and activate templates ⚠ (S6). They do it on the **Templates** page of the website, which is linked, for them, from a button on the Projects page and from the Dashboard (it is rarely changed, so it is not in the top bar).
 
 1. **Add.** Choose the document type and upload a new Word (`.docx`) file, with an optional note. A new version **reuses the previous version's specification**, so a new Word file is all the VP or the Head needs. (A type's first template, or a change to its specification, is prepared from Jayon's sample document: by the assistant in the Workstation, which puts the placeholders into the person's own Word file and shows an action card ([the flow](./workstation-and-ai.md#making-a-template-from-a-sample-document)), or by the AI coding assistant for a whole folder at once and the import command below. The checks, and the draft status, are the same.)
 2. **Check.** COAL refuses the file, listing every problem to fix, unless:
@@ -232,7 +232,7 @@ Signatures will use **passkeys**, the standard behind Face ID, fingerprint and W
   - where a scanner is set up, a file that isn't scanned yet can't be opened;
   - *Locally,* no scanner runs unless you start one (`docker compose --profile scan up -d`, then set `CLAMAV_HOST=localhost`). Uploads then stay "not scanned" and can be opened. That's acceptable only while COAL holds made-up data. Files COAL makes itself (PDFs) need no scan.
 - **Pictures** can be attached to any step, task or document, including straight from a phone camera. An attachment belongs to a project and to exactly one step, document or task, with an optional caption.
-- **Sources** (a link, a file or a citation, with a note) can be added to a step, a document or a task, and show in a Sources section. A link must be `http` or `https`.
+- **Sources** (a link, a file or a citation, with a note) can be added to a step, a document or a task, and show in a Sources section. A link must be `http` or `https`. A result of research in public sources becomes a source when the person who ran it keeps it on a step: a link to the result, with a note that starts as who wrote it, when, and the lines the source gave, and a mark that says it was kept from research ([workstation-and-ai.md](./workstation-and-ai.md#researching-what-already-exists)).
 - **Who can add and read.** The people who do or sign a step, and the project team, add attachments and sources to it. Reading follows the step's or the document's rule; the Board sees a step's attachments only at its checkpoints.
 
 ## Later

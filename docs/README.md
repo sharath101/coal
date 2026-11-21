@@ -31,7 +31,8 @@ This is the main doc. It gives the whole picture on one page and points to the d
 - turns an idea into a project;
 - drafts documents from Jayon's templates, always loading the current one from COAL's template library;
 - assigns work;
-- explains documents before you sign.
+- explains documents before you sign;
+- researches what already exists (products, studies, trials, safety problems) in the public sources Jayon chose, with search words you confirm.
 
 It acts as you, sees only what you can see, and anything that affects other people needs your confirmation on an action card. It never signs or decides. It runs on Claude (Anthropic). → [workstation-and-ai.md](./workstation-and-ai.md)
 
@@ -49,7 +50,7 @@ It acts as you, sees only what you can see, and anything that affects other peop
 
 These hold everywhere. If a change breaks one, raise it first.
 
-1. **People decide; the AI prepares.** The AI never signs, decides, or sends anything outside Jayon. Changes that affect others need a person's confirmation.
+1. **People decide; the AI prepares.** The AI never signs, decides, or sends anything outside Jayon on its own: research sends only the general search words a person confirms on a card ([P97](./decisions.md)). Changes that affect others need a person's confirmation.
 2. **Facts come from records.** Numbers, dates, names and statuses come from the database, with their source, never from the AI.
 3. **The backend enforces the rules.** Permissions, AI tiers and signatures are checked in the backend, never only in a client or in the AI's instructions.
 4. **Processes are data.** Jayon's processes, starting with the R&D route, live in versioned definitions, not in code. Projects stay on the version they started with.
@@ -105,6 +106,7 @@ The full log, with reasons, is in [decisions.md](./decisions.md).
 | A Dashboard widget, dates, alerts or notifications | [dashboard.md](./dashboard.md) |
 | The Workstation, the AI, a tool, a prompt or a chat channel | [workstation-and-ai.md](./workstation-and-ai.md) |
 | How a request is processed, step by step, and where it can stop | [workstation-and-ai.md § How a reply is made](./workstation-and-ai.md#how-a-reply-is-made) |
+| Research, the source library or a connector to a public source | [workstation-and-ai.md § Researching what already exists](./workstation-and-ai.md#researching-what-already-exists) |
 | A template or the template library | [documents-and-signing.md § The template library](./documents-and-signing.md#the-template-library) |
 | Documents, versions or signing | [documents-and-signing.md](./documents-and-signing.md) |
 | The repo setup, the stack, hosting or security | [architecture.md](./architecture.md) |

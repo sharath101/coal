@@ -16,6 +16,7 @@ const TYPES = [
   'person',
   'widget',
   'sample',
+  'source',
 ] as const;
 const isKnownType = (type: string): type is (typeof TYPES)[number] =>
   (TYPES as readonly string[]).includes(type);

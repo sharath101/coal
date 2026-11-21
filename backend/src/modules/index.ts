@@ -9,6 +9,7 @@ import { notificationsRoutes } from './notifications/routes';
 import { orgRoutes } from './org/routes';
 import { processRoutes } from './process/routes';
 import { proposalsRoutes } from './proposals/routes';
+import { researchRoutes } from './research/routes';
 import { rndRoutes } from './rnd/routes';
 import { scheduleRoutes } from './schedule/routes';
 import { searchRoutes } from './search/routes';
@@ -39,4 +40,5 @@ export const IMPLEMENTATIONS = [
   ...proposalsRoutes,
   ...searchRoutes,
   ...aiRoutes,
+  ...researchRoutes,
 ] as unknown as Implementation[];

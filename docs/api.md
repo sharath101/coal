@@ -148,7 +148,7 @@ Work given by hand (`POST /tasks`) isn't on the route's plan: no step closes or 
 | `POST /files/{id}/complete` | Finish an upload: COAL reads the staged file once, checks its size and records its SHA-256 hash, then moves exactly those bytes to where they're served from, which no upload link can write to, and has it scanned for viruses where a scanner is set up. Safe to repeat | auto |
 | `GET /files/{id}/link` | A short-lived download link, after the permission check: the uploader, or anyone who may see a record that holds the file. An infected file is refused, and so is an unscanned one where a scanner is set up | read |
 | `POST /projects/{id}/attachments`, `GET /projects/{id}/attachments?step=&document=&task=` | Attach files and pictures to a step, document or task; list them | auto / read |
-| `POST /projects/{id}/sources`, `GET /projects/{id}/sources?step=&document=&task=` | Add or list sources (link, file or citation) | auto / read |
+| `POST /projects/{id}/sources`, `GET /projects/{id}/sources?step=&document=&task=` | Add or list sources (link, file or citation). A source kept from research says which result it was (`researchResultId`) | auto / read |
 | `GET /history/{recordType}/{id}` | A record's history | read |
 
 ### Dates, deviations and the plan
@@ -206,6 +206,19 @@ The events, in order, each as `event: <type>` and `data: <json>` (the shapes are
 
 Closing the connection stops the reply.
 
+### Research
+
+Research in public sources ([workstation-and-ai.md](./workstation-and-ai.md#researching-what-already-exists)). A run belongs to the person who ran it, whatever their role: its results are outside material until they keep them.
+
+| Endpoint | Purpose | Tier |
+|---|---|---|
+| `GET /research-sources` | The source library: each place, its kind and settings, the note on when to use it, whether it is switched on, and whether COAL can search it here (`searchable`) or the person opens it | read |
+| `POST /research-sources`, `PATCH /research-sources/{id}` | Add a place, or change one or switch it off (VP, R&D Head, R&D Leads ⚠). Its `settings` say how to search it, by kind: `pubmed`, `europepmc`, `clinicaltrials`, `openfda` (`datasets`), `journal` (`issn`, optional `pubmedTitle`), `website` (`domains`) or `link` (an https `url`, `{q}` for the words). Names are unique, ignoring case | never |
+| `POST /research` | Start a run: `question` (stays in COAL), `terms` (up to 8, at most 6 words each: the only words that leave COAL), `sourceIds`, optional `since` (a year), `projectId` and `stepKey`. `400 VALIDATION_FAILED` for terms that name a project, a person or the company, or sources not switched on; `503 AI_UNAVAILABLE` or `429 AI_BUDGET_REACHED` when something would be searched. The run is `queued` and a job runs it; with only link sources it is `done` at once. Its card shows the terms and where they go | confirm |
+| `GET /research?proposal=`, `GET /research/{id}` | My runs, newest first (or the one a card started); one run with its brief (citing `[R1]`), its results (each with its source, kind, the source's own id, the address COAL built, a few lines, and when it was kept), the searches that were sent, and the places to open with the search ready | never |
+| `POST /research/{id}/stop` | Stop it: a queued run at once, a running one at its next search. What was found is kept | never |
+| `POST /research/{id}/keep` | Keep results as sources of a project step (`projectId`, `stepKey`, and `results` with an optional `note` each), under the rule for adding a source to that step. Only kept results are records the assistant can read | never |
+
 ## Proposals and action cards
 
 A proposal is a set of actions with their preview, waiting for the user to confirm it. Action cards in the Workstation are proposals. The website also uses them for bulk actions.
@@ -218,7 +231,7 @@ A proposal is a set of actions with their preview, waiting for the user to confi
 | `POST /proposals/{id}/confirm` | Carry it out. Needs `If-Match` with the version the user saw | never |
 | `POST /proposals/{id}/reject` | Discard it | never |
 
-**Actions.** An action is a call to an endpoint, as `{ endpoint, params, query, body, ifMatch }`, such as `{ "endpoint": "tasks.create", "body": { "title": "Rerun the FEA", "assigneeId": "…" } }`. It runs through the endpoint's own checks and handler, as the user, so a card can do exactly what the user could do on a screen. Only endpoints of the `auto` or `confirm` tier whose implementation says how to describe itself can be proposed (`describe` in `implement()`; the backend refuses to start otherwise). Now: `tasks.create`, `tasks.accept`, `tasks.decline`, `tasks.claim`, `tasks.reassign`, `steps.start`, `steps.submit` and `deviations.record`. More are added as the AI needs them.
+**Actions.** An action is a call to an endpoint, as `{ endpoint, params, query, body, ifMatch }`, such as `{ "endpoint": "tasks.create", "body": { "title": "Rerun the FEA", "assigneeId": "…" } }`. It runs through the endpoint's own checks and handler, as the user, so a card can do exactly what the user could do on a screen. Only endpoints of the `auto` or `confirm` tier whose implementation says how to describe itself can be proposed (`describe` in `implement()`; the backend refuses to start otherwise). Now: `tasks.create`, `tasks.accept`, `tasks.decline`, `tasks.claim`, `tasks.reassign`, `steps.start`, `steps.submit`, `deviations.record`, `templates.create`, `documentTypes.create` and `research.start`. More are added as the AI needs them.
 
 **The preview** of each action has a summary in plain words ("Assign to Dev Example: Rerun the FEA, due 27 Nov"), its effects (steps that move, tasks made with their assignees or queues, warnings) and who is told.
 
@@ -245,6 +258,7 @@ Events are written in the same transaction as the change ([architecture.md](./ar
 | Timeline | `timeline.changed` (a baseline or a date change), `forecast.changed`, `project.health_changed`, `deviation.recorded`, `deviation.reviewed` |
 | Collaboration | `comment.added`, `mention.created`, `attachment.added`, `source.added` |
 | Proposals | `proposal.created`, `proposal.confirmed`, `proposal.rejected` |
+| Research | `research.requested` (a confirmed run is handed to the job queue) |
 
 ## Adding an endpoint
 

@@ -159,7 +159,10 @@ function SourceItem({ source }: { source: SourceView }) {
       </span>
       {source.note && <span className="pl-5.5">{source.note}</span>}
       <span className="pl-5.5 text-xs text-muted-foreground">
-        {t('by', { name: source.addedBy.name, when: formatDateTime(source.addedAt) })}
+        {t(source.researchResultId ? 'keptBy' : 'by', {
+          name: source.addedBy.name,
+          when: formatDateTime(source.addedAt),
+        })}
       </span>
     </li>
   );

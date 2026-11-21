@@ -60,6 +60,66 @@ const turnOf = (over: Partial<ModelTurn>): ModelTurn => ({
 });
 
 describe('the Anthropic provider', () => {
+  it('searches the web on the given websites, keeping only the pages the search returned', async () => {
+    const model = new MockLanguageModelV4({
+      doGenerate: async () => ({
+        content: [
+          {
+            type: 'tool-call',
+            toolCallId: 'w1',
+            toolName: 'web_search',
+            input: '{"query":"expandable cage launch"}',
+            providerExecuted: true,
+          },
+          {
+            type: 'tool-result',
+            toolCallId: 'w1',
+            toolName: 'web_search',
+            result: [
+              {
+                type: 'web_search_result',
+                url: 'https://news.example.com/a',
+                title: 'A made-up launch',
+                pageAge: null,
+                encryptedContent: 'x',
+              },
+            ],
+          },
+          {
+            type: 'text',
+            text: 'https://news.example.com/a | A made-up cage was launched.\nhttps://invented.example.org/b | Not from the search.',
+          },
+        ],
+        finishReason: { unified: 'stop', raw: 'stop' },
+        usage: usage(300, 40),
+        warnings: [],
+      }),
+    });
+    const outcome = await new AnthropicProvider({ model: () => model }).searchWeb({
+      model: 'claude-test',
+      query: 'expandable cage',
+      domains: ['news.example.com'],
+      maxSearches: 2,
+      signal: new AbortController().signal,
+      timeoutMs: 10_000,
+    });
+    expect(outcome).toEqual({
+      pages: [
+        {
+          url: 'https://news.example.com/a',
+          title: 'A made-up launch',
+          summary: 'A made-up cage was launched.',
+        },
+      ],
+      queries: ['expandable cage launch'],
+      usage: { calls: 1, inputTokens: 300, outputTokens: 40 },
+    });
+    // The search was limited to the source's websites.
+    expect(model.doGenerateCalls[0]!.tools).toMatchObject([
+      { type: 'provider', args: { allowedDomains: ['news.example.com'], maxUses: 2 } },
+    ]);
+  });
+
   it('runs the tool loop through the AI SDK, streams the words and adds up the usage', async () => {
     const seen: unknown[] = [];
     const calls: Part[][] = [
@@ -203,14 +263,16 @@ describe('settings', () => {
       title: 'claude-haiku-5-5',
       draft_write: 'claude-sonnet-5-5',
       template: 'claude-sonnet-5-5',
+      research: 'claude-sonnet-5-5',
     });
-    // Turning a sample into a template stays on the strong model when the everyday one is made cheaper.
+    // Turning a sample into a template, and research, stay on the strong model when the everyday one is made cheaper.
     expect(config({ AI_PROVIDER: 'copilot', AI_MODEL_CHAT: 'claude-haiku-5.5' }).ai.models).toEqual(
       {
         chat: 'claude-haiku-5.5',
         title: 'claude-haiku-5.5',
         draft_write: 'claude-sonnet-5.5',
         template: 'claude-sonnet-5.5',
+        research: 'claude-sonnet-5.5',
       },
     );
   });

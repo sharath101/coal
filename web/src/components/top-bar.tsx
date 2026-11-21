@@ -3,12 +3,12 @@
 import { signOut, type Me } from '@coal/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-  FileText,
   FolderKanban,
   LayoutDashboard,
   ListChecks,
   LogOut,
   MessagesSquare,
+  Telescope,
   UserRound,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -17,7 +17,7 @@ import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { NotificationBell } from '@/components/notification-bell';
 import { api } from '@/lib/api';
-import { canManageTemplates } from '@/lib/roles';
+import { canResearch } from '@/lib/roles';
 import { cn } from '@/lib/utils';
 
 /** The two pages per person, with the toggle between them (docs/dashboard.md). */
@@ -59,10 +59,8 @@ function MainLinks({ roleKey }: { roleKey: string }) {
   const links = [
     { href: '/projects', label: t('projects'), icon: FolderKanban },
     { href: '/tasks', label: t('tasks'), icon: ListChecks },
-    // The VP and the R&D Head manage the template library.
-    ...(canManageTemplates(roleKey)
-      ? [{ href: '/templates', label: t('templates'), icon: FileText }]
-      : []),
+    // The people of steps C, 1 and 2 research what already exists.
+    ...(canResearch(roleKey) ? [{ href: '/research', label: t('research'), icon: Telescope }] : []),
   ];
   return (
     <nav aria-label={t('main')} className="flex gap-1">

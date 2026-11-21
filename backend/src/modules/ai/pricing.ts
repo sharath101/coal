@@ -14,3 +14,6 @@ export function costOf(model: string, inputTokens: number, outputTokens: number)
   const price = PER_MILLION[family];
   return (inputTokens * price.input + outputTokens * price.output) / 1_000_000;
 }
+
+/** What one web search costs on top of the tokens, in US dollars ⚠ (AI11): Anthropic's starting price. */
+export const WEB_SEARCH_USD = 0.01;

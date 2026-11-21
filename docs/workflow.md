@@ -172,6 +172,7 @@ Who else may do this is an open question.
 
 These are details from the workflow page that matter for tasks and documents. Step modules for them come later ([roadmap.md](./roadmap.md)).
 
+- **Steps C, 1 and 2.** What already exists (products on the market, studies, trials, safety problems) can be researched in the source library, and the results kept as sources of the step; the Market Research Survey can then cite them ([workstation-and-ai.md](./workstation-and-ai.md#researching-what-already-exists)).
 - **Steps 7 and 8.** The FEA runs at the start of the design. The metallurgy expert in AEMS covers the material work through to the FEA, and is part of every project team. Drawings mark the critical dimensions for QC inspection.
 - **Steps 10 and 11.**
   - *The test licence.* The company QA team (not NPD QA) applies to CDSCO for the manufacturing test licence before prototypes are made.

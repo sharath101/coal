@@ -6,7 +6,7 @@ const repoEnvFile = fileURLToPath(new URL('../../../.env', import.meta.url));
 if (process.env.NODE_ENV !== 'test' && existsSync(repoEnvFile)) process.loadEnvFile(repoEnvFile);
 
 /** What the AI is asked for; each can use its own model (docs/workstation-and-ai.md#ai-providers). */
-export const AI_PURPOSES = ['chat', 'title', 'draft_write', 'template'] as const;
+export const AI_PURPOSES = ['chat', 'title', 'draft_write', 'template', 'research'] as const;
 export type AiPurpose = (typeof AI_PURPOSES)[number];
 export const AI_PROVIDERS = ['anthropic', 'copilot', 'none'] as const;
 export type AiProviderName = (typeof AI_PROVIDERS)[number];
@@ -18,12 +18,14 @@ const DEFAULT_MODELS: Record<'anthropic' | 'copilot', Record<AiPurpose, string>>
     title: 'claude-haiku-5-5',
     draft_write: 'claude-sonnet-5-5',
     template: 'claude-sonnet-5-5',
+    research: 'claude-sonnet-5-5',
   },
   copilot: {
     chat: 'claude-sonnet-5.5',
     title: 'claude-haiku-5.5',
     draft_write: 'claude-sonnet-5.5',
     template: 'claude-sonnet-5.5',
+    research: 'claude-sonnet-5.5',
   },
 };
 
@@ -87,6 +89,17 @@ const Env = z.object({
   AI_MODEL_TITLE: z.string().default(''),
   AI_MODEL_DRAFT_WRITE: z.string().default(''),
   AI_MODEL_TEMPLATE: z.string().default(''),
+  AI_MODEL_RESEARCH: z.string().default(''),
+  /**
+   * Research (docs/workstation-and-ai.md#researching-what-already-exists). The keys are free and
+   * optional: they raise the sources' limits. NCBI and Crossref ask for a contact address.
+   */
+  NCBI_API_KEY: z.string().default(''),
+  OPENFDA_API_KEY: z.string().default(''),
+  RESEARCH_CONTACT_EMAIL: z.string().default(''),
+  /** The most searches one research run may send outside. */
+  RESEARCH_MAX_SEARCHES: z.coerce.number().int().positive().default(20),
+  RESEARCH_TIMEOUT_MS: z.coerce.number().int().positive().default(300_000),
 });
 
 export type AppConfig = ReturnType<typeof loadConfig>;
@@ -108,6 +121,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
     title: e.AI_MODEL_TITLE,
     draft_write: e.AI_MODEL_DRAFT_WRITE,
     template: e.AI_MODEL_TEMPLATE,
+    research: e.AI_MODEL_RESEARCH,
   };
   const defaults = provider === 'none' ? DEFAULT_MODELS.anthropic : DEFAULT_MODELS[provider];
   return {
@@ -148,6 +162,13 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
       models: Object.fromEntries(
         AI_PURPOSES.map((p) => [p, overrides[p] || defaults[p]]),
       ) as Record<AiPurpose, string>,
+    },
+    research: {
+      ncbiApiKey: e.NCBI_API_KEY,
+      openFdaApiKey: e.OPENFDA_API_KEY,
+      contactEmail: e.RESEARCH_CONTACT_EMAIL,
+      maxSearches: e.RESEARCH_MAX_SEARCHES,
+      timeoutMs: e.RESEARCH_TIMEOUT_MS,
     },
   };
 }

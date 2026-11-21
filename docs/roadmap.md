@@ -62,7 +62,7 @@ Each block depends on the ones before it. Within a block, the work can run side 
    - The widget framework and W1 to W10 with each role's default layout and expanded views; the measures (on-time rate, days per task, sign-off turnaround, rework rate, open load); the project page's health, dates and Timeline tab.
    - `seed:demo` makes a Dashboard worth looking at in local work.
    - Left for later: the weekly digest of the exception list (with email), @mentions (with comments on steps), days per stage against plan and trend charts (with daily snapshots), personal layouts, and editing the settings and the calendar on a page (today: rows in `settings` and `work_calendar`).
-5. **Workstation and AI**, in five parts:
+5. **Workstation and AI**, in six parts:
    - **5a. Groundwork** ✅ `POST /tasks` (own tasks, assignments and requests by the ladder) with accept and decline, and a "Given by me" list; proposals (action cards) with preview, edit, confirm, `PREVIEW_CHANGED` and expiry; `GET /search` over projects, documents, tasks and people.
    - **5b. The AI gateway and chat** ✅ the provider adapter (Anthropic; the Copilot SDK on one laptop for now, D19; a scripted stand-in for tests), the AI tables, the tools tied to the tiers, layered instructions, budgets and logging, chats streamed over Server-Sent Events.
    - **5c. The Workstation page** ✅ three panes, citations, action cards, commands, and "Ask AI" and "Open in Workstation" from other pages.
@@ -72,6 +72,7 @@ Each block depends on the ones before it. Within a block, the work can run side 
      - **5d-3. Idea to project** ✅ `preview_project` (`POST /projects/preview`), the idea card with one box for each person, and Review and Go.
      - **5d-4. Explaining and comparing documents** ✅ `read_document` reports gaps and the assistant's sections; the rules for `/brief`, comparing versions and completeness checks.
    - **5e. Safety and the test sets:** outside documents, refusals that name who can help, `pnpm eval:ai`, polish.
+   - **5f. Research from the source library** ✅ (asked for by the R&D Head, built before 5e): the source library and its page (the VP, the Head and the Leads keep it), connectors for PubMed, Europe PMC, ClinicalTrials.gov, openFDA and journals by ISSN, websites through the provider's web search, links the person opens; `/research` and a card that shows the words that will leave COAL; the research assistant in the background, with only the approved words; the brief, the results and keeping them as sources of a step ([the flow](./workstation-and-ai.md#researching-what-already-exists)).
 6. **Passkey signing** (last, D16)
    - Passkey registration on the website, and the signing intent: Face ID, fingerprint or Windows Hello for every signature, replacing the confirmed click.
    - One prompt signs a step's sign-off record and the step's main document together.
@@ -119,7 +120,7 @@ The likely next steps. Their order is decided as we learn, mostly by what the fi
 7. **More AI:**
    - runs that start when a task opens, following playbooks;
    - AI-written work messages and a daily briefing;
-   - the research assistant;
+   - more research: a patents connector, and research from a step's playbook;
    - meeting minutes;
    - the outside-document reader;
    - vector search;
@@ -140,7 +141,7 @@ Everything deliberately left out of the first release, and why:
 | Signing on someone's behalf during leave | Needs real identity and admin | [roles-and-access.md](./roles-and-access.md#later) |
 | Sensitivity labels, compartments, row-level security | The simple content rules are enough for made-up data | [roles-and-access.md](./roles-and-access.md#later) |
 | AI runs that start on their own, playbooks, AI work messages and briefings | Decided: the AI runs only when asked, for now | [workstation-and-ai.md](./workstation-and-ai.md#later) |
-| Research assistant, meeting minutes, outside-document reader, vector search | Useful, but not needed to prove the base | [workstation-and-ai.md](./workstation-and-ai.md#later) |
+| Meeting minutes, outside-document reader, vector search, a patents connector | Useful, but not needed to prove the base | [workstation-and-ai.md](./workstation-and-ai.md#later) |
 | SolidWorks and ERP connectors, shop-floor tablets, machine data | Need Jayon's IT details and the step modules first | [archive/PLAN.md §5.5, §5.6](./archive/PLAN.md#55-cad-the-solidworks-connector) |
 | WhatsApp chat and alerts | After the first release. The chat is built channel-neutral, so WhatsApp is a new channel, not a rebuild | [workstation-and-ai.md](./workstation-and-ai.md#channels) |
 | More widgets, trends, personal layouts, email digest | Come with the data they need | [dashboard.md](./dashboard.md#later) |

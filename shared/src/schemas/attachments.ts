@@ -81,6 +81,8 @@ export const SourceView = z.object({
   file: StoredFile.nullable(),
   note: z.string(),
   target: Target,
+  /** Kept from a research run: the result it was. */
+  researchResultId: Id.nullable(),
   addedBy: Person,
   addedAt: Timestamp,
 });

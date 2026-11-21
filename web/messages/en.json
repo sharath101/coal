@@ -14,8 +14,8 @@
     "account": "Your account",
     "projects": "Projects",
     "tasks": "My tasks",
-    "templates": "Templates",
-    "main": "Main"
+    "main": "Main",
+    "research": "Research"
   },
   "signIn": {
     "title": "Sign in",
@@ -128,6 +128,10 @@
       "brief": {
         "help": "what am I signing, and what changed?",
         "text": "What am I signing, and what changed in each document since its previous version?"
+      },
+      "research": {
+        "help": "find what already exists outside",
+        "text": "Research what already exists: "
       }
     },
     "mention": {
@@ -166,7 +170,8 @@
         "template": "Template",
         "person": "Person",
         "widget": "Dashboard widget",
-        "sample": "Attached file"
+        "sample": "Attached file",
+        "source": "Kept source"
       },
       "preview": "Preview"
     },
@@ -248,6 +253,17 @@
         "fieldSource": "Comes from",
         "fieldNotes": "Note for the library",
         "fieldTypeName": "Name of the kind of document"
+      },
+      "research": {
+        "question": "The question (stays in COAL)",
+        "terms": "These words will leave COAL",
+        "termsNote": "Only these words are searched, nothing else.",
+        "since": "Only results from {year} on.",
+        "searched": "COAL searches",
+        "linksOnly": "You open these, with the search ready",
+        "keepIn": "Results can be kept in",
+        "open": "Open the research",
+        "startedNote": "The research assistant is searching. You'll get a notification when the brief is ready."
       }
     },
     "draft": {
@@ -300,7 +316,8 @@
     "upload_empty": "That file is empty.",
     "upload_transfer": "The file couldn't be sent. Check your connection and try again.",
     "generic": "Something went wrong. Try again.",
-    "USE_THE_STEP": "This task belongs to a step, so it follows the step. Start the step and submit it for sign-off from the step, and the task closes when the step is signed off."
+    "USE_THE_STEP": "This task belongs to a step, so it follows the step. Start the step and submit it for sign-off from the step, and the task closes when the step is signed off.",
+    "SOURCE_UNAVAILABLE": "A public source didn't answer. Try again later."
   },
   "status": {
     "active": "Active",
@@ -331,7 +348,8 @@
     "stage": "Stage {stage}",
     "launch": "Launch {date}",
     "by": "Started by {name}",
-    "more": "Show more"
+    "more": "Show more",
+    "templates": "Document templates"
   },
   "newProject": {
     "title": "Go: start a project",
@@ -680,7 +698,8 @@
     "sourceTitle": "Title",
     "sourceUrl": "Web address",
     "sourceNote": "Note (optional)",
-    "sourceSubmit": "Add the source"
+    "sourceSubmit": "Add the source",
+    "keptBy": "Kept from research by {name}, {when}"
   },
   "document": {
     "loading": "Loading…",
@@ -1129,5 +1148,118 @@
       "escalation": "Escalation",
       "alert": "Alert"
     }
+  },
+  "research": {
+    "title": "Research",
+    "intro": "What already exists outside the company: products on the market, published results, trials and safety problems. Ask the assistant in the Workstation (/research). It prepares a card with the search words, and nothing leaves COAL until you confirm.",
+    "askInWorkstation": "Research in the Workstation",
+    "library": "Source library",
+    "loading": "Loading…",
+    "none": "No research yet. In the Workstation, type /research and say what you want to know.",
+    "back": "All research",
+    "status": {
+      "queued": "Waiting",
+      "running": "Searching",
+      "done": "Ready",
+      "failed": "Could not finish",
+      "stopped": "Stopped"
+    },
+    "results": "{count, plural, =0 {no results} one {# result} other {# results}}",
+    "started": "Started {when}",
+    "for": "For {project}",
+    "forStep": "For {project}, step {step}",
+    "terms": "The words that left COAL",
+    "termsNote": "Only these words were searched. The question stays in COAL.",
+    "since": "Only results from {year} on.",
+    "searchedIn": "Searched:",
+    "nothingSearched": "nothing; only places to open yourself.",
+    "running": "The research assistant is searching. This page updates by itself, and you'll get a notification.",
+    "stop": "Stop",
+    "stopping": "Stopping…",
+    "linksTitle": "Search these yourself",
+    "linksNote": "COAL can't search these places for you. Each opens with the search words filled in.",
+    "brief": "Brief",
+    "briefNote": "Written by the research assistant from the results below. Check each point against its result before you rely on it.",
+    "noBrief": "No brief was written.",
+    "resultsTitle": "{count, plural, =0 {Results} one {# result} other {# results}}",
+    "resultsNote": "Tick the ones worth keeping. Kept results become sources of the step: everyone on the project can see them, and the assistant can cite them.",
+    "searching": "Searching…",
+    "noResults": "Nothing was found.",
+    "choose": "Keep {title}",
+    "kept": "Kept",
+    "kinds": {
+      "article": "Paper",
+      "trial": "Trial",
+      "clearance": "510(k) clearance",
+      "classification": "FDA product code",
+      "adverse_event": "Adverse event report",
+      "recall": "Recall",
+      "device": "Device listing",
+      "web": "Web page"
+    },
+    "keepTitle": "Keep as sources of a step",
+    "keepProject": "Project",
+    "keepStep": "Step",
+    "chooseProject": "Choose a project",
+    "chooseStep": "Choose a step",
+    "keep": "{count, plural, =0 {Keep} one {Keep # result} other {Keep # results}}",
+    "keeping": "Keeping…",
+    "keptNote": "{count, plural, one {# result kept} other {# results kept}} as sources of step {step}.",
+    "searchesTitle": "What was sent, and where",
+    "searchesNote": "Every search that left COAL, as it was sent.",
+    "found": "{count, plural, =0 {nothing found} one {# found} other {# found}}",
+    "noSearches": "Nothing was sent."
+  },
+  "sourceLibrary": {
+    "title": "Source library",
+    "back": "Research",
+    "intro": "The places COAL may search when someone researches what already exists, and when to use each. The research assistant reads the notes. Only general search words ever leave COAL, and only after a person confirms them.",
+    "manageNote": "The VP, the R&D Head and the R&D Leads add, change and switch off sources.",
+    "add": "Add a source",
+    "addTitle": "Add a source",
+    "editTitle": "Change the source",
+    "dialogIntro": "Choose what kind of place it is: COAL knows how to search each kind. A link is a place you open yourself.",
+    "edit": "Edit",
+    "switchOff": "Switch off",
+    "switchOn": "Switch on",
+    "off": "Switched off",
+    "searchable": "COAL searches it",
+    "linkOnly": "You open it",
+    "websiteNote": "Searched with the assistant's web search, limited to these websites, where the AI provider has one. Until then, you open it.",
+    "addedBy": "Added by {name}",
+    "fromCoal": "Comes with COAL",
+    "loading": "Loading…",
+    "kinds": {
+      "pubmed": "PubMed",
+      "europepmc": "Europe PMC",
+      "clinicaltrials": "ClinicalTrials.gov",
+      "openfda": "openFDA",
+      "journal": "A journal",
+      "website": "A website",
+      "link": "A link you open"
+    },
+    "datasets": {
+      "510k": "510(k) clearances",
+      "classification": "Product codes and classes",
+      "event": "Adverse events (MAUDE)",
+      "recall": "Recalls",
+      "udi": "Device identifiers (GUDID)"
+    },
+    "journalPubmed": "ISSN {issn}, searched through PubMed as {title}",
+    "journalCrossref": "ISSN {issn}, searched through Crossref",
+    "fieldName": "Name",
+    "fieldKind": "Kind",
+    "fieldDatasets": "Parts of openFDA",
+    "fieldIssn": "ISSN",
+    "issnPlaceholder": "0000-0000",
+    "fieldPubmedTitle": "PubMed abbreviation (optional)",
+    "pubmedTitleHelp": "Such as J Spine Surg. With it, the journal is searched through PubMed; without it, through Crossref by its ISSN.",
+    "fieldDomains": "Websites, one per line, without https://",
+    "fieldUrl": "Search address",
+    "urlHelp": "An https address. '{q}' in it becomes the search words.",
+    "fieldNote": "When to use it",
+    "noteHelp": "The research assistant reads this to choose where to look.",
+    "save": "Save",
+    "cancel": "Cancel"
   }
 }

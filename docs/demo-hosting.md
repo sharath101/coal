@@ -43,6 +43,7 @@ Set in Railway (`railway variable list --service …`), never in the repository.
 | | `GOTENBERG_URL` | `http://${{gotenberg.RAILWAY_PRIVATE_DOMAIN}}:3000` |
 | | `COOKIE_SECURE` | `true` |
 | | `AI_PROVIDER`, `ANTHROPIC_API_KEY`, `ANTHROPIC_WORKSPACE_ID` | `anthropic`, and the key and workspace from Madhav. Never the Copilot stand-in ([D19](./decisions.md)) |
+| | `NCBI_API_KEY`, `OPENFDA_API_KEY`, `RESEARCH_CONTACT_EMAIL` | Optional. Free keys and a contact address that raise the public sources' limits for research ([workstation-and-ai.md](./workstation-and-ai.md#researching-what-already-exists)). Research works without them, and the default sources load when the backend migrates. Websites in the source library are searched only on `anthropic` |
 | `web` | `RAILWAY_DOCKERFILE_PATH` | `web/Dockerfile` |
 | | `COAL_API_URL` | `http://backend.railway.internal:4000`. Read when the website is **built**, so a change needs a rebuild |
 | | `PORT` | `3000`, the port of the public address |

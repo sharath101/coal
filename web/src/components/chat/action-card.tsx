@@ -23,6 +23,7 @@ import {
   TemplateDetailView,
   isTemplateCard,
 } from '@/components/chat/template-detail';
+import { ResearchCardOutcome, ResearchDetailView } from '@/components/research/research-card';
 import { api } from '@/lib/api';
 import { formatDate, todayIst } from '@/lib/format';
 import { queryKeys, useMe, usePeople, useRefreshWork } from '@/lib/queries';
@@ -37,6 +38,9 @@ const TONE = {
 
 const asRecord = (value: unknown): Record<string, unknown> =>
   value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
+
+const isResearchCard = (actions: ProposalAction[]) =>
+  actions.some((a) => a.endpoint === 'research.start');
 
 /** A card can be edited on screen when every action is a task: who, what and when. */
 const editableOnScreen = (actions: ProposalAction[]) =>
@@ -74,6 +78,8 @@ export function ActionCard({
       // A template card adds a draft to the library, and maybe a kind of document.
       void queryClient.invalidateQueries({ queryKey: queryKeys.templates });
       void queryClient.invalidateQueries({ queryKey: queryKeys.documentTypes });
+      // A research card starts a run.
+      void queryClient.invalidateQueries({ queryKey: queryKeys.research });
     },
     // If it changed, the card is shown again as it stands now.
     onError: () => void reload(),
@@ -120,6 +126,7 @@ export function ActionCard({
                 }
               />
             )}
+            {action.detail?.kind === 'research' && <ResearchDetailView detail={action.detail} />}
             {action.notified.length > 0 && (
               <p className="text-xs text-muted-foreground">
                 {t('told', { names: action.notified.map((p) => p.name).join(', ') })}
@@ -156,7 +163,11 @@ export function ActionCard({
           </span>
         </footer>
       ) : proposal.status === 'confirmed' ? (
-        <p className="text-xs text-muted-foreground">{t('confirmedNote')}</p>
+        isResearchCard(proposal.actions) ? (
+          <ResearchCardOutcome proposalId={proposal.id} />
+        ) : (
+          <p className="text-xs text-muted-foreground">{t('confirmedNote')}</p>
+        )
       ) : null}
 
       {editing &&

@@ -54,6 +54,19 @@ export const ActionDetail = z.discriminatedUnion('kind', [
       }),
     ),
   }),
+  z.object({
+    kind: z.literal('research'),
+    question: z.string(),
+    /** Exactly the words that will leave COAL. */
+    terms: z.array(z.string()),
+    since: z.number().int().nullable(),
+    /** The sources COAL will search. */
+    searched: z.array(z.object({ name: z.string(), kind: z.string() })),
+    /** The places the person opens themselves, with the search ready. */
+    linksOnly: z.array(z.string()),
+    /** Where results will most likely be kept: a project and step. */
+    keepIn: z.string().nullable(),
+  }),
 ]);
 export type ActionDetail = z.infer<typeof ActionDetail>;
 

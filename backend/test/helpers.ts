@@ -29,7 +29,7 @@ export type TestApp = Awaited<ReturnType<typeof createTestApp>>;
 
 export async function createTestApp(
   env: Record<string, string> = {},
-  overrides: Partial<Pick<AppDeps, 'scanner' | 'now' | 'ai'>> = {},
+  overrides: Partial<Pick<AppDeps, 'scanner' | 'now' | 'ai' | 'fetchOutside'>> = {},
 ) {
   const database = await createTestDatabase();
   const config = loadConfig({
@@ -51,6 +51,11 @@ export async function createTestApp(
     scanner: null,
     ai: null,
     now: () => new Date(),
+    // Tests never reach the internet: a test that searches outside sources gives its own stand-in.
+    fetchOutside: async (input) => {
+      const url = input instanceof Request ? input.url : input.toString();
+      throw new Error(`No outside calls in tests: ${url}`);
+    },
     ...overrides,
   };
   const app = await buildApp(deps);

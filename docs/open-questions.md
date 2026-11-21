@@ -59,6 +59,7 @@
 | A8 | Which authentication method (company Microsoft or Google sign-in, email codes) and how admin works | Name-only placeholder; no admin | Founders |
 | A9 | When other departments join, does everyone in Jayon see the status of every R&D project (D6), or only R&D and the people involved? | Everyone in COAL, which is R&D and the people it works with for now | VP |
 | A10 | How will employees without a company email (for example on the shop floor) sign in, once real sign-in comes? | Not needed until real sign-in | Founders, Jayon IT |
+| A11 | Who keeps the source library, and who may research? | The VP, the R&D Head and the R&D Leads keep it; those three and R&D Ops (the people of steps C, 1 and 2) research. Design engineers may want literature at steps 7 and 8 later | R&D Head |
 
 ## Documents and signing
 
@@ -89,11 +90,13 @@
 | AI8 | How is a phone number linked to an employee's account, and unlinked when they change phones or leave? | Not needed until the WhatsApp phase | Founders, Jayon IT |
 | AI9 | How long may an action card wait to be confirmed before it expires? | 72 hours (`PROPOSAL_EXPIRY_HOURS`). Confirming re-checks everything anyway, so a stale card can't do something different from what it shows | Founders |
 | AI10 | Do the AI's answers on Claude match what was tested on the Copilot stand-in (D19)? | Not yet known: the AI test sets run again on Anthropic as soon as the new laptop arrives | Sharath |
-| AI11 | What do the models really cost? | Starting prices by family per million tokens (Haiku $1 in and $5 out, Sonnet $3 and $15, Opus $5 and $25) set the budget. Check them against Anthropic's bills. (The model names `claude-sonnet-5-5` and `claude-haiku-5-5` were confirmed on the test deployment on 20 Nov 2026) | Sharath |
+| AI11 | What do the models really cost? | Starting prices by family per million tokens (Haiku $1 in and $5 out, Sonnet $3 and $15, Opus $5 and $25) set the budget. Check them against Anthropic's bills. (The model names `claude-sonnet-5-5` and `claude-haiku-5-5` were confirmed on the test deployment on 20 Nov 2026). A web search for research is counted at US$0.01 | Sharath |
 | AI12 | How long are chats and AI logs kept, and may a person delete their own chats? | Kept for as long as the database is; only the owner reads a chat | Jayon |
 | AI13 | Which sample files may a template be made from? | Word (`.docx`) and text PDFs (a PDF's layout can't be kept, so COAL builds a plain Word form and says so). Scans and photos are refused until a reader for them is added ⚠. Check with real samples whether PDFs read well enough | Sharath, Madhav |
 | AI14 | Are the drafting checks the right ones? The assistant's number rule lets single digits through, requires a person's own words for the fields they give, and does not check dates, names or standards. The idea card shows the tasks and who gets them, not due dates or work messages | Yes for now: they stop invented figures and keep the person's fields theirs; the person reads every draft. To be judged on real drafts, with the AI test sets ([AI10](#ai)) | Sharath, Madhav |
 | AI15 | The fields of a template are stored as a database object, so a form shows them in the database's key order (shorter names first), not the document's order. Should COAL keep them as an ordered list? | Not changed: it affects every template, not only those made from a sample, and the Word file's own layout is unaffected | Sharath |
+| AI16 | Research sends search words to public databases (NCBI, Europe PMC, ClinicalTrials.gov, openFDA, Crossref) and, for websites, to Anthropic's web search. May it, and what may those words say? NCBI and Crossref ask for a contact address, which tells them who is searching. Should a sensitive project be able to switch research off? | Yes, with general words only: the person confirms them on a card, and COAL refuses project codes and names, people's names and the company's name. The contact address is optional (`RESEARCH_CONTACT_EMAIL`). No switch per project yet | Jayon, VP |
+| AI17 | Patents: which search (PatentsView, the EPO's OPS, or Google Patents by hand), and who registers the key? | Links only for now: Google Patents and Espacenet open with the search ready | R&D Head, Sharath |
 
 ## Regulatory
 

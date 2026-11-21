@@ -24,6 +24,7 @@ export async function createRuntime() {
     scanner: config.scan ? new ClamdScanner(config.scan) : null,
     ai: createProvider(config),
     now: () => new Date(),
+    fetchOutside: globalThis.fetch,
   };
   return { deps, pool, log };
 }

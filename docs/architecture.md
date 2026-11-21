@@ -115,8 +115,10 @@ coal/
                       records), attachments (attachments and sources), schedule (the working
                       calendar, settings, the plan and baseline, forecast and health),
                       deviations (late work, its reviews and comments), notifications (work
-                      messages, reminders, the live stream), widgets (the Dashboard's data);
-                      later ai
+                      messages, reminders, the live stream), widgets (the Dashboard's data),
+                      proposals (action cards), search, ai (the gateway, tools, instructions,
+                      chats), research (the source library, its connectors to public sources,
+                      the research assistant's runs)
                       Department modules: rnd (product lines, projects, teams, task routing,
                       and the actions that turn the engine's effects into tasks); others later
                       Each module has tables.ts, service.ts and routes.ts
@@ -139,7 +141,8 @@ coal/
                       only; imported as @coal/shared/process-files by the backend and the tests)
       widgets/        Dashboard widget definitions and their shapes
       rules/          Small rules both clients and the backend use: names, upload limits, templates and
-                      documents, the working calendar, schedule and health, and the measures
+                      documents, drafting checks, research terms and queries, the working calendar,
+                      schedule and health, and the measures
   docs/               This plan
   private/            Jayon's files on this computer, such as templates. Git-ignored: never committed
   docker-compose.yml  The local services
@@ -238,6 +241,7 @@ The AI lives inside the backend (`backend/src/modules/ai/`) for now. It can be s
 - **Templates.** Drafting always loads the active template from the template library ([documents-and-signing.md](./documents-and-signing.md#the-template-library)).
 - **Search.** `GET /search` and the AI find projects, documents, tasks and people with PostgreSQL full-text search (a GIN index on each document version's text), and each kind is filtered by its own permission rule before it is returned. Vector search comes later.
 - **Logged.** Every reply and tool call is recorded: who, which model, tokens, cost, the tools used and the records returned. Logs never hold the person's words or the answers.
+- **Research** (`backend/src/modules/research/`, [workstation-and-ai.md](./workstation-and-ai.md#researching-what-already-exists)). A run is confirmed on a card, saved with a `research.requested` event, and handed by the worker to a job. The job runs a separate model turn with two tools of its own (not endpoint wrappers): each searches only the library's sources, through one connector per kind (`connectors/`). The connectors reach the outside world only through `deps.fetchOutside` (a stand-in in tests), call only their own fixed hosts, one request at a time per host with a gap between, and keep answers for ten minutes. A website is searched by the provider's web search (`searchWeb`), where it has one.
 
 ## Sign-in and sessions
 
@@ -256,7 +260,8 @@ pg-boss runs:
 - the nightly recalculation of every running project's dates and health (00:10 Indian time);
 - the daily audit-chain check (02:30 Indian time);
 - removing stored Idempotency-Key responses after a day;
-- the virus-scan sweep (every minute, for uploads the scanner couldn't reach).
+- the virus-scan sweep (every minute, for uploads the scanner couldn't reach);
+- research runs (`research.run`, as each confirmed run's event is delivered, two at a time per worker), and a sweep every minute that sends again a run left waiting and ends one a stopped worker left running.
 
 Documents are rendered while a version is saved, not by a job, so a version never exists without its PDF. The price is that the save holds the project's lock while Gotenberg works (it gives up after 30 seconds, `PDF_TIMEOUT_MS`), and the render uses the save's own database connection so a slow service can't starve the connection pool. Fine for R&D's size; a render job is the answer if saves ever queue up.
 
@@ -272,6 +277,7 @@ Jobs are written so that running one twice does no harm: each reminder carries a
 - **Uploads** are virus-scanned (ClamAV, required in production) and limited by type and size. Clients upload to a staging area; COAL checks the bytes and copies them to where they're served from, so a file's recorded hash always matches what's served. Files are served only through short-lived links, after a check that the person may see a record that holds the file. Word templates are also refused if they would unpack to something huge (a zip bomb), and only `http` and `https` links are accepted as sources. In production, a storage rule removes staged uploads left unfinished after a day.
 - **Rate limits** on sign-in and the AI endpoints, counted per address. The backend believes `X-Forwarded-For` only from the reverse proxies named in `TRUST_PROXY`, and only a proxy that overwrites that header with the connecting address may be named. The website's own rewrite passes a browser's header through, so it's never trusted: locally and on the test deployment, where no such proxy stands in front of `/api/v1`, everyone shares one counter.
 - **Logs** never contain document content, prompts or AI results. Error reports are scrubbed before they're stored.
+- **Calls outside.** The backend calls nothing outside except the AI provider and, for research, a fixed list of public hosts (NCBI, Europe PMC, ClinicalTrials.gov, openFDA, Crossref), with only the words a person confirmed ([workstation-and-ai.md](./workstation-and-ai.md#safety-basics)).
 
 ## Environments and hosting
 

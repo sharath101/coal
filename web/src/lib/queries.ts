@@ -8,6 +8,7 @@ import {
   getProcess,
   getProject,
   getProjectRoute,
+  getResearch,
   getStep,
   getTimeline,
   getWidget,
@@ -19,6 +20,8 @@ import {
   listProductLines,
   listProjectDocuments,
   listProjects,
+  listResearch,
+  listResearchSources,
   listRoles,
   listSignatureRequests,
   listSources,
@@ -70,6 +73,9 @@ export const queryKeys = {
   projectOptions: ['projects', 'options'] as const,
   // Under the project's key, so refreshing a project also refreshes its dates.
   timeline: (id: string) => ['project', id, 'timeline'] as const,
+  researchSources: ['research-sources'] as const,
+  research: ['research'] as const,
+  researchRun: (id: string) => ['research', id] as const,
 };
 
 export const useMe = () => useQuery({ queryKey: queryKeys.me, queryFn: () => api(getMe) });
@@ -110,10 +116,11 @@ export function useProjects(status: ProjectSummary['status'] | '') {
 export const useProject = (id: string) =>
   useQuery({ queryKey: queryKeys.project(id), queryFn: () => api(getProject, { params: { id } }) });
 
-export const useProjectRoute = (id: string) =>
+export const useProjectRoute = (id: string, enabled = true) =>
   useQuery({
     queryKey: queryKeys.route(id),
     queryFn: () => api(getProjectRoute, { params: { id } }),
+    enabled: enabled && !!id,
   });
 
 export const useStepDetail = (id: string, key: string, enabled: boolean) =>
@@ -369,4 +376,42 @@ export const useSearch = (q: string) =>
     enabled: q.trim().length >= 2,
     staleTime: 30_000,
     placeholderData: keepPreviousData,
+  });
+
+/** The source library: the places research may search. */
+export const useResearchSources = () =>
+  useQuery({
+    queryKey: queryKeys.researchSources,
+    queryFn: async () => (await api(listResearchSources)).items,
+  });
+
+const STILL_WORKING = ['queued', 'running'];
+
+/** My research runs, newest first. Checked again every few seconds while one is still working. */
+export const useResearchRuns = () =>
+  useQuery({
+    queryKey: queryKeys.research,
+    queryFn: async () => (await api(listResearch, { query: { limit: 50 } })).items,
+    refetchInterval: (query) =>
+      query.state.data?.some((r) => STILL_WORKING.includes(r.status)) ? 5000 : false,
+  });
+
+/** The run an action card started, once it is confirmed. */
+export const useResearchOfCard = (proposalId: string, enabled: boolean) =>
+  useQuery({
+    queryKey: [...queryKeys.research, 'card', proposalId] as const,
+    queryFn: async () =>
+      (await api(listResearch, { query: { proposal: proposalId, limit: 1 } })).items[0] ?? null,
+    enabled,
+    refetchInterval: (query) =>
+      query.state.data && STILL_WORKING.includes(query.state.data.status) ? 5000 : false,
+  });
+
+/** One run in full. Checked again every few seconds while it is still working. */
+export const useResearchRun = (id: string) =>
+  useQuery({
+    queryKey: queryKeys.researchRun(id),
+    queryFn: () => api(getResearch, { params: { id } }),
+    refetchInterval: (query) =>
+      query.state.data && STILL_WORKING.includes(query.state.data.status) ? 3000 : false,
   });

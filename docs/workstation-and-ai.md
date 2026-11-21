@@ -37,7 +37,7 @@ The Workstation is each person's second page: a chat assistant like ChatGPT or C
 - **Centre: the conversation.** Answers carry citations: small numbered marks that show the record and its passage on hover and open it on click, numbered in the order the answer uses them. A line under the answer shows what the AI consulted ("Looked at 3 things", opening to the list), and while it works each lookup appears as it happens. Action cards sit in the conversation with Confirm, Edit and Cancel. Each answer has thumbs up and down, and a Stop button replaces Send while it is being written.
 - **Right: sources and preview.** The records the selected answer rests on, with the passage each gave and a link to open it, and what the AI looked at. Above the sources is a **preview**: the sample PDF of a template card, or the PDF of the draft the assistant just saved. Submit and Sign buttons come here with passkey signing, so reviewing and signing happen in one place ([roadmap.md](./roadmap.md#build-order)).
 - **Context.** A chat can be pinned to a project, step, document or task, and shows what it is about. The address says what a new chat is about (`/workstation?project=&step=&document=&task=&widget=`), so "Ask AI" on a Dashboard widget, a project, a step and a document, and "Open in Workstation" on a task, are plain links.
-- **Input.** `/` lists commands (`/status`, `/assign`, `/idea`, `/draft`: each starts a message you finish; `/brief` sends at once). `@` finds people, projects and documents. Enter sends and Shift+Enter starts a new line. A paperclip attaches a Word file or a PDF (up to three) as a sample for a template; the file is uploaded as an outside file, and the message says what it is for ([safety](#safety-basics)). Other files and photos come later.
+- **Input.** `/` lists commands (`/status`, `/assign`, `/idea`, `/draft`, `/research`: each starts a message you finish; `/brief` sends at once). `@` finds people, projects and documents. Enter sends and Shift+Enter starts a new line. A paperclip attaches a Word file or a PDF (up to three) as a sample for a template; the file is uploaded as an outside file, and the message says what it is for ([safety](#safety-basics)). Other files and photos come later.
 - **Editing a card.** A card of tasks can be edited on screen (what, who, when), and a card for a template (its name, steps, who signs, each section's title and instructions, and each field's label, source and whether it is required); each save checks the card again as a new version. Any other card, or a change that moves a field in the document, is made by asking the assistant ("make it Monday"), which knows which cards are waiting.
 - **Drafts and ideas.** A draft the assistant saved shows as a small card in the conversation (its title, version, what is still missing, and buttons to preview and to open and edit it). An idea worked out as a project shows the concept, one box for each person who would get work, and **Review and Go**, which opens the new-project page filled in. Nothing is created until the VP presses Go there.
 - **On a narrow screen,** such as a phone's browser, the three panes become tabs.
@@ -59,8 +59,9 @@ The Workstation is each person's second page: a chat assistant like ChatGPT or C
 | 4 | **Assign work and make requests** | "Ask Anil to rerun the FEA by Friday, and tell Priya to update the drawing" | Tasks or requests, after the user confirms ([below](#assigning-work)) |
 | 5 | **Explain and check documents** | "What am I signing, and what changed?" · "Compare draft 2 with draft 3" · "Is anything missing from this Action Plan?" | Nothing |
 | 6 | **Turn a sample document into a template** (VP and R&D Head) | The VP attaches an old Project Initiation Document and says "make this a template" | A draft template, after the user confirms ([below](#making-a-template-from-a-sample-document)) |
+| 7 | **Research what already exists** in public sources (the people of steps C, 1 and 2) | "Which expandable TLIF cages are on the market, and what do studies report?" | Nothing until the user confirms the search words; then a brief and results, which the user keeps as sources ([below](#researching-what-already-exists)) |
 
-Commands for these: `/status`, `/assign`, `/brief` (what am I signing) now; `/idea` and `/draft` with drafting. Asking a question needs no command.
+Commands for these: `/status`, `/assign`, `/brief` (what am I signing), `/idea`, `/draft` and `/research`. Asking a question needs no command.
 
 ## What the AI may do
 
@@ -70,8 +71,8 @@ Every backend endpoint declares what the AI may do with it: its **AI tier** ([ap
 |---|---|---|
 | `read` | Use it freely, within what the user may see | Projects, route, tasks, documents, widgets, search |
 | `auto` | Use it directly, for the user's own things only. It's logged and can be undone | Save a draft the user owns; create a task for the user themselves; add a note to the user's own draft |
-| `confirm` | Only through an **action card** that the user confirms | Assign a task or send a request; reassign; submit a document or step; record a milestone or deviation; change the team; comment where others are notified; edit someone else's draft |
-| `never` | Never. It can prepare the work and give a button that opens the right screen | Sign anything (including Go); decide at a checkpoint; send work back; hold or drop a project; send anything outside Jayon; delete anything |
+| `confirm` | Only through an **action card** that the user confirms | Assign a task or send a request; reassign; submit a document or step; record a milestone or deviation; change the team; comment where others are notified; edit someone else's draft; start research in public sources, whose card shows the exact search words that will leave COAL ([P97](./decisions.md)) |
+| `never` | Never. It can prepare the work and give a button that opens the right screen | Sign anything (including Go); decide at a checkpoint; send work back; hold or drop a project; send anything else outside Jayon; delete anything; read research results nobody has kept |
 
 **The server enforces this, not the AI's instructions.**
 
@@ -198,6 +199,7 @@ sequenceDiagram
 | **A draft** | `active_template`, `start_draft`, tools that read, `save_draft` | The template is the active one; the person may write on that step; every number in a written section is in a source read in this reply or said by the person; a field the person types is in their own words; COAL's own fields cannot be set; required parts left empty are reported as gaps | A draft version owned by the person, its sections marked as the assistant's until they edit them, with a preview |
 | **An idea** | `list_product_lines`, `preview_project` | Only the VP may preview Go; the route, not the model, decides who gets which task; nothing is created | A card with the concept, one box for each person, and **Review and Go**, which opens the new-project page filled in |
 | **An explanation** | `waiting_signatures`, `read_document`, `compare_versions` | Only what the person may see is read; a restricted document shows only that it exists | Words with citations; nothing is written |
+| **Research** | `list_research_sources`, `propose` (`research.start`) | Only the VP, the Head, the Leads and Ops may research; the search terms hold no project code or name, no person and not the company; the sources are in the library and switched on; the budget | A card showing exactly the words that will leave COAL; once confirmed, a run in the background ([below](#researching-what-already-exists)) |
 
 ### Where a request can stop
 
@@ -218,6 +220,8 @@ sequenceDiagram
 | A template that does not pass its checks | Template checks | `VALIDATION_FAILED` 400 with every problem, as text | The model fixes the plan and builds again |
 | Too many tool calls | The loop | Said to the model | It answers with what it has and says what is missing |
 | A card the model may not prepare | The card runner | `VALIDATION_FAILED` 400, as text | Signing and deciding are not on any card |
+| Research terms that name a project, a person or the company; a source not in the library | `research.start`, at the card's preview | `VALIDATION_FAILED` 400, as text | The assistant chooses general words |
+| A research query with a word that was not approved | The research assistant's `search_source` | Said to the research model; nothing is sent | It searches with the approved words |
 | Confirming a card | Confirm | `VALIDATION_FAILED` (no `If-Match`), `PREVIEW_CHANGED` 409, `PROPOSAL_EXPIRED` 409 | The card is shown again as it now stands |
 
 ### The tools
@@ -240,9 +244,11 @@ Each tool is a thin wrapper over one endpoint, takes that endpoint's AI tier, an
 | `waiting_signatures` | `GET /signature-requests` | read | What waits for the person's signature |
 | `get_widget` | `GET /widgets/{key}` | read | A Dashboard widget's numbers and rows |
 | `create_my_task` | `POST /tasks` | auto | A task on the person's **own** list. For anyone else, the server refuses a "via AI" call |
+| `list_research_sources` | `GET /research-sources` | read | The source library: where research may search, and the note on when to use each ([research](#researching-what-already-exists)) |
+| `list_sources` | `GET /projects/{id}/sources` | read | The sources kept on a project's step, including research results a person kept. A draft may rest on them |
 | `propose`, `revise_card` | `POST /proposals`, `PATCH /proposals/{id}` | auto | Preparing or changing an action card. The card lists what it may carry: the endpoints that can go on a card ([api.md](./api.md#proposals-and-action-cards)) |
 
-No tool marks a task done: a step's tasks follow the step ([P96](./decisions.md)), so to hand in a step the assistant prepares a card for the step's own action (`steps.submit`), and the task closes when the step is signed off. Nothing that signs, decides, sends back, holds, drops, deletes or sends outside Jayon has a tool, and `confirm` and `reject` for cards are tier `never`. A test fails if a tool is built on an endpoint of any other tier, or if the card catalogue offers a `never` endpoint.
+Research itself is not a tool: `research.start` is tier `confirm`, so the assistant prepares a card for it, and the run's results are read only by the person (`never`) until they keep them. No tool marks a task done: a step's tasks follow the step ([P96](./decisions.md)), so to hand in a step the assistant prepares a card for the step's own action (`steps.submit`), and the task closes when the step is signed off. Nothing that signs, decides, sends back, holds, drops, deletes or sends outside Jayon has a tool, and `confirm` and `reject` for cards are tier `never`. A test fails if a tool is built on an endpoint of any other tier, or if the card catalogue offers a `never` endpoint.
 
 ### Citations
 
@@ -250,8 +256,8 @@ Every tool result gives the records it read a tag (`[S1]`, `[S2]`…). The AI is
 
 ### What is logged
 
-- **`ai_requests`** (insert-only): for each reply, the provider, model, prompt version, model calls, tool calls, tokens, cost, outcome (completed, stopped, error) and time. The title is a separate row with purpose `title`, and a chat that holds a file logs its replies with purpose `template`. The cost is worked out from the tokens at starting prices ⚠ ([AI11](./open-questions.md#ai)): it sets the budget and is never a bill.
-- **`ai_tool_calls`** (insert-only): each tool the AI used, the endpoint and tier, whether it was allowed (and why not), what it asked for (cut short), and the records it got back.
+- **`ai_requests`** (insert-only): for each reply, the provider, model, prompt version, model calls, tool calls, tokens, cost, outcome (completed, stopped, error) and time. The title is a separate row with purpose `title`, a chat that holds a file logs its replies with purpose `template`, and a research run is one row with purpose `research` (its web searches priced at US$0.01 each ⚠). The cost is worked out from the tokens at starting prices ⚠ ([AI11](./open-questions.md#ai)): it sets the budget and is never a bill.
+- **`ai_tool_calls`** (insert-only): each tool the AI used, the endpoint and tier, whether it was allowed (and why not), what it asked for (cut short), and the records it got back. The research assistant's searches are logged here too, as endpoint `outside:<kind>` and tier `outside`; the queries themselves are on the run.
 - **Writes** are in the audit trail as usual: a task or a draft the AI made for the person is "user via AI", and a card prepared in a chat records that chat. A draft version also points to the reply that wrote it (`ai_request_id`).
 - Logs never carry the person's words or the AI's answers; those are in the chat itself, which only its owner can read.
 
@@ -310,6 +316,64 @@ For the VP and the R&D Head, who are the ones who may add templates ([S6](./open
 
 No new write is needed: the assistant reads. `waiting_signatures` lists what waits for the person; `read_document` returns a version's fields and sections, who signs and has signed, the **gaps** the template still needs and the sections the assistant wrote that nobody has changed; `compare_versions` says what changed, field by field and section by section. The assistant explains in plain words with citations, and never tells the person to sign or not to sign. `/brief` asks "what am I signing, and what changed?" in one click.
 
+### Researching what already exists
+
+At the idea (C), the inception (1) and the market study (2), people need to know what is already out there: products on the market and who makes them, what published studies report, registered trials, and safety problems. The assistant can research this, but only in the places Jayon has chosen, with words a person has confirmed, and its findings stay material to review until a person keeps them ([P97](./decisions.md)).
+
+#### The source library
+
+A list of the places COAL may search, on the **Source library** page (`/research/sources`). Everyone sees it; the VP, the R&D Head and the R&D Leads add, change and switch off sources ⚠ ([A11](./open-questions.md#people-and-access)). Each source is of a **kind** COAL's code knows how to search, and has a **note** on when to use it, written by whoever added it; the research assistant reads the notes to choose where to look.
+
+| Kind | Searched through | Examples |
+|---|---|---|
+| `pubmed`, `europepmc` | NCBI E-utilities; Europe PMC's API | Published studies, with abstracts |
+| `clinicaltrials` | ClinicalTrials.gov's API | Registered trials: design, size, status, sponsor |
+| `openfda` | openFDA, the parts the source names: 510(k) clearances, product codes and classes, adverse events (MAUDE), recalls, device identifiers (GUDID) | The products on the US market and who makes them; safety signals |
+| `journal` | By ISSN: through PubMed with the journal's PubMed abbreviation, or through Crossref | A spine journal the R&D Head trusts |
+| `website` | The AI provider's own web search, limited to the source's websites. Only Anthropic has one, so on the Copilot stand-in a website is a link | Trade news such as a device magazine |
+| `link` | Nothing: a search address, with `{q}` for the words, that the person opens | Google Scholar (no API, and no automated searching allowed), CTRI (behind a declaration page), patents |
+
+COAL starts the library with the public databases (PubMed, Europe PMC, ClinicalTrials.gov, four parts of openFDA) and links to Google Scholar, CTRI, Google Patents and Espacenet. Jayon's own picks (journals, trade news) are added on the page. A source's settings choose **what** to search, never **where to send it**: each kind calls only its own fixed host, and every result's address is built by COAL from the source's own id (a PubMed id, an NCT number, a 510(k) number, a DOI), never taken from what a source or the model wrote.
+
+#### A research run
+
+1. **Ask.** The person asks, in the Workstation (`/research` starts the message), usually in a chat about the project.
+2. **The card.** The assistant looks at the library (`list_research_sources`), chooses the sources, and writes up to 8 **general** search terms of at most 6 words each: the kind of device, the anatomy, the approach, the material, an FDA product code. It prepares one card for `research.start` with the question, the terms, the sources, optionally a year to start from, and the project and step the results are for. The card shows **exactly the words that will leave COAL**, which sources COAL searches, and which the person opens. The server refuses terms that hold a project's code or name, a person's name, the company's name or an address (`researchTermProblems` in `shared/`), and the question itself never leaves COAL.
+3. **Confirm.** The person confirms. The run is saved (`queued`) with an event, and a job takes it in the background.
+4. **The research assistant** is a separate model turn, on the strong `research` model, with its own instructions (`prompts/research.ts`) and two tools, both on the library only: `search_source` and `read_result`. It sees the question, the approved terms and the library's notes, and none of COAL's records; it can save nothing but results. Every query must use only the approved words (and AND, OR, NOT, brackets and quotes): COAL checks each one (`queryProblems`) and refuses, as text, anything else, before it is sent. A run makes at most `RESEARCH_MAX_SEARCHES` (20) searches and reads at most 15 results in full, within `RESEARCH_TIMEOUT_MS` (5 minutes) and the person's daily budget.
+5. **The brief.** It writes a short brief in parts (existing products, evidence, trials, safety signals, gaps and next steps), citing each statement with its result's tag (`[R3]`). A tag that points to no result is removed. Every search that left COAL is logged with the run, as it was sent.
+6. **Read.** The person gets a notification and opens the run (`/research/{id}`): the brief, whose tags jump to their results; the results, each with its source, maker or journal, year and link; the places to search by hand, with the search ready; and the list of what was sent where. A run is private to the person who ran it; they can stop it, and what was found so far is kept.
+7. **Keep.** The person ticks the results worth keeping and chooses the project and step. Each becomes a **source** of that step (a link with a note), under the same rule as adding a source by hand ([documents-and-signing.md](./documents-and-signing.md#files-pictures-and-sources)). Only then is it a record: the project team sees it, and the assistant can read it (`list_sources`) and cite it, for example when drafting the Market Research Survey. Keeping is the person's own act (tier `never`).
+
+At the idea, before Go, there is no project yet: the results are kept after Go, by choosing the new project and its step.
+
+```mermaid
+sequenceDiagram
+  actor You as The person
+  participant Chat as The assistant
+  participant API as COAL API
+  participant Job as Worker
+  participant RA as Research assistant
+  participant Pub as Public sources
+  You->>Chat: Which expandable cages exist, and how do they do?
+  Chat->>API: list_research_sources
+  Chat->>API: propose research.start (question, general terms, sources)
+  API-->>You: the card: the words that will leave COAL, and where they go
+  You->>API: Confirm
+  API->>Job: research.requested
+  Job->>RA: the question, the approved terms, the library's notes
+  loop at most 20 searches
+    RA->>Job: search_source (a query)
+    Job->>Job: only approved words? otherwise refused, nothing sent
+    Job->>Pub: the query, to the source's own host only
+    Pub-->>Job: results, stored with tags R1, R2
+  end
+  RA-->>Job: the brief, citing R tags
+  Job-->>You: a notification: research ready
+  You->>API: keep R1 and R3 as sources of step 2
+  Note over API: Now they are records: the team sees them and the assistant can cite them
+```
+
 ### Assigning work
 
 1. **Ask.** A manager writes, for example: "Ask Anil to rerun the FEA on the cage by Friday, and tell Priya to update the drawing to rev C."
@@ -336,9 +400,9 @@ COAL uses **Claude (Anthropic)** ([D17](./decisions.md)). OpenAI isn't integrate
 
 - **One gateway.** All AI calls go through one small gateway in the backend, which hides the provider behind one interface: "run a turn with these instructions and these tools, and stream the answer back".
 - **Configuration, not code.** Switching the model is a configuration change. Each purpose can have its own model:
-  - chat, drafting and making a template from a sample use a strong model (`AI_MODEL_CHAT`, `AI_MODEL_DRAFT_WRITE` and `AI_MODEL_TEMPLATE`);
+  - chat, drafting, making a template from a sample and research use a strong model (`AI_MODEL_CHAT`, `AI_MODEL_DRAFT_WRITE`, `AI_MODEL_TEMPLATE` and `AI_MODEL_RESEARCH`);
   - short tasks, such as titles, classification and extraction, use a cheaper one.
-- **Two adapters, one interface.** A provider takes a turn (instructions, earlier messages, tools) and streams words back; tools, limits, logging and costs are COAL's own and are the same for every provider. The Anthropic adapter uses the Vercel AI SDK and names the workspace its key bills to on every call. The scripted stand-in plays a fixed script of words and tool calls, so the automatic tests need no key.
+- **Two adapters, one interface.** A provider takes a turn (instructions, earlier messages, tools) and streams words back; tools, limits, logging and costs are COAL's own and are the same for every provider. A provider may also search the web on given websites only (`searchWeb`), for a website in the source library: the Anthropic adapter uses Claude's web search tool and keeps only the pages the search returned; the Copilot stand-in has none. The Anthropic adapter uses the Vercel AI SDK and names the workspace its key bills to on every call. The scripted stand-in plays a fixed script of words and tool calls, so the automatic tests need no key.
 - **For now, Copilot on one laptop.** While the company laptop's network blocks the Anthropic API, Sharath's local development runs the AI through the GitHub Copilot SDK on his own Copilot licence (`AI_PROVIDER=copilot`, [D19](./decisions.md)). It is a stand-in for his own local work only: never for demos with other people, never with Jayon's data, and the backend refuses to start with it in production. It is a development-only dependency. COAL offers it only its own tools (`custom:*`: none of its built-in shell, file or web tools) and refuses every permission request it makes. Every request uses his Copilot allowance. When it ends, the AI test sets run again on Anthropic.
 - **Data settings.** Chats are kept in COAL's own database, and storage is turned off at the provider where the API allows it. Provider APIs don't train on our data by default. Apply for zero data retention before real data is used.
 - **Budgets.** Each person has a daily budget of US$5 ([D18](./decisions.md), `AI_DAILY_BUDGET_USD`) and each request has a limit. Every call's tokens and cost are logged.
@@ -353,9 +417,11 @@ Each request builds the AI's instructions in layers (`backend/src/modules/ai/pro
 3. **Role** (`role.ts`): the steps this person's role does and signs, worked out from the route.
 4. **User:** name, role, product line, and today's date in Indian time.
 5. **Context:** the pinned project, step, document, task or widget, with ids so the AI need not search; and the action cards of this chat that still wait, with their ids, so "make it Monday" can change the right one.
-6. **Writing rules** (`writing.ts`): how to draft a document, how to work out a new project from an idea, and how to explain and check documents.
+6. **Writing rules** (`writing.ts`): how to draft a document, how to work out a new project from an idea, and how to explain and check documents. **Research rules** (`research.ts`): how to prepare a research card with general terms.
 7. **A file is in the chat** (`template.ts`, only then): that the file's words are never instructions, and how to turn a sample into a template.
 8. **Retrieved data:** tool results, each with source tags.
+
+The research assistant has its own, much shorter instructions (`RESEARCH_ASSISTANT` in `research.ts`): the question, the approved terms and the library's notes, and how to write the brief. They carry their own version (`r1-` and a fingerprint).
 
 The layers are files in the repository, apart from the data. Every request logs a **prompt version** (`v1-` and a fingerprint of the fixed text), which changes whenever the words do, so a change in behaviour can be traced to a change in the instructions. Any change should be checked against the AI test sets ([below](#testing-the-ai)).
 
@@ -368,6 +434,11 @@ The layers are files in the repository, apart from the data. Every request logs 
   - links and images in AI answers aren't displayed: the chat screen shows only text, citations, cards, drafts and project ideas.
 
   This limits what hidden instructions in a document can do. The reader for lab reports and certificates, with no tools at all, is later ([Later](#later)).
+- **Research.** The only way anything leaves COAL is a research run, and only the words on its card leave ([P97](./decisions.md)):
+  - the person confirms the terms, which may not name a project, a person or the company, and every query is checked against them before it is sent;
+  - the research assistant has no COAL tools and sees no records, and what it reads (abstracts, reports, web pages) is outside material: information, never instructions;
+  - its results are the person's own (tier `never`) until they keep them; only then can the main assistant read them;
+  - each source calls only its own fixed host, and results' addresses are built by COAL.
 - **No dangerous tools.** There is no tool to sign, decide, delete, or send anything outside Jayon. No instruction, however worded, can make the AI do these.
 - **Refusals.** If the user may not see something, the AI says so plainly and names who can. It never hints at the content.
 - **Drafts are drafts.** AI-written sections are marked until a person edits or approves them, and a person signs every document.
@@ -382,7 +453,7 @@ The layers are files in the repository, apart from the data. Every request logs 
 
 - **Runs that start on their own.** When a task opens, the AI starts the work with a live checklist from a **playbook** for each step, so the draft is waiting when the person arrives.
 - **AI-written messages.** Work messages and a daily briefing, written by the AI.
-- **A research assistant** that searches public sources (openFDA, PubMed, ClinicalTrials.gov, patents) with no access to Jayon's data.
+- **More research.** A patents connector (PatentsView or EPO, once a key is chosen, [AI17](./open-questions.md#ai)), and research that runs from a step's playbook.
 - **Outside documents.** A reader with no tools that turns lab reports and certificates into fixed forms for a person to confirm.
 - **Meetings.** Minutes for the review meeting (step 12), from recordings in English and Malayalam.
 - **SolidWorks.** A connector on designers' own PCs (read and export first).

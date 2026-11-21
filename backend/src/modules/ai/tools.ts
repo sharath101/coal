@@ -18,6 +18,8 @@ import {
   listProductLines,
   listProjectDocuments,
   listProjects,
+  listResearchSources,
+  listSources,
   listSignatureRequests,
   listTasks,
   listUsers,
@@ -408,6 +410,41 @@ const TOOLS: AiToolDef[] = [
   }),
 
   aiTool({
+    name: 'list_sources',
+    endpoint: listSources,
+    description:
+      'The sources kept on a project (links, files and citations, with a note each), optionally of one step: what people found and kept, including results of research. Cite them in your message when a draft rests on them.',
+    input: z.object({
+      projectId: id('project'),
+      stepKey: z.string().max(8).optional().describe('Only the sources of this step'),
+    }),
+    call: ({ projectId, stepKey }) => ({
+      params: { id: projectId },
+      query: stepKey ? { step: stepKey } : {},
+    }),
+    label: () => 'Looked at the project’s sources',
+    shape: (out, input) => ({
+      data: out.items.map((s) => ({
+        title: s.title,
+        kind: s.kind,
+        address: s.url,
+        file: s.file?.name ?? null,
+        note: s.note,
+        step: s.target.stepKey,
+        fromResearch: !!s.researchResultId,
+        keptBy: s.addedBy.name,
+      })),
+      sources: out.items.map((s) => ({
+        type: 'source',
+        id: s.id,
+        label: s.title,
+        link: `/projects/${input.projectId}${s.target.stepKey ? `?step=${s.target.stepKey}` : ''}`,
+        passage: s.note ? s.note.slice(0, 300) : null,
+      })),
+    }),
+  }),
+
+  aiTool({
     name: 'read_document',
     endpoint: getDocument,
     description:
@@ -599,6 +636,28 @@ const TOOLS: AiToolDef[] = [
         signatureRows: t.signatureRows,
         activeTemplate: t.activeTemplate && `${t.activeTemplate.name} v${t.activeTemplate.version}`,
       })),
+      sources: [],
+    }),
+  }),
+
+  aiTool({
+    name: 'list_research_sources',
+    endpoint: listResearchSources,
+    description:
+      'The source library: the public places research may search (with ids), what each holds, a note on when to use it, and whether COAL can search it here or the person opens it. Use it before preparing a research card.',
+    input: z.object({}),
+    call: () => ({}),
+    label: () => 'Looked at the source library',
+    shape: (out) => ({
+      data: out.items
+        .filter((s) => s.enabled)
+        .map((s) => ({
+          id: s.id,
+          name: s.name,
+          kind: s.kind,
+          note: s.note,
+          searchable: s.searchable,
+        })),
       sources: [],
     }),
   }),
@@ -940,7 +999,7 @@ export function aiToolDefs(): AiToolDef[] {
     t.name === 'propose'
       ? {
           ...t,
-          description: `Prepare one or more actions for the person to confirm on an action card. Use it for anything that affects other people or that you may not do yourself: assigning work or asking someone (tasks.create with assigneeId), starting or submitting a step, recording a delay's reason, answering a request. Put all the actions of one request in ONE call, so they are one card. Nothing happens until the person confirms; never say it is done. Each action is { endpoint, params, query, body }. Whether it becomes an assignment or a request is decided by the server from the reporting line, so do not promise one. The actions:\n${proposableCatalogue()}`,
+          description: `Prepare one or more actions for the person to confirm on an action card. Use it for anything that affects other people or that you may not do yourself: assigning work or asking someone (tasks.create with assigneeId), starting or submitting a step, recording a delay's reason, answering a request, research in public sources (research.start). Put all the actions of one request in ONE call, so they are one card. Nothing happens until the person confirms; never say it is done. Each action is { endpoint, params, query, body }. Whether it becomes an assignment or a request is decided by the server from the reporting line, so do not promise one. The actions:\n${proposableCatalogue()}`,
         }
       : t,
   );
