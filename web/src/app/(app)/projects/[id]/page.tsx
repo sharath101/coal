@@ -5,6 +5,7 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { Suspense } from 'react';
 import { ActivityList } from '@/components/activity-list';
+import { ProjectSources } from '@/components/attachments-sources';
 import { HealthBadge } from '@/components/health-badge';
 import { Milestones } from '@/components/milestones';
 import { HealthReasons, LaunchDates, useHealthReasonText } from '@/components/project-health';
@@ -149,6 +150,7 @@ function ProjectView() {
           <aside className="grid content-start gap-8">
             <TeamPanel project={p} onChanged={changed} />
             <Milestones projectId={id} route={r} onChanged={changed} />
+            <ProjectSources projectId={id} />
             <ActivityList projectId={id} />
           </aside>
         </TabsContent>

@@ -286,7 +286,8 @@ export const stopResearch = defineEndpoint({
 
 export const KeepResearchBody = z.object({
   projectId: Id,
-  stepKey: StepKey,
+  /** Left out: the sources belong to the whole project, for everyone working on it. */
+  stepKey: StepKey.optional(),
   results: z
     .array(z.object({ resultId: Id, note: z.string().trim().max(1000).optional() }))
     .min(1)
@@ -298,7 +299,7 @@ export const keepResearch = defineEndpoint({
   method: 'POST',
   path: '/research/{id}/keep',
   summary:
-    'Keep results as sources on a project step, with a note each. Only kept results become records the assistant may read',
+    'Keep results as sources of a project (or one of its steps), with a note each. Only kept results become records the assistant may read',
   auth: 'session',
   permission: 'research.write',
   aiTier: 'never',

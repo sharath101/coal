@@ -699,7 +699,10 @@
     "sourceUrl": "Web address",
     "sourceNote": "Note (optional)",
     "sourceSubmit": "Add the source",
-    "keptBy": "Kept from research by {name}, {when}"
+    "keptBy": "Kept from research by {name}, {when}",
+    "projectTitle": "Project sources",
+    "projectNone": "Nothing kept for the whole project yet. Research results and references kept here are read by everyone working on it, and the assistant uses them.",
+    "projectOnSteps": "{count, plural, one {# more source is} other {# more sources are}} kept on steps and documents."
   },
   "document": {
     "loading": "Loading…",
@@ -1182,7 +1185,7 @@
     "briefNote": "Written by the research assistant from the results below. Check each point against its result before you rely on it.",
     "noBrief": "No brief was written.",
     "resultsTitle": "{count, plural, =0 {Results} one {# result} other {# results}}",
-    "resultsNote": "Tick the ones worth keeping. Kept results become sources of the step: everyone on the project can see them, and the assistant can cite them.",
+    "resultsNote": "Tick the ones worth keeping. Kept results become sources of the project: everyone working on it can read them, and the assistant can use and cite them.",
     "searching": "Searching…",
     "noResults": "Nothing was found.",
     "choose": "Keep {title}",
@@ -1197,18 +1200,21 @@
       "device": "Device listing",
       "web": "Web page"
     },
-    "keepTitle": "Keep as sources of a step",
+    "keepTitle": "Keep as sources of the project",
     "keepProject": "Project",
-    "keepStep": "Step",
+    "keepStep": "Where in the project",
     "chooseProject": "Choose a project",
-    "chooseStep": "Choose a step",
     "keep": "{count, plural, =0 {Keep} one {Keep # result} other {Keep # results}}",
     "keeping": "Keeping…",
-    "keptNote": "{count, plural, one {# result kept} other {# results kept}} as sources of step {step}.",
+    "keptNote": "{count, plural, one {# result kept} other {# results kept}} as sources of the project. Everyone working on it can read them, and the assistant can use them.",
     "searchesTitle": "What was sent, and where",
     "searchesNote": "Every search that left COAL, as it was sent.",
     "found": "{count, plural, =0 {nothing found} one {# found} other {# found}}",
-    "noSearches": "Nothing was sent."
+    "noSearches": "Nothing was sent.",
+    "keepNoProject": "This research isn't for a project yet. It stays here, so once the project exists (the VP presses Go), come back and keep what you need as sources of the project. Everyone working on it, such as the R&D Head writing the inception document, can then read them, and the assistant can use them at any point.",
+    "startProject": "Start a project",
+    "wholeProject": "The whole project (recommended)",
+    "keptNoteStep": "{count, plural, one {# result kept} other {# results kept}} as sources of step {step}."
   },
   "sourceLibrary": {
     "title": "Source library",

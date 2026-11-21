@@ -519,7 +519,7 @@ export async function keepResults(
   id: string,
   body: {
     projectId: string;
-    stepKey: string;
+    stepKey?: string | undefined;
     results: { resultId: string; note?: string | undefined }[];
   },
 ): Promise<SourceView[]> {

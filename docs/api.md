@@ -148,7 +148,7 @@ Work given by hand (`POST /tasks`) isn't on the route's plan: no step closes or 
 | `POST /files/{id}/complete` | Finish an upload: COAL reads the staged file once, checks its size and records its SHA-256 hash, then moves exactly those bytes to where they're served from, which no upload link can write to, and has it scanned for viruses where a scanner is set up. Safe to repeat | auto |
 | `GET /files/{id}/link` | A short-lived download link, after the permission check: the uploader, or anyone who may see a record that holds the file. An infected file is refused, and so is an unscanned one where a scanner is set up | read |
 | `POST /projects/{id}/attachments`, `GET /projects/{id}/attachments?step=&document=&task=` | Attach files and pictures to a step, document or task; list them | auto / read |
-| `POST /projects/{id}/sources`, `GET /projects/{id}/sources?step=&document=&task=` | Add or list sources (link, file or citation). A source kept from research says which result it was (`researchResultId`) | auto / read |
+| `POST /projects/{id}/sources`, `GET /projects/{id}/sources?step=&document=&task=` | Add or list sources (link, file or citation). A source belongs to a step, a document, a task, or, with none of them, to the whole project; the list without a filter returns all of them. A source kept from research says which result it was (`researchResultId`) | auto / read |
 | `GET /history/{recordType}/{id}` | A record's history | read |
 
 ### Dates, deviations and the plan
@@ -217,7 +217,7 @@ Research in public sources ([workstation-and-ai.md](./workstation-and-ai.md#rese
 | `POST /research` | Start a run: `question` (stays in COAL), `terms` (up to 8, at most 6 words each: the only words that leave COAL), `sourceIds`, optional `since` (a year), `projectId` and `stepKey`. `400 VALIDATION_FAILED` for terms that name a project, a person or the company, or sources not switched on; `503 AI_UNAVAILABLE` or `429 AI_BUDGET_REACHED` when something would be searched. The run is `queued` and a job runs it; with only link sources it is `done` at once. Its card shows the terms and where they go | confirm |
 | `GET /research?proposal=`, `GET /research/{id}` | My runs, newest first (or the one a card started); one run with its brief (citing `[R1]`), its results (each with its source, kind, the source's own id, the address COAL built, a few lines, and when it was kept), the searches that were sent, and the places to open with the search ready | never |
 | `POST /research/{id}/stop` | Stop it: a queued run at once, a running one at its next search. What was found is kept | never |
-| `POST /research/{id}/keep` | Keep results as sources of a project step (`projectId`, `stepKey`, and `results` with an optional `note` each), under the rule for adding a source to that step. Only kept results are records the assistant can read | never |
+| `POST /research/{id}/keep` | Keep results as sources of a project (`projectId`, `results` with an optional `note` each, and optionally a `stepKey` to put them on one step). Without a step they belong to the whole project, for everyone working on it. Under the rule for adding a source there. Only kept results are records the assistant can read | never |
 
 ## Proposals and action cards
 

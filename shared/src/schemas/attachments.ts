@@ -22,6 +22,11 @@ const oneTarget = (value: z.infer<typeof TargetInput>) =>
   [value.stepKey, value.documentId, value.taskId].filter((v) => v !== undefined).length === 1;
 const ONE_TARGET = { error: 'Choose exactly one of a step, a document or a task.' };
 
+/** A source may also belong to the whole project: none of the three. */
+const atMostOne = (value: z.infer<typeof TargetInput>) =>
+  [value.stepKey, value.documentId, value.taskId].filter((v) => v !== undefined).length <= 1;
+const AT_MOST_ONE = { error: 'Choose at most one of a step, a document or a task.' };
+
 export const AttachmentView = z.object({
   id: Id,
   file: StoredFile,
@@ -98,7 +103,7 @@ export const CreateSourceBody = TargetInput.extend({
   fileId: Id.optional(),
   note: z.string().trim().max(1000).default(''),
 })
-  .refine(oneTarget, ONE_TARGET)
+  .refine(atMostOne, AT_MOST_ONE)
   .refine((v) => v.kind !== 'link' || !!v.url, {
     error: 'A link needs its address.',
     path: ['url'],
@@ -113,7 +118,7 @@ export const createSource = defineEndpoint({
   method: 'POST',
   path: '/projects/{id}/sources',
   summary:
-    'Add a source (a link, a file or a citation, with a note) to a step, a document or a task',
+    'Add a source (a link, a file or a citation, with a note) to a step, a document or a task, or to the whole project (none of the three)',
   auth: 'session',
   permission: 'sources.write',
   aiTier: 'auto',

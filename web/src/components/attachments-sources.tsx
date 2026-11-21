@@ -23,16 +23,19 @@ import { formatDateTime, formatSize } from '@/lib/format';
 import { queryKeys, useAttachments, useSources } from '@/lib/queries';
 import { ACCEPT_ALL, ACCEPT_IMAGES, uploadFile } from '@/lib/upload';
 
-/** What the attachments and sources belong to: a step, or one document. */
-export type Target = { stepKey: string } | { documentId: string };
+/** What the attachments and sources belong to: a step, one document, or (sources only) the whole project. */
+export type ItemTarget = { stepKey: string } | { documentId: string };
+export type Target = ItemTarget | { project: true };
 
 const belongsTo = (
   row: { target: { stepKey: string | null; documentId: string | null; taskId: string | null } },
   target: Target,
 ) =>
-  'documentId' in target
-    ? row.target.documentId === target.documentId
-    : row.target.stepKey === target.stepKey && !row.target.documentId && !row.target.taskId;
+  'project' in target
+    ? !row.target.stepKey && !row.target.documentId && !row.target.taskId
+    : 'documentId' in target
+      ? row.target.documentId === target.documentId
+      : row.target.stepKey === target.stepKey && !row.target.documentId && !row.target.taskId;
 
 const KIND_ICON = { link: Link2, citation: BookOpen, file: Paperclip } as const;
 
@@ -48,7 +51,7 @@ export function AttachmentsAndSources({
   defaultOpen = false,
 }: {
   projectId: string;
-  target: Target;
+  target: ItemTarget;
   defaultOpen?: boolean;
 }) {
   const t = useTranslations('attachments');
@@ -115,6 +118,58 @@ export function AttachmentsAndSources({
   );
 }
 
+/**
+ * The sources of the whole project (docs/documents-and-signing.md#files-pictures-and-sources): what
+ * research and people found about it, kept where everyone working on it can read them, and where the
+ * assistant looks at any point. Sources of a step or a document are on that step or document.
+ */
+export function ProjectSources({ projectId }: { projectId: string }) {
+  const t = useTranslations('attachments');
+  const sources = useSources(projectId);
+  const [adding, setAdding] = useState(false);
+  const target: Target = { project: true };
+  const whole = (sources.data ?? []).filter((s) => belongsTo(s, target));
+  const onSteps = (sources.data ?? []).length - whole.length;
+
+  return (
+    <section className="grid gap-3" aria-labelledby="project-sources">
+      <h2
+        id="project-sources"
+        className="text-sm font-medium tracking-wide text-muted-foreground uppercase"
+      >
+        {t('projectTitle')}
+      </h2>
+      <ProblemMessage error={sources.error} />
+      {sources.isSuccess && whole.length === 0 && (
+        <p className="text-sm text-muted-foreground">{t('projectNone')}</p>
+      )}
+      {whole.length > 0 && (
+        <ul className="grid gap-2 text-sm">
+          {whole.map((s) => (
+            <SourceItem key={s.id} source={s} />
+          ))}
+        </ul>
+      )}
+      {onSteps > 0 && (
+        <p className="text-xs text-muted-foreground">{t('projectOnSteps', { count: onSteps })}</p>
+      )}
+      <div>
+        <Button
+          size="sm"
+          variant="outline"
+          aria-expanded={adding}
+          onClick={() => setAdding((open) => !open)}
+        >
+          {t('addSource')}
+        </Button>
+      </div>
+      {adding && (
+        <SourceForm projectId={projectId} target={target} onDone={() => setAdding(false)} />
+      )}
+    </section>
+  );
+}
+
 function AttachmentItem({ attachment }: { attachment: AttachmentView }) {
   const t = useTranslations('attachments');
   return (
@@ -169,7 +224,14 @@ function SourceItem({ source }: { source: SourceView }) {
 }
 
 const targetBody = (target: Target) =>
-  'documentId' in target ? { documentId: target.documentId } : { stepKey: target.stepKey };
+  'project' in target
+    ? {}
+    : 'documentId' in target
+      ? { documentId: target.documentId }
+      : { stepKey: target.stepKey };
+
+const targetKey = (target: Target) =>
+  'project' in target ? 'project' : 'documentId' in target ? target.documentId : target.stepKey;
 
 function AttachForm({
   projectId,
@@ -177,7 +239,7 @@ function AttachForm({
   onDone,
 }: {
   projectId: string;
-  target: Target;
+  target: ItemTarget;
   onDone: () => void;
 }) {
   const t = useTranslations('attachments');
@@ -276,7 +338,7 @@ function SourceForm({
   const [url, setUrl] = useState('');
   const [note, setNote] = useState('');
   const [file, setFile] = useState<File | null>(null);
-  const key = 'documentId' in target ? target.documentId : target.stepKey;
+  const key = targetKey(target);
 
   const mutation = useMutation({
     mutationFn: async () => {

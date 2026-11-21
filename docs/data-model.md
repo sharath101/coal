@@ -59,7 +59,7 @@ In words:
 - Each step becomes a **run step**, once per iteration, and run steps create **tasks**.
 - Runs produce **documents**. A document is made from a **template** version of its type, or uploaded, and has numbered **versions**.
 - A document version that needs signing gets **signature requests**, one for each row, which **signatures** fill. A step sign-off record is a document, so it works the same way. A decision is signed directly: its signature points at the decision.
-- **Attachments** and **sources** hang off a run and a step, document or task.
+- **Attachments** hang off a run and a step, document or task; **sources** too, or, with none of them, the whole project.
 - **Proposals** hold actions waiting for a person to confirm them.
 
 ## Tables
@@ -120,7 +120,7 @@ Departments, roles and product lines are reference data. Their rows are listed i
 | `signatures` *(insert-only)* | Each signature, on a document version or a decision | request_id (empty for a decision), subject_type (document_version, decision), subject_id, content_sha256, pdf_sha256, user_id, printed_name, role_key, role_name, meaning (prepared, reviewed, approved, decision), decision, reason, method (`click` until passkeys), signed_at. *The passkey columns (intent, authenticator data, client data, assertion) come with passkeys* |
 | `files` | Every stored file | storage_key, name, mime_type (from the file extension), size, sha256 (recorded when the upload completes), status (pending, uploaded), uploaded_by (empty for a file COAL made with no person behind it), scan_status (not scanned, clean, infected), origin (internal, outside), derived_from (the file it was made from: a built template's Word file points at its sample, and its sample PDF at the Word file) |
 | `attachments` | Files and pictures on a step, document or task | run_id, step_key, document_id, task_id (exactly one of the last three), file_id, caption, added_by |
-| `sources` | Sources added to a step, document or task | run_id, step_key, document_id, task_id, kind (link, file, citation), title, url, file_id, note, research_result_id (kept from a research run), added_by |
+| `sources` | Sources added to a step, document or task, or to the whole project (none of the three) | run_id, step_key, document_id, task_id (at most one of the last three), kind (link, file, citation), title, url, file_id, note, research_result_id (kept from a research run), added_by |
 
 **Guards in the database** (migration 0005): `signatures` is insert-only. `document_versions` rows can't be deleted, and an update may change only a version's status and revision letter, forwards: content, files, hashes, step iteration, author and the assistant's marks (`via_ai`, `ai_request_id`, `ai_sections`; migration 0012) never change, an approved version can only become superseded, and a revision letter once given stays.
 

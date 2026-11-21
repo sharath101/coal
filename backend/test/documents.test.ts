@@ -1144,4 +1144,45 @@ describe('attachments and sources', () => {
     });
     expect(noFile.status).toBe(400);
   });
+
+  it('keeps a source for the whole project, which the team reads and others do not', async () => {
+    const id = await w.go('Plate AG');
+    const whole = await call('POST', `/projects/${id}/sources`, 'designer', {
+      kind: 'link',
+      title: 'A made-up standard overview',
+      url: 'https://example.com/standard',
+      note: 'Background for everyone working on this.',
+    });
+    expect(whole.status).toBe(201);
+    expect(whole.body.target).toEqual({ stepKey: null, documentId: null, taskId: null });
+    // Not the whole project and a step at once.
+    const both = await call('POST', `/projects/${id}/sources`, 'designer', {
+      stepKey: '2',
+      documentId: '01a1fe83-f5e3-7650-9df4-3075e75ec08f',
+      kind: 'link',
+      title: 'Too many places',
+      url: 'https://example.com/x',
+    });
+    expect(both.status).toBe(400);
+
+    const titles = async (who: string) =>
+      (await ok(call('GET', `/projects/${id}/sources`, who))).items.map((x: any) => x.title);
+    expect(await titles('ops')).toContain('A made-up standard overview');
+    expect(await titles('head')).toContain('A made-up standard overview');
+    expect(await titles('outsider')).toEqual([]);
+    // The VP and the Head work on every project, so they may add one without being on the team.
+    const byVp = await call('POST', `/projects/${id}/sources`, 'vp', {
+      kind: 'link',
+      title: 'Added by the VP',
+      url: 'https://example.com/vp',
+    });
+    expect(byVp.status).toBe(201);
+    // Someone who is not on the team may not add one.
+    const outside = await call('POST', `/projects/${id}/sources`, 'outsider', {
+      kind: 'link',
+      title: 'Not mine to add',
+      url: 'https://example.com/y',
+    });
+    expect(outside.status).toBe(403);
+  });
 });

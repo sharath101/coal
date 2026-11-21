@@ -413,7 +413,7 @@ const TOOLS: AiToolDef[] = [
     name: 'list_sources',
     endpoint: listSources,
     description:
-      'The sources kept on a project (links, files and citations, with a note each), optionally of one step: what people found and kept, including results of research. Cite them in your message when a draft rests on them.',
+      'The sources kept on a project (links, files and citations, with a note each): what people found and kept, including results of research, whether kept on the whole project or on one step. Without a step you get all of them. Use it whenever the project, its market or its documents come up, and cite them in your message when an answer or a draft rests on them.',
     input: z.object({
       projectId: id('project'),
       stepKey: z.string().max(8).optional().describe('Only the sources of this step'),
@@ -431,6 +431,7 @@ const TOOLS: AiToolDef[] = [
         file: s.file?.name ?? null,
         note: s.note,
         step: s.target.stepKey,
+        wholeProject: !s.target.stepKey && !s.target.documentId && !s.target.taskId,
         fromResearch: !!s.researchResultId,
         keptBy: s.addedBy.name,
       })),

@@ -3,7 +3,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import { aiRequests, aiToolCalls } from '../src/modules/ai/tables';
 import type { WebSearch } from '../src/modules/ai/provider';
 import { runResearch } from '../src/modules/research/assistant';
-import { clearOutsideCache } from '../src/modules/research/connectors/client';
+import { clearOutsideCache, plainOf } from '../src/modules/research/connectors/client';
 import { openFdaSearch, yearOf } from '../src/modules/research/connectors/index';
 import { sweepResearch } from '../src/modules/research/jobs';
 import { researchRuns } from '../src/modules/research/tables';
@@ -442,18 +442,18 @@ describe('a research run', () => {
 });
 
 describe('keeping results', () => {
-  it('keeps chosen results as sources of a step, which the assistant can then read', async () => {
-    const { run } = await startResearch('ops', cageResearch({ projectId, stepKey: '2' }));
+  it('keeps chosen results as sources of the whole project, which everyone on it and the assistant can read', async () => {
+    const { run } = await startResearch('ops', cageResearch({ projectId }));
     ai.queue(
       { tool: 'search_source', input: { source: idOf('PubMed'), query: 'expandable cage' } },
       { say: 'Evidence\nFusion was seen [R1].' },
     );
     await runResearch(t.deps, run.id);
     const found = await ok(call('GET', `/research/${run.id}`, 'ops'));
-    const first = found.results[0];
+    const [first, second] = found.results;
 
     // Only the person who ran it.
-    const body = { projectId, stepKey: '2', results: [{ resultId: first.id }] };
+    const body = { projectId, results: [{ resultId: first.id }] };
     expect((await call('POST', `/research/${run.id}/keep`, 'head', body)).status).toBe(403);
 
     const kept = await ok(call('POST', `/research/${run.id}/keep`, 'ops', body));
@@ -463,29 +463,50 @@ describe('keeping results', () => {
       url: first.url,
       researchResultId: first.id,
       note: expect.stringContaining('38 of 40 patients'),
-      target: { stepKey: '2' },
+      target: { stepKey: null, documentId: null, taskId: null },
     });
     expect((await ok(call('GET', `/research/${run.id}`, 'ops'))).results[0].keptAt).not.toBeNull();
     // A result is kept once.
     expect((await call('POST', `/research/${run.id}/keep`, 'ops', body)).status).toBe(400);
 
-    const chat = (await ok(call('POST', '/ai/chats', 'ops', { context: { projectId } }))).id;
-    ai.reply(
-      { tool: 'list_sources', input: { projectId, stepKey: '2' } },
-      { say: 'One kept source [S1].' },
+    // Everyone working on the project reads it, with no step to look at.
+    for (const who of ['designer', 'lead', 'head']) {
+      const items = (await ok(call('GET', `/projects/${projectId}/sources`, who))).items;
+      expect(items.map((x: any) => x.title)).toContain(first.title);
+    }
+    // The Board sees project content only at its checkpoints, so it reads none of this.
+    expect((await ok(call('GET', `/projects/${projectId}/sources`, 'md'))).items).toEqual([]);
+
+    // One result can also go on a single step.
+    const onStep = await ok(
+      call('POST', `/research/${run.id}/keep`, 'ops', {
+        projectId,
+        stepKey: '2',
+        results: [{ resultId: second.id }],
+      }),
     );
+    expect(onStep.items[0].target).toMatchObject({ stepKey: '2' });
+
+    // At any point, the assistant reads what was kept on the project, without naming a step.
+    const chat = (await ok(call('POST', '/ai/chats', 'ops', { context: { projectId } }))).id;
+    ai.reply({ tool: 'list_sources', input: { projectId } }, { say: 'Two kept sources [S1].' });
     const reply = await ok(call('POST', `/ai/chats/${chat}/messages`, 'ops', { text: 'Sources?' }));
-    expect(JSON.parse(ai.results.at(-1)!).result[0]).toMatchObject({
-      title: first.title,
+    const listed = JSON.parse(ai.results.at(-1)!).result;
+    expect(listed.find((x: any) => x.title === first.title)).toMatchObject({
+      wholeProject: true,
       fromResearch: true,
     });
+    expect(listed.find((x: any) => x.title === second.title)).toMatchObject({
+      wholeProject: false,
+      step: '2',
+    });
     const text = reply.message.parts.find((p: any) => p.type === 'text');
-    expect(text.citations[0]).toMatchObject({ type: 'source', label: first.title });
+    expect(text.citations[0]).toMatchObject({ type: 'source' });
   });
 });
 
 describe('keeping results elsewhere', () => {
-  it('is only into a step the person may add sources to', async () => {
+  it('is only into a project the person may add sources to', async () => {
     // The Trauma Lead may research, but is not on this Spine project.
     const { run } = await startResearch('leadOther', cageResearch());
     ai.queue(
@@ -496,7 +517,6 @@ describe('keeping results elsewhere', () => {
     const [first] = (await ok(call('GET', `/research/${run.id}`, 'leadOther'))).results;
     const res = await call('POST', `/research/${run.id}/keep`, 'leadOther', {
       projectId,
-      stepKey: '2',
       results: [{ resultId: first.id }],
     });
     expect(res.status).toBe(403);
@@ -507,6 +527,10 @@ describe('keeping results elsewhere', () => {
 });
 
 describe('reading what sources send', () => {
+  it('turns markup and entities into plain words', () => {
+    expect(plainOf('<p>A &amp; B&#xa0;C &#233; &nbsp;D</p>')).toBe('A & B C é D');
+  });
+
   it('finds the year in each source’s way of writing a date', () => {
     expect(yearOf('2024 Mar')).toBe('2024');
     expect(yearOf('2025-02-03')).toBe('2025');

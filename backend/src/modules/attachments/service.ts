@@ -26,13 +26,22 @@ interface Target {
   taskId: string | null;
 }
 
-/** The people who do or sign a step, and the project team, may add to it (docs/roles-and-access.md). */
+/**
+ * The people who do or sign a step, and the project team, may add to it (docs/roles-and-access.md).
+ * Something for the whole project may be added by the team and by the VP, the R&D Head and the
+ * Lead of the line, who work on every project of theirs.
+ */
 const rolesFor = (env: Env, stepKey: string | null): string[] => {
   const step = env.loaded.route.steps.find((s) => s.key === stepKey);
-  return step ? [...step.doers, ...(step.signer ? [step.signer] : []), 'team'] : ['team'];
+  return step
+    ? [...step.doers, ...(step.signer ? [step.signer] : []), 'team']
+    : ['team', 'vp', 'rd_head', 'rd_lead'];
 };
 
-/** Which step, document or task a new attachment belongs to, checked against the project. */
+/**
+ * Which step, document or task a new attachment or source belongs to, checked against the
+ * project. A source may name none of them: it belongs to the whole project.
+ */
 async function resolveTarget(
   deps: AppDeps,
   tx: Executor,
@@ -53,7 +62,8 @@ async function resolveTarget(
     if (!doc) throw validationFailed('There is no such document.', 'documentId');
     return { stepKey: doc.stepKey, documentId: doc.id, taskId: null };
   }
-  const task = input.taskId ? await findTask(tx, ctx.orgId, input.taskId) : null;
+  if (!input.taskId) return { stepKey: null, documentId: null, taskId: null };
+  const task = await findTask(tx, ctx.orgId, input.taskId);
   if (!task || task.runId !== env.loaded.run.id) {
     throw validationFailed('There is no such task.', 'taskId');
   }
@@ -319,7 +329,8 @@ export async function keepSources(
   ctx: RequestContext,
   actor: Actor,
   projectId: string,
-  stepKey: string,
+  /** Left out: the whole project. */
+  stepKey: string | undefined,
   items: KeptResult[],
   then: (tx: Executor) => Promise<void>,
 ): Promise<SourceView[]> {

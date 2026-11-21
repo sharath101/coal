@@ -15,7 +15,13 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { api } from '@/lib/api';
 import { formatDateTime } from '@/lib/format';
-import { queryKeys, useProjectOptions, useProjectRoute, useResearchRun } from '@/lib/queries';
+import {
+  queryKeys,
+  useMe,
+  useProjectOptions,
+  useProjectRoute,
+  useResearchRun,
+} from '@/lib/queries';
 
 /** `[R3]` (or `[R2, R5]`) in the brief becomes a link to each result on this page. */
 function withRefs(text: string, known: Set<string>): ReactNode[] {
@@ -312,6 +318,7 @@ function KeepForm({
   const t = useTranslations('research');
   const id = useId();
   const queryClient = useQueryClient();
+  const me = useMe();
   const projects = useProjectOptions();
   const [projectId, setProjectId] = useState(run.project?.id ?? '');
   const [stepKey, setStepKey] = useState(run.stepKey ?? '');
@@ -321,7 +328,11 @@ function KeepForm({
     mutationFn: () =>
       api(keepResearch, {
         params: { id: run.id },
-        body: { projectId, stepKey, results: chosen.map((resultId) => ({ resultId })) },
+        body: {
+          projectId,
+          ...(stepKey && { stepKey }),
+          results: chosen.map((resultId) => ({ resultId })),
+        },
       }),
     onSuccess: (out) => {
       setDone({ count: out.items.length, step: stepKey });
@@ -341,6 +352,16 @@ function KeepForm({
       }}
     >
       <h3 className="font-medium">{t('keepTitle')}</h3>
+      {!run.project && (
+        <p className="text-sm text-muted-foreground">
+          {t('keepNoProject')}{' '}
+          {me.data?.role.key === 'vp' && (
+            <Link href="/projects/new" className="font-medium underline-offset-2 hover:underline">
+              {t('startProject')}
+            </Link>
+          )}
+        </p>
+      )}
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="grid gap-2">
           <Label htmlFor={`${id}-project`}>{t('keepProject')}</Label>
@@ -370,7 +391,7 @@ function KeepForm({
             disabled={!projectId}
             onChange={(e) => setStepKey(e.target.value)}
           >
-            <option value="">{t('chooseStep')}</option>
+            <option value="">{t('wholeProject')}</option>
             {(projectId ? (route.data?.steps ?? []) : []).map((s) => (
               <option key={s.key} value={s.key}>
                 {s.key} · {s.name}
@@ -382,14 +403,13 @@ function KeepForm({
       <ProblemMessage error={keep.error} />
       {done && (
         <p className="text-sm text-emerald-800">
-          {t('keptNote', { count: done.count, step: done.step })}
+          {done.step
+            ? t('keptNoteStep', { count: done.count, step: done.step })
+            : t('keptNote', { count: done.count })}
         </p>
       )}
       <div>
-        <Button
-          type="submit"
-          disabled={chosen.length === 0 || !projectId || !stepKey || keep.isPending}
-        >
+        <Button type="submit" disabled={chosen.length === 0 || !projectId || keep.isPending}>
           {keep.isPending ? t('keeping') : t('keep', { count: chosen.length })}
         </Button>
       </div>

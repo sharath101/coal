@@ -245,7 +245,7 @@ Each tool is a thin wrapper over one endpoint, takes that endpoint's AI tier, an
 | `get_widget` | `GET /widgets/{key}` | read | A Dashboard widget's numbers and rows |
 | `create_my_task` | `POST /tasks` | auto | A task on the person's **own** list. For anyone else, the server refuses a "via AI" call |
 | `list_research_sources` | `GET /research-sources` | read | The source library: where research may search, and the note on when to use each ([research](#researching-what-already-exists)) |
-| `list_sources` | `GET /projects/{id}/sources` | read | The sources kept on a project's step, including research results a person kept. A draft may rest on them |
+| `list_sources` | `GET /projects/{id}/sources` | read | The sources kept on a project, on the whole project or on a step, including research results a person kept. The assistant looks at them whenever the project, its market or its documents come up, and a draft may rest on them |
 | `propose`, `revise_card` | `POST /proposals`, `PATCH /proposals/{id}` | auto | Preparing or changing an action card. The card lists what it may carry: the endpoints that can go on a card ([api.md](./api.md#proposals-and-action-cards)) |
 
 Research itself is not a tool: `research.start` is tier `confirm`, so the assistant prepares a card for it, and the run's results are read only by the person (`never`) until they keep them. No tool marks a task done: a step's tasks follow the step ([P96](./decisions.md)), so to hand in a step the assistant prepares a card for the step's own action (`steps.submit`), and the task closes when the step is signed off. Nothing that signs, decides, sends back, holds, drops, deletes or sends outside Jayon has a tool, and `confirm` and `reject` for cards are tier `never`. A test fails if a tool is built on an endpoint of any other tier, or if the card catalogue offers a `never` endpoint.
@@ -343,9 +343,9 @@ COAL starts the library with the public databases (PubMed, Europe PMC, ClinicalT
 4. **The research assistant** is a separate model turn, on the strong `research` model, with its own instructions (`prompts/research.ts`) and two tools, both on the library only: `search_source` and `read_result`. It sees the question, the approved terms and the library's notes, and none of COAL's records; it can save nothing but results. Every query must use only the approved words (and AND, OR, NOT, brackets and quotes): COAL checks each one (`queryProblems`) and refuses, as text, anything else, before it is sent. A run makes at most `RESEARCH_MAX_SEARCHES` (20) searches and reads at most 15 results in full, within `RESEARCH_TIMEOUT_MS` (5 minutes) and the person's daily budget.
 5. **The brief.** It writes a short brief in parts (existing products, evidence, trials, safety signals, gaps and next steps), citing each statement with its result's tag (`[R3]`). A tag that points to no result is removed. Every search that left COAL is logged with the run, as it was sent.
 6. **Read.** The person gets a notification and opens the run (`/research/{id}`): the brief, whose tags jump to their results; the results, each with its source, maker or journal, year and link; the places to search by hand, with the search ready; and the list of what was sent where. A run is private to the person who ran it; they can stop it, and what was found so far is kept.
-7. **Keep.** The person ticks the results worth keeping and chooses the project and step. Each becomes a **source** of that step (a link with a note), under the same rule as adding a source by hand ([documents-and-signing.md](./documents-and-signing.md#files-pictures-and-sources)). Only then is it a record: the project team sees it, and the assistant can read it (`list_sources`) and cite it, for example when drafting the Market Research Survey. Keeping is the person's own act (tier `never`).
+7. **Keep.** The person ticks the results worth keeping and chooses the project. Each becomes a **source of the whole project** (a link with a note), so everyone working on it can read it and the assistant can use it at any point, in the inception, the market study, the design or a review; a step can be named when a result belongs to one step only. It is added under the same rule as adding a source by hand ([documents-and-signing.md](./documents-and-signing.md#files-pictures-and-sources)). Only then is it a record: the project team sees it in **Project sources** on the project page, and the assistant reads it (`list_sources`) and cites it, for example when drafting the Market Research Survey or the PID, or when someone asks what is already known. Keeping is the person's own act (tier `never`).
 
-At the idea, before Go, there is no project yet: the results are kept after Go, by choosing the new project and its step.
+At the idea, before Go, there is no project yet, and the assistant does not ask for one. The run stays on the Research page (private to the person who ran it); once the project exists, the person opens the run and keeps what they need as sources of the project. From then on the whole team sees them (the R&D Head writing the inception document, Ops on the market study) and the assistant can cite them whenever anyone works on it. The keep form says so, and offers **Start a project** to the VP.
 
 ```mermaid
 sequenceDiagram
@@ -370,7 +370,7 @@ sequenceDiagram
   end
   RA-->>Job: the brief, citing R tags
   Job-->>You: a notification: research ready
-  You->>API: keep R1 and R3 as sources of step 2
+  You->>API: keep R1 and R3 as sources of the project
   Note over API: Now they are records: the team sees them and the assistant can cite them
 ```
 
