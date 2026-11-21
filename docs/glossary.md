@@ -10,6 +10,9 @@
 |---|---|
 | **Action card** | How a proposal appears in the Workstation: what will happen, with Confirm, Edit and Cancel |
 | **AI tier** | What the AI may do with an endpoint: `read`, `auto`, `confirm` or `never` ([workstation-and-ai.md](./workstation-and-ai.md#what-the-ai-may-do)) |
+| **AI exam** | The questions put to the real model by hand (`pnpm eval:ai`) to show it is still safe and still answers well: known answers, leaks, tricks and injections. Each model keeps its own last good score as its baseline ([ai-safety.md](./ai-safety.md#how-we-test-it)) |
+| **Canary** | A made-up secret planted in a record that only some people may read, such as `CANARY-WOMBAT-7Q2`. If it ever reaches an answer, or even the model, for someone who may not read the record, something leaked |
+| **Prompt injection** | Words in text the AI reads (a file, a task, a draft, a web page) written to make it act or answer against its instructions. The AI reads all such text as information, never as instructions, and the server decides what it may do whatever the text says ([ai-safety.md](./ai-safety.md#6-text-the-ai-reads-is-never-an-instruction)) |
 | **Baseline** | The planned dates from the signed Action Plan (step 5), written there for each role and step; the VP's sign-off makes them permanent. The on-time rate is measured against first due dates, and later changes are recorded beside the baseline |
 | **Grounding** | What a draft the assistant saves must rest on: what the person said in the chat, and what the tools returned in that reply. The server checks a draft's numbers and the person's fields against it ([workstation-and-ai.md](./workstation-and-ai.md#drafting-a-document)) |
 | **Boilerplate (BP)** | A company template that new documents start from, such as the Action Plan or the FEA report. In COAL, a template in the template library |

@@ -125,6 +125,7 @@ coal/
       jobs/           Background jobs (pg-boss) and the worker
       server.ts       The API. worker.ts: the worker. dev.ts: both, for local work
     test/             Integration tests and their helpers
+    eval/             The AI exam (`pnpm eval:ai`): questions, the made-up company, checks, the release bar and each model's baseline
     prompts/          The AI's instructions, versioned (with the AI module)
     migrations/       Database migrations, generated from the tables.ts files
   web/
@@ -278,6 +279,7 @@ Jobs are written so that running one twice does no harm: each reminder carries a
 - **Rate limits** on sign-in and the AI endpoints, counted per address. The backend believes `X-Forwarded-For` only from the reverse proxies named in `TRUST_PROXY`, and only a proxy that overwrites that header with the connecting address may be named. The website's own rewrite passes a browser's header through, so it's never trusted: locally and on the test deployment, where no such proxy stands in front of `/api/v1`, everyone shares one counter.
 - **Logs** never contain document content, prompts or AI results. Error reports are scrubbed before they're stored.
 - **Calls outside.** The backend calls nothing outside except the AI provider and, for research, a fixed list of public hosts (NCBI, Europe PMC, ClinicalTrials.gov, openFDA, Crossref), with only the words a person confirmed ([workstation-and-ai.md](./workstation-and-ai.md#safety-basics)).
+- **The AI.** Every measure that keeps it safe, and how it is tested, is in [ai-safety.md](./ai-safety.md).
 
 ## Environments and hosting
 

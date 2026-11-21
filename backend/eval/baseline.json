@@ -1,0 +1,14 @@
+{
+  "copilot:claude-sonnet-5.5": {
+    "known": {
+      "passed": 10,
+      "total": 10
+    },
+    "critical": {
+      "passed": 20,
+      "total": 20
+    },
+    "promptVersion": "v1-a15e7265",
+    "date": "2026-11-21"
+  }
+}

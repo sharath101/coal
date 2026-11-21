@@ -16,5 +16,7 @@ dist/
 next-env.d.ts
 backend/openapi.json
 
+# The AI exam's last run (full answers of the made-up people); its baseline is kept
+backend/eval/results/
 # macOS
 .DS_Store

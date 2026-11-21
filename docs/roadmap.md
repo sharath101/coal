@@ -29,7 +29,7 @@ This roadmap gives an **order, not dates**. Madhav's effort estimates and costs 
 
 Each block depends on the ones before it. Within a block, the work can run side by side.
 
-**Progress:** blocks 1 (Foundations), 2 (the route), 3 (Documents and signing) and 4 (Dashboard) are done. The Workstation and AI (block 5) is under way: parts 5a, 5b, 5c and 5d are done; 5e (safety and the test sets) is left. Passkey signing is the last block (D16).
+**Progress:** blocks 1 (Foundations), 2 (the route), 3 (Documents and signing), 4 (Dashboard) and 5 (the Workstation and AI, parts 5a to 5f) are done. Passkey signing is the last block (D16).
 
 1. **Foundations** ✅
    - The monorepo (pnpm workspaces): `backend/`, `web/` and `shared/`; `app/` waits for its phase.
@@ -71,7 +71,7 @@ Each block depends on the ones before it. Within a block, the work can run side 
      - **5d-2. Drafting from the template library** ✅ `start_draft` and `save_draft`, the checks on numbers and the person's words, gaps, the marks on sections the assistant wrote, the draft card and the preview.
      - **5d-3. Idea to project** ✅ `preview_project` (`POST /projects/preview`), the idea card with one box for each person, and Review and Go.
      - **5d-4. Explaining and comparing documents** ✅ `read_document` reports gaps and the assistant's sections; the rules for `/brief`, comparing versions and completeness checks.
-   - **5e. Safety and the test sets:** outside documents, refusals that name who can help, `pnpm eval:ai`, polish.
+   - **5e. Safety and the test sets** ✅ the AI exam (`pnpm eval:ai`: known answers, leaks, tricks and injections on a made-up company with planted secrets, graded by code from COAL's own records, with a release bar and a baseline for each model, [how it works](./ai-safety.md#how-we-test-it)); a test that every refusal names who can help; the AI safety document, [ai-safety.md](./ai-safety.md). Moved to later: the reader with no tools for lab reports (P104).
    - **5f. Research from the source library** ✅ (asked for by the R&D Head, built before 5e): the source library and its page (the VP, the Head and the Leads keep it), connectors for PubMed, Europe PMC, ClinicalTrials.gov, openFDA and journals by ISSN, websites through the provider's web search, links the person opens; `/research` and a card that shows the words that will leave COAL; the research assistant in the background, with only the approved words; the brief, the results and keeping them as sources of a step ([the flow](./workstation-and-ai.md#researching-what-already-exists)).
 6. **Passkey signing** (last, D16)
    - Passkey registration on the website, and the signing intent: Face ID, fingerprint or Windows Hello for every signature, replacing the confirmed click.

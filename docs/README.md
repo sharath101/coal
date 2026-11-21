@@ -81,7 +81,8 @@ The full log, with reasons, is in [decisions.md](./decisions.md).
 | [workflow.md](./workflow.md) | Jayon's R&D route: the 28 steps, who does and signs each one, when each starts, checkpoints, decisions, milestones, rework |
 | [roles-and-access.md](./roles-and-access.md) | Roles, accounts, project teams, who sees what, who can do what, assigning work, task routing, enforcement |
 | [dashboard.md](./dashboard.md) | Widgets, layouts, the project page, measures, health, deadlines and deviations, notifications |
-| [workstation-and-ai.md](./workstation-and-ai.md) | The Workstation, the AI's features, tiers and action cards, the main flows, channels (website, WhatsApp, app), AI providers, safety, AI tests |
+| [workstation-and-ai.md](./workstation-and-ai.md) | The Workstation, the AI's features, tiers and action cards, the main flows, channels (website, WhatsApp, app), AI providers, safety basics, AI tests |
+| [ai-safety.md](./ai-safety.md) | How the AI is kept safe, for the company and for reuse: the threats, every measure and where it lives, the exam that tests it, what isn't covered, and a checklist for the next AI project |
 | [documents-and-signing.md](./documents-and-signing.md) | Documents, the template library, versions, signature rows, step sign-off records, passkey signing, audit trail, files |
 | [architecture.md](./architecture.md) | The parts, stack, growing to all of Jayon, repo layout, process engine, events, AI module, sign-in, jobs, security, hosting |
 | [demo-hosting.md](./demo-hosting.md) | The test deployment on Railway: its pieces and settings, updating, filling and resetting it |
@@ -106,6 +107,7 @@ The full log, with reasons, is in [decisions.md](./decisions.md).
 | A Dashboard widget, dates, alerts or notifications | [dashboard.md](./dashboard.md) |
 | The Workstation, the AI, a tool, a prompt or a chat channel | [workstation-and-ai.md](./workstation-and-ai.md) |
 | How a request is processed, step by step, and where it can stop | [workstation-and-ai.md § How a reply is made](./workstation-and-ai.md#how-a-reply-is-made) |
+| AI safety: presenting it, a new AI feature, a change to instructions, tools, tiers or the model, or running the exam | [ai-safety.md](./ai-safety.md) |
 | Research, the source library or a connector to a public source | [workstation-and-ai.md § Researching what already exists](./workstation-and-ai.md#researching-what-already-exists) |
 | A template or the template library | [documents-and-signing.md § The template library](./documents-and-signing.md#the-template-library) |
 | Documents, versions or signing | [documents-and-signing.md](./documents-and-signing.md) |

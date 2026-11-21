@@ -9,6 +9,7 @@
     "worker": "tsx src/worker.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
+    "eval:ai": "vitest run --config vitest.eval.config.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/scripts/migrate.ts",
     "openapi": "tsx src/scripts/openapi.ts",

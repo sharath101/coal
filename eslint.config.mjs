@@ -47,7 +47,7 @@ export default tseslint.config(
     ...tseslint.configs.disableTypeChecked,
   },
   {
-    files: ['**/*.test.ts', 'backend/test/**'],
+    files: ['**/*.test.ts', 'backend/test/**', 'backend/eval/**'],
     rules: {
       '@typescript-eslint/no-unsafe-member-access': 'off',
       '@typescript-eslint/no-unsafe-assignment': 'off',

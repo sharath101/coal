@@ -51,6 +51,11 @@ tester.run('coal/module-tables', coal.rules['module-tables'], {
       filename: at('backend/src/modules/users/tables.ts'),
       code: "import { roles } from '../org/tables';",
     },
+    // The AI exam reads the records as evidence, the way the tests do.
+    {
+      filename: at('backend/eval/observe.ts'),
+      code: "import { auditEvents } from '../src/modules/audit/tables';",
+    },
   ],
   invalid: [
     {

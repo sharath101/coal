@@ -180,7 +180,7 @@ When a step opens, the engine creates one task for each doer role on the step, p
 - **Lists are filtered, not just checked.** Lists and searches only return what the person may see.
 - **Documents** follow [the need-to-know table](#content-is-need-to-know), decided by one pure rule (`documentAccess` in `rules.ts`) that the document endpoints, file links and attachments all use. The rule's cases have their own table in `permissions.test.ts`.
 - **Files** are only served through short-lived links issued after the permission check: to the uploader, or to anyone who may see a record that holds the file.
-- **Refusals.** When content is restricted, the response says so and names who can see it. It never hints at the content itself.
+- **Refusals.** When content is restricted, the response says so and names who can see it. It never hints at the content itself. A test checks that every refusal of every permission names who can, in role names ([P103](./decisions.md)).
 - **Tests.** A table of role × action × expected result (allowed or denied) runs as tests on every change (`permissions.test.ts`). A new endpoint without a rule fails the build.
 - **The AI** acts as the person, with the same checks, plus extra limits ([workstation-and-ai.md](./workstation-and-ai.md#what-the-ai-may-do)).
 

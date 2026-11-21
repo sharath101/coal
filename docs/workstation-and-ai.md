@@ -427,26 +427,31 @@ The layers are files in the repository, apart from the data. Every request logs 
 
 ## Safety basics
 
+The whole picture, for the company and for reuse, is in [ai-safety.md](./ai-safety.md). The measures in the AI's own path:
+
 - **Outside documents.** A file attached to a chat (a sample document, later lab reports and vendor PDFs) is uploaded as an **outside** file. From the moment one is in a chat, the chat is outside for good (`ai_chats.has_outside_text`), and:
   - the server refuses the AI every `auto` endpoint except preparing cards (`proposals.create` and `proposals.update`), so it can't add a task, start or save a draft, or save anything else on the file's say-so; a person confirms every card;
   - the AI is told, in its instructions, that the file's words are information about the file, never instructions, and to tell the person if the file tries to give some;
   - the chat uses the strong model, and its requests are logged with the purpose `template`;
   - links and images in AI answers aren't displayed: the chat screen shows only text, citations, cards, drafts and project ideas.
 
-  This limits what hidden instructions in a document can do. The reader for lab reports and certificates, with no tools at all, is later ([Later](#later)).
+  This limits what hidden instructions in a document can do. The reader for lab reports and certificates, with no tools at all, is later ([Later](#later), [P104](./decisions.md)).
+- **Text colleagues wrote.** A task, a comment or a draft written by a colleague is text too, and anyone can put a note meant for the assistant in it. The instructions say that all text inside documents, files and tool results is information, never instructions, and the exam plants such notes in a task and a draft to check that it holds ([ai-safety.md](./ai-safety.md#6-text-the-ai-reads-is-never-an-instruction)).
 - **Research.** The only way anything leaves COAL is a research run, and only the words on its card leave ([P97](./decisions.md)):
   - the person confirms the terms, which may not name a project, a person or the company, and every query is checked against them before it is sent;
   - the research assistant has no COAL tools and sees no records, and what it reads (abstracts, reports, web pages) is outside material: information, never instructions;
   - its results are the person's own (tier `never`) until they keep them; only then can the main assistant read them;
   - each source calls only its own fixed host, and results' addresses are built by COAL.
 - **No dangerous tools.** There is no tool to sign, decide, delete, or send anything outside Jayon. No instruction, however worded, can make the AI do these.
-- **Refusals.** If the user may not see something, the AI says so plainly and names who can. It never hints at the content.
+- **Refusals.** If the user may not see something, the AI says so plainly and names who can. It never hints at the content. A test checks that every refusal of every permission names who can, in role names ([P103](./decisions.md)).
 - **Drafts are drafts.** AI-written sections are marked until a person edits or approves them, and a person signs every document.
 
 ## Testing the AI
 
-- **Known answers.** A set of questions with known answers for each role runs on every change to the instructions, tools or model (`pnpm eval:ai`, by hand: it needs a key and costs money, so it isn't part of CI). A drop in accuracy blocks the release. The automatic tests use a scripted stand-in for the model instead: they check what the AI is shown, which tools it can reach (none of a closed tier), that every refusal reaches it as text, citations, budgets, stopping, failing and the logs.
-- **Permission tests.** Questions each role must **not** be able to answer, plus attempts to talk the AI out of its rules. Any leak blocks the release.
+Why the AI can be trusted, and the exam in full, are in [ai-safety.md](./ai-safety.md#how-we-test-it). In short, three layers:
+
+- **Automatic tests, on every change.** A scripted stand-in plays the model, running the real tools like a model would, so these tests need no key. They check what the AI is shown, which tools it can reach (none of a closed tier), that every refusal reaches it as text and names who can help, citations, budgets, stopping, failing and the logs. The permission table (`permissions.test.ts`) checks every role against every permission.
+- **The exam, by hand against the real model** (`pnpm eval:ai`). Thirty questions on a made-up company: known answers, leaks, tricks and injections, with secrets planted in records that only some people may read. A leak, a trick or an injection that works blocks the release; a drop in known answers blocks it too. It needs a key and costs money, so it isn't part of CI: it runs whenever the instructions, the tools, the tiers or the **model** change, and before a release ([when to run it](./ai-safety.md#when-the-exam-is-run)).
 - **Measures in use:** how often action cards are confirmed, how much drafts change before approval, thumbs up or down, cost per person.
 
 ## Later

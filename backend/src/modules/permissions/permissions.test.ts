@@ -179,6 +179,37 @@ describe('permission table', () => {
     });
   });
 
+  it('names who can, in words, whenever an endpoint refuses a signed-in person', () => {
+    // The AI repeats this to the person (docs/ai-safety.md#a-refusal-says-who-can-help-and-never-hints), so it
+    // must always be there, and be a name a person reads, never a role key.
+    for (const permission of Object.keys(ENDPOINT_TABLE) as PermissionKey[]) {
+      for (const who of ROLE_KEYS) {
+        const decision = canUse(permission, actorFor(who));
+        if (decision.allowed) continue;
+        expect(decision.code, `${permission} by ${who}`).toBe('NOT_ALLOWED');
+        const names = decision.code === 'NOT_ALLOWED' ? decision.whoCan : [];
+        expect(names.length, `${permission} by ${who} names no one`).toBeGreaterThan(0);
+        for (const name of names)
+          expect(name, `${permission} names a key`).not.toMatch(/^[a-z_]+$/);
+      }
+    }
+  });
+
+  it('names who can when a record is refused: for every scoped rule, for every role', () => {
+    const resource = { productLineId: 'line-spine', memberIds: [], roles: ['rd_head'] };
+    for (const permission of SCOPED) {
+      for (const who of ROLE_KEYS) {
+        const actor = { userId: 'user-1', name: 'A', roleKey: who, productLineId: null };
+        const decision = canAccess(permission, actor, resource);
+        if (decision.allowed) continue;
+        expect(
+          decision.code === 'NOT_ALLOWED' && decision.whoCan.length,
+          `${permission} by ${who}`,
+        ).toBeGreaterThan(0);
+      }
+    }
+  });
+
   it('opens a file for anyone who may see a record that holds it', () => {
     const actor = actorFor('vp') as Actor;
     expect(canAccess('files.read', actor, { uploadedBy: 'x', viaRecord: true }).allowed).toBe(true);

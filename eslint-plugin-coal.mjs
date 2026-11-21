@@ -81,8 +81,8 @@ const moduleTables = {
   create(context) {
     const file = context.filename;
     const isTablesFile = /[\\/]tables\.ts$/.test(file);
-    const isTest = /\.test\.ts$/.test(file) || /backend[\\/]test[\\/]/.test(file);
-    // Table files may reference other tables for foreign keys; tests may inspect any table.
+    const isTest = /\.test\.ts$/.test(file) || /backend[\\/](test|eval)[\\/]/.test(file);
+    // Table files may reference other tables for foreign keys; tests and the AI exam may inspect any table.
     if (isTablesFile || isTest) return {};
     const from = ownerOf(file);
     return importVisitors((node, source) => {
