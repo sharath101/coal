@@ -77,6 +77,11 @@
 | S10 | Is the product concept at step C a document, with its own template, and who writes it? | No document yet: Go records the idea's name and description, and that is the concept. A template can be added as a document type later | VP |
 | S11 | May the assistant add a new **document type** from a sample (for a step whose forms aren't in COAL yet), and who decides its numbering and who signs? | Yes, on the same card, for the VP and the R&D Head. The card proposes `{project_code}-ABC-nn` numbering and Prepared, Reviewed and Approved rows, to correct before confirming ⚠ | VP, R&D Head |
 | S12 | Which documents must a step have before it can be submitted? | Each template document type of the step in [the table](./documents-and-signing.md#document-types), except the budget annex: made or uploaded, and with its required parts filled in if it comes from a template. Steps with no document type yet ask for nothing. Whether a step needs *several* documents of one type, or an annex, or a document that isn't a template type is open | VP, R&D Head |
+| S13 | Which parts of Jayon's Project Initiation Document must be filled in before the step is submitted? | The description, scope, objectives, business need, benefits and risks; the other sections are optional ⚠ ([P108](./decisions.md)) | R&D Head |
+| S14 | Jayon's printed PID has its own form number, revision number and revision date. How do they relate to COAL's document number and revision letters (S2)? | The header's form number is COAL's document number; the form's own revision number and date stay as fixed text; the cover's revision number is typed by the person and not required; COAL's revision letters come at approval ⚠ | Company QA |
+| S15 | Jayon's printed PID has three Reviewed rows, a Summary of Revision table and printed approvals (name, signature, date). COAL has one Reviewed row and records signatures itself | One Reviewed row (DARD) and the Approved row (VP); the Summary of Revision table is kept, blank; the printed approvals are left out until a signed PDF shows its signatures (S8) ⚠ | Company QA, R&D Head |
+| S16 | The PID holds pictures (a figure and a market chart) and a list of figures. May COAL's written sections hold pictures? | No: written sections are plain text, so the pictures and the list of figures are left out of the template. Needs a COAL feature if wanted ⚠ | VP, R&D Head |
+| S17 | Which font should COAL's PDFs use? Jayon's form is set in Segoe UI Light, which the PDF service does not have | The Word file names Segoe UI Light, so it looks right in Word; the PDF service shows a similar sans-serif (Noto Sans). An exact match needs the font installed on the PDF service, which depends on its licence ⚠ | Jayon IT |
 
 ## AI
 
@@ -141,7 +146,7 @@ These matter when the [regulatory notes](./regulatory-notes.md) are taken up.
 
 These were listed at the COAL meeting, plus what the build needs:
 
-- **Every current R&D form and template, as Word files, for every step.** The founders are providing these, starting with stages 1 and 2: the product concept, PID, Market Research Survey, Project Planning, Project Approval Form and Action Plan. They go in `private/templates/`, never in the repository.
+- **Every current R&D form and template, as Word files, for every step.** The founders are providing these, starting with stages 1 and 2: the product concept, PID, Market Research Survey, Project Planning, Project Approval Form and Action Plan. They go in `private/templates/`, never in the repository. The PID has arrived and is loaded as a draft ([P108](./decisions.md)).
 - **The Action Plan document**, with the data for its boilerplate (Bharath).
 - **The audit procedure documents and the NCP document** (Akhil).
 - **Step documents:**

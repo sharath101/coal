@@ -88,6 +88,7 @@ docxtemplater fills the Word template, Gotenberg turns it into a PDF, and people
 - Fields from COAL's records are filled afresh at every save. A person can't type over them, and the AI never writes them.
 - What a person doesn't change stays as it was in the previous version.
 - The PDF is made while the version is saved. If the PDF service is down, the save fails and nothing is saved, so a version never exists without its PDF.
+- The PDF service uses the fonts installed in its container. A form set in a font it lacks (Jayon's PID uses Segoe UI Light) is shown in a similar one, so the PDF can differ a little from the Word file ([S17](./open-questions.md#documents-and-signing)). Its contents table and page numbers are worked out when the PDF is made.
 
 ### Where templates live
 
