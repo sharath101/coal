@@ -21,7 +21,7 @@ let projectId: string;
 
 beforeAll(async () => {
   t = await createTestApp(
-    { AI_MAX_TOOL_CALLS: '3', AI_DAILY_BUDGET_USD: '1' },
+    { AI_MAX_TOOL_CALLS: '3', AI_DAILY_BUDGET_USD: '1', TEMPLATE_FILLING: 'true' },
     { ai, now: () => clock.now },
   );
   w = await createWorld(t);

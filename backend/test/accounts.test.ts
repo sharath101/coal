@@ -132,6 +132,21 @@ describe('sign-in and sign-out', () => {
 });
 
 describe('my profile', () => {
+  it('says what is switched on: filling templates in COAL is parked unless the setting is on', async () => {
+    const { cookie } = await signUp(t.app, { name: 'Features Reader', roleKey: 'rd_head' });
+    const read = async (app: typeof t.app, c: string) =>
+      (await app.inject({ method: 'GET', url: '/api/v1/me', headers: { cookie: c } })).json();
+    expect((await read(t.app, cookie)).features).toEqual({ templateFilling: false });
+
+    const on = await createTestApp({ TEMPLATE_FILLING: 'true' });
+    try {
+      const other = await signUp(on.app, { name: 'Features Reader', roleKey: 'rd_head' });
+      expect((await read(on.app, other.cookie)).features).toEqual({ templateFilling: true });
+    } finally {
+      await on.close();
+    }
+  });
+
   it('changes my role, and drops the product line when the new role has none', async () => {
     const trauma = await productLineId(t.app, 'TRM');
     const { cookie, user } = await signUp(t.app, {

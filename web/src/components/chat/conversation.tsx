@@ -25,7 +25,7 @@ import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';
 import { streamReply } from '@/lib/chat-stream';
 import { uploadFile } from '@/lib/upload';
-import { queryKeys, useChat, useProject } from '@/lib/queries';
+import { queryKeys, useChat, useMe, useProject } from '@/lib/queries';
 import { isPinned, type Pin } from '@/lib/workstation';
 import { cn } from '@/lib/utils';
 
@@ -235,6 +235,8 @@ interface Props {
   chatId: string | null;
   /** What a new chat is about; once there is a chat, its own context is used. */
   pin: Pin;
+  /** Typed into the message box when a new chat opens, for the person to read and send. */
+  say?: string;
   onClearPin: () => void;
   onChatCreated: (id: string) => void;
   selectedMessageId: string | null;
@@ -249,6 +251,7 @@ interface Props {
 export function Conversation({
   chatId,
   pin,
+  say = '',
   onClearPin,
   onChatCreated,
   selectedMessageId,
@@ -259,7 +262,8 @@ export function Conversation({
   const t = useTranslations('workstation');
   const queryClient = useQueryClient();
   const chat = useChat(chatId);
-  const [input, setInput] = useState('');
+  const me = useMe();
+  const [input, setInput] = useState(chatId ? '' : say);
   const [live, setLive] = useState<Live | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [attached, setAttached] = useState<{ id: string; name: string }[]>([]);
@@ -270,10 +274,14 @@ export function Conversation({
   const idRef = useRef<string | null>(chatId);
   const sending = useRef(false);
 
-  // Another chat was opened: start clean. (A chat made by sending keeps its words.)
+  // Another chat was opened: start clean. (A chat made by sending keeps its words, and a new chat
+  // opened with something to say keeps what it was given.)
+  const shown = useRef(chatId);
   useEffect(() => {
     idRef.current = chatId;
-    if (!sending.current) {
+    const another = shown.current !== chatId;
+    shown.current = chatId;
+    if (!sending.current && another) {
       setLive(null);
       setError(null);
       setInput('');
@@ -484,6 +492,7 @@ export function Conversation({
             uploading={uploading}
             onAttach={(file) => void attach(file)}
             onDetach={(id) => setAttached((all) => all.filter((f) => f.id !== id))}
+            canAttach={!!me.data?.features.templateFilling}
           />
           <p className="text-xs text-muted-foreground">{t('composer.hint')}</p>
         </div>

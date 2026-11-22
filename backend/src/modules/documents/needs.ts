@@ -1,13 +1,19 @@
 import { missingRequired } from '@coal/shared';
 import type { Executor } from '../../core/db/client';
 import { AppError } from '../../core/http/errors';
-import { findTemplatesById, findTypesById, listDocumentTypes } from '../templates/service';
+import {
+  blankFormHashes,
+  findTemplatesById,
+  findTypesById,
+  listDocumentTypes,
+} from '../templates/service';
 import { documentsOfRun, versionsOf } from './store';
 
 /**
  * What a step still lacks before it can be submitted: each of its documents (a template type that
- * belongs to the step) made or uploaded, and a document made from a template filled in, so a blank
- * template is never what goes to the signer. A document needn't be signed (S7). Need-to-know
+ * belongs to the step) made or uploaded, and filled in: a document filled in COAL has its required
+ * parts, and a Word form is not still the blank form, so an empty template is never what goes to
+ * the signer. A document needn't be signed (S7). Need-to-know
  * documents (the budget annex) are not asked for: the whole team sees this list, and the annex's
  * existence is not for them (docs/roles-and-access.md#content-is-need-to-know).
  */
@@ -42,11 +48,23 @@ export async function documentNeedsOfSteps(
     docs.flatMap((d) => (d.templateId ? [d.templateId] : [])),
   );
 
+  const blank = await blankFormHashes(
+    ex,
+    orgId,
+    [...asked.values()].flatMap((list) => list.map((t) => t.code)),
+  );
+
   /** What is empty in a document that is still a template: nothing for an upload. */
   const emptyIn = (doc: (typeof docs)[number]): string[] => {
     const content = versions.get(doc.id)?.[0]?.content;
     const template = doc.templateId ? templates.get(doc.templateId) : undefined;
-    return content && template ? missingRequired(template.spec, content) : [];
+    return content && template?.spec ? missingRequired(template.spec, content) : [];
+  };
+  /** A Word file that is still the blank form: nobody has filled it in. */
+  const stillBlank = (doc: (typeof docs)[number]): boolean => {
+    const latest = versions.get(doc.id)?.[0];
+    const code = typeOf.get(doc.documentTypeId)?.code;
+    return !!latest?.fileId && !!code && !!blank.get(code)?.has(latest.contentSha256);
   };
 
   for (const [key, required] of asked) {
@@ -57,9 +75,13 @@ export async function documentNeedsOfSteps(
       );
       if (made.length === 0) {
         lacking.push(`${type.name}: not made or uploaded yet.`);
-      } else if (made.every((d) => emptyIn(d).length > 0)) {
+      } else if (made.every((d) => emptyIn(d).length > 0 || stillBlank(d))) {
         const first = made[0] as (typeof made)[number];
-        lacking.push(`${first.number} (${type.name}): fill in ${emptyIn(first).join(', ')}.`);
+        lacking.push(
+          stillBlank(first)
+            ? `${first.number} (${type.name}): still the blank form. Ask the assistant to fill it in, or fill it in Word and upload it as a new version.`
+            : `${first.number} (${type.name}): fill in ${emptyIn(first).join(', ')}.`,
+        );
       }
     }
     if (lacking.length > 0) needs.set(key, lacking);

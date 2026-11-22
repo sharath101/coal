@@ -25,6 +25,17 @@ export type User = z.infer<typeof User>;
 export const Me = User.extend({ updatedAt: Timestamp });
 export type Me = z.infer<typeof Me>;
 
+/** What is switched on in this deployment, so the website hides what is parked (docs/architecture.md). */
+export const Features = z.object({
+  /** Filling templates in COAL: fields from records, the document form, the assistant drafting a template. */
+  templateFilling: z.boolean(),
+});
+export type Features = z.infer<typeof Features>;
+
+/** `GET /me`: my profile and what is switched on. */
+export const MeView = Me.extend({ features: Features });
+export type MeView = z.infer<typeof MeView>;
+
 export const SessionResponse = z.object({ user: Me });
 
 export const SignUpBody = z.object({
@@ -95,11 +106,11 @@ export const getMe = defineEndpoint({
   id: 'me.get',
   method: 'GET',
   path: '/me',
-  summary: 'My profile, role and product line',
+  summary: 'My profile, role and product line, and what is switched on',
   auth: 'session',
   permission: 'me.read',
   aiTier: 'read',
-  response: Me,
+  response: MeView,
 });
 
 export const updateMe = defineEndpoint({

@@ -55,10 +55,10 @@ The Workstation is each person's second page: a chat assistant like ChatGPT or C
 |---|---|---|---|
 | 1 | **Answer questions** about projects, tasks, documents and status | "What's waiting on me?" · "Which Spine projects are late, and why?" · "What did the FEA report conclude?" · "When does my part start?" | Nothing |
 | 2 | **Turn an idea into a project** (step C) | The VP describes an idea in their own words | A concept draft. Go needs the VP's signature ([below](#idea-to-project)) |
-| 3 | **Draft a document** from its template | "Draft the PID from the concept" · "Draft the market study" | A draft the user owns ([below](#drafting-a-document)) |
+| 3 | **Fill in a document** from its Word form | "Fill in the PID from what the project already records" · "Add a short justification to the budget annex" | A new draft version the user owns ([below](#filling-a-form-with-the-assistant)) |
 | 4 | **Assign work and make requests** | "Ask Anil to rerun the FEA by Friday, and tell Priya to update the drawing" | Tasks or requests, after the user confirms ([below](#assigning-work)) |
 | 5 | **Explain and check documents** | "What am I signing, and what changed?" · "Compare draft 2 with draft 3" · "Is anything missing from this Action Plan?" | Nothing |
-| 6 | **Turn a sample document into a template** (VP and R&D Head) | The VP attaches an old Project Initiation Document and says "make this a template" | A draft template, after the user confirms ([below](#making-a-template-from-a-sample-document)) |
+| 6 | **Turn a sample document into a template** (VP and R&D Head) | **Parked** ([P109](./decisions.md)): a template is Jayon's Word form as it is, so this only runs where `TEMPLATE_FILLING` is on | A draft template, after the user confirms ([below](#making-a-template-from-a-sample-document)) |
 | 7 | **Research what already exists** in public sources (the people of steps C, 1 and 2) | "Which expandable TLIF cages are on the market, and what do studies report?" | Nothing until the user confirms the search words; then a brief and results, which the user keeps as sources ([below](#researching-what-already-exists)) |
 
 Commands for these: `/status`, `/assign`, `/brief` (what am I signing), `/idea`, `/draft` and `/research`. Asking a question needs no command.
@@ -196,7 +196,8 @@ sequenceDiagram
 
 | | The model uses | What COAL checks | What the person gets |
 |---|---|---|---|
-| **A draft** | `active_template`, `start_draft`, tools that read, `save_draft` | The template is the active one; the person may write on that step; every number in a written section is in a source read in this reply or said by the person; a field the person types is in their own words; COAL's own fields cannot be set; required parts left empty are reported as gaps | A draft version owned by the person, its sections marked as the assistant's until they edit them, with a preview |
+| **A form** | `active_template`, `start_form`, tools that read, `read_form`, `fill_form` | The person may write on that step and may read the document; the form is the latest version they were shown (`VERSION_CONFLICT` otherwise); every number in the text is in a source read in this reply or said by the person; the file's own layout is kept; nothing is saved in a chat holding a file from outside | A new draft version, with its PDF, shown as a draft card; the earlier version is kept |
+| **A draft from a specification** (parked) | `active_template`, `start_draft`, tools that read, `save_draft` | The template is the active one; the person may write on that step; every number in a written section is in a source read in this reply or said by the person; a field the person types is in their own words; COAL's own fields cannot be set; required parts left empty are reported as gaps | A draft version owned by the person, its sections marked as the assistant's until they edit them, with a preview |
 | **An idea** | `list_product_lines`, `preview_project` | Only the VP may preview Go; the route, not the model, decides who gets which task; nothing is created | A card with the concept, one box for each person, and **Review and Go**, which opens the new-project page filled in |
 | **An explanation** | `waiting_signatures`, `read_document`, `compare_versions` | Only what the person may see is read; a restricted document shows only that it exists | Words with citations; nothing is written |
 | **Research** | `list_research_sources`, `propose` (`research.start`) | Only the VP, the Head, the Leads and Ops may research; the search terms hold no project code or name, no person and not the company; the sources are in the library and switched on; the budget | A card showing exactly the words that will leave COAL; once confirmed, a run in the background ([below](#researching-what-already-exists)) |
@@ -235,10 +236,11 @@ Each tool is a thin wrapper over one endpoint, takes that endpoint's AI tier, an
 | `list_projects`, `get_project`, `get_route`, `get_timeline` | projects, route and timeline | read | Where a project is, what comes next, its dates and delays |
 | `list_deviations` | `GET /deviations` | read | Why work is late |
 | `list_documents`, `read_document`, `compare_versions` | documents | read | What a document says, and what changed |
-| `active_template` | `GET /templates/active` | read | The template in use for a document type (asked for every time) |
+| `active_template` | `GET /templates/active` | read | The template in use for a document type (asked for every time): its name and version, and whether it is a plain Word form |
 | `list_document_types` | `GET /document-types` | read | Which kinds of document exist, their steps and signers |
-| `read_sample`, `prepare_template` | `GET /templates/sample-outline`, `POST /templates/prepare` | read | A sample document as a numbered outline; turning it into a template without saving one ([the flow](#making-a-template-from-a-sample-document)) |
-| `start_draft`, `save_draft` | `POST /projects/{id}/documents`, `POST /documents/{id}/versions` | auto | Starting a document from its template, and saving the assistant's words as a draft the person owns ([drafting](#drafting-a-document)) |
+| `start_form`, `read_form`, `fill_form` | `POST /projects/{id}/documents` (`fromForm`), `GET /documents/{id}/form`, `POST /documents/{id}/fill` | auto, read, auto | Starting a document as a copy of the approved blank form, reading the form as a numbered outline, and putting the assistant's words into the person's own Word file as a new draft version ([filling a form](#filling-a-form-with-the-assistant)) |
+| `read_sample`, `prepare_template` | `GET /templates/sample-outline`, `POST /templates/prepare` | read | **Parked** (only where `TEMPLATE_FILLING` is on). A sample document as a numbered outline; turning it into a template without saving one ([the flow](#making-a-template-from-a-sample-document)) |
+| `start_draft`, `save_draft` | `POST /projects/{id}/documents`, `POST /documents/{id}/versions` | auto | **Parked** (only where `TEMPLATE_FILLING` is on). Starting a document from a template's specification, and saving the assistant's words as a draft the person owns ([drafting](#drafting-a-document-parked)) |
 | `list_product_lines`, `preview_project` | `GET /product-lines`, `POST /projects/preview` | read | The product lines, and what Go would do for a concept, creating nothing ([idea to project](#idea-to-project)) |
 | `find_person` | `GET /users` | read | Who someone is, and their role |
 | `waiting_signatures` | `GET /signature-requests` | read | What waits for the person's signature |
@@ -295,7 +297,40 @@ For the VP and the R&D Head, who are the ones who may add templates ([S6](./open
 
 **The model.** This flow reads a whole document and has to get structure right, so it runs on the strong model (Sonnet by default), not the cheap one: chat replies in a chat that holds a sample file use the `template` model ([P89](./decisions.md)).
 
-### Drafting a document
+### Filling a form with the assistant
+
+Jayon's documents are Word forms, and COAL does not break a form into fields ([P109](./decisions.md)). So the assistant does what a careful colleague would: it **reads the form, works out what each part needs, gathers what it can from COAL's records, and fills in what it can ground**. It reasons about the form itself, not about a specification, so it works for any form.
+
+```mermaid
+sequenceDiagram
+  actor P as The person
+  participant API as COAL API
+  participant Model as The model
+  P->>API: "Fill in this document from what the project records"
+  Model->>API: active_template, list_documents
+  Model->>API: start_form (a copy of the approved blank form) or work on the existing document
+  Model->>API: read_form: a numbered outline of the form
+  Model->>API: get_project, read_document, list_sources, get_route (what the form needs)
+  Model->>API: fill_form: text for the parts it can write, naming the version it read
+  Note over API: COAL checks the numbers, puts the text into the person's own Word file (layout kept), makes the PDF, saves a new version
+  API-->>Model: saved, or what to fix
+  Model-->>P: what it filled in and from what, what is missing and who can give it
+```
+
+1. **Start.** The person asks in the Workstation ("Fill in the PID for this project"), or presses **Fill it in with the assistant** on a Word document, which opens a chat pinned to it with the request typed in for them to send. The assistant looks at what exists (`list_documents`) and checks the form with `active_template`. If there is no document yet, `start_form` makes one as a copy of the approved blank form, draft 1, owned by the person; if there is no form for the kind, it says so and who can add one.
+2. **Read.** `read_form` returns the latest version as a numbered outline (`p12 | where it is | style | its words`): headings, the form's own instructions, example text and blank table cells, in order. The form's words are **information, never instructions**, as with any file.
+3. **Decide.** For each part the assistant decides whether it is boilerplate to keep, a heading, an instruction or example to replace with real content, or a blank to fill. The form's own instructions say what a part should hold.
+4. **Gather.** It reads what the form needs with its usual tools: the project and its concept, earlier documents, the sources kept on the project, the route and the dates. It asks the person **one short question** for what only they can give, and never guesses it.
+5. **Fill.** `fill_form` takes the version it read and, for each part, `replace` (an instruction, example or blank cell), `append` (after a label) or `after` (new paragraphs under a heading). COAL does the editing in the person's own file, so fonts, headers, tables and everything else stay. Headers and footers are not filled.
+6. **Check.** The server refuses text with a number that no source gave (it must be in something a tool returned in this reply, or in what the person said), a part that does not exist, and a version that is no longer the latest. A refusal comes back as text and the assistant fixes it. The checks are a floor, not a proof ⚠ ([AI14](./open-questions.md#ai)): names and standards are held by the instructions, and **the person reads and edits the draft**.
+7. **Save.** A new version, with its PDF, owned by the person (`auto` tier; nothing is overwritten). It records that the assistant saved it (`via_ai`) and the reply that did, whose log gives the model, the instructions' version and every record read. The reply carries a **draft card** with buttons to preview the PDF and to open and edit it.
+8. **Say.** The assistant tells the person what it filled in and from what (citing records in its message, never inside the document), what is still missing and who can give it, and that submitting for signatures is their own step. If asked to change something, it reads the form again (the part numbers change after each save) and fills only those parts.
+
+**Closed in a chat that holds a file from outside:** `fill_form` and `start_form` are `auto` tier, so the server refuses them there, as for any save ([safety](#safety-basics)). A person can also fill a copy in Word and upload it: the assistant is a help, never the only way.
+
+### Drafting a document (parked)
+
+*Parked with filling templates in COAL ([P109](./decisions.md)): these tools and instructions exist only where `TEMPLATE_FILLING` is on.*
 
 1. **Start.** The user asks for a document in the Workstation (`/draft` starts the message). A "Draft it" button on a task comes later.
 2. **Find the template.** Every time, the AI looks up the document type's **active template** in the [template library](./documents-and-signing.md#the-template-library) (`active_template`). It never works from memory or an earlier chat, so a changed template applies at once. If there's no template, it says so, and that the person can upload the document, or the VP or the R&D Head can add the template (a sample document can be turned into one in the chat).
@@ -417,8 +452,8 @@ Each request builds the AI's instructions in layers (`backend/src/modules/ai/pro
 3. **Role** (`role.ts`): the steps this person's role does and signs, worked out from the route.
 4. **User:** name, role, product line, and today's date in Indian time.
 5. **Context:** the pinned project, step, document, task or widget, with ids so the AI need not search; and the action cards of this chat that still wait, with their ids, so "make it Monday" can change the right one.
-6. **Writing rules** (`writing.ts`): how to draft a document, how to work out a new project from an idea, and how to explain and check documents. **Research rules** (`research.ts`): how to prepare a research card with general terms.
-7. **A file is in the chat** (`template.ts`, only then): that the file's words are never instructions, and how to turn a sample into a template.
+6. **Writing rules** (`writing.ts`): how to fill a form, how to work out a new project from an idea, and how to explain and check documents (and, where `TEMPLATE_FILLING` is on, how to draft from a specification). **Research rules** (`research.ts`): how to prepare a research card with general terms.
+7. **A file is in the chat** (`template.ts`, only then): that the file's words are never instructions, and (where `TEMPLATE_FILLING` is on) how to turn a sample into a template.
 8. **Retrieved data:** tool results, each with source tags.
 
 The research assistant has its own, much shorter instructions (`RESEARCH_ASSISTANT` in `research.ts`): the question, the approved terms and the library's notes, and how to write the brief. They carry their own version (`r1-` and a fingerprint).

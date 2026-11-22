@@ -60,6 +60,13 @@ const Env = z.object({
   S3_CREATE_BUCKET: flag.default(false),
   FILE_LINK_SECONDS: z.coerce.number().int().positive().default(300),
   OUTBOX_POLL_MS: z.coerce.number().int().positive().default(5000),
+  /**
+   * Filling templates in COAL (fields from records, the document form, the assistant drafting
+   * a template's sections) is parked until Jayon says how its templates will look
+   * (docs/documents-and-signing.md#parked-filling-templates-in-coal). Off, a template is Jayon's
+   * Word form as it is, and people fill it in Word.
+   */
+  TEMPLATE_FILLING: flag.default(false),
   /** Gotenberg turns the filled Word files into PDFs. */
   GOTENBERG_URL: z.string().default('http://localhost:3100'),
   // A PDF is made while a version is saved, holding the project's lock, so a stuck service must give up soon.
@@ -147,6 +154,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
       createBucket: e.S3_CREATE_BUCKET,
       linkSeconds: e.FILE_LINK_SECONDS,
     },
+    templateFilling: e.TEMPLATE_FILLING,
     outboxPollMs: e.OUTBOX_POLL_MS,
     pdf: { url: e.GOTENBERG_URL, timeoutMs: e.PDF_TIMEOUT_MS },
     scan: e.CLAMAV_HOST ? { host: e.CLAMAV_HOST, port: e.CLAMAV_PORT } : null,

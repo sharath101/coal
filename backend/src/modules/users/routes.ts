@@ -8,7 +8,10 @@ export const usersRoutes = [
   implement(getMe, async ({ deps, ctx, actor }) => {
     const row = await findUser(deps.db, ctx.orgId, actor.userId);
     if (!row) throw notFound('person');
-    return presentMe(deps.db, ctx.orgId, row);
+    return {
+      ...(await presentMe(deps.db, ctx.orgId, row)),
+      features: { templateFilling: deps.config.templateFilling },
+    };
   }),
 
   implement(updateMe, ({ deps, ctx, actor, body, ifMatch }) =>

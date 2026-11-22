@@ -261,7 +261,7 @@ let w: World;
 const ai = new ScriptedAi();
 
 beforeAll(async () => {
-  t = await createTestApp({}, { ai });
+  t = await createTestApp({ TEMPLATE_FILLING: 'true' }, { ai });
   w = await createWorld(t);
 }, 60_000);
 afterAll(async () => {

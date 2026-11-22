@@ -29,7 +29,7 @@ This is the main doc. It gives the whole picture on one page and points to the d
 
 - it answers questions;
 - turns an idea into a project;
-- drafts documents from Jayon's templates, always loading the current one from COAL's template library;
+- helps fill in Jayon's templates (Word forms kept in COAL's template library, always the approved one) by reading the form and writing into a copy of it;
 - assigns work;
 - explains documents before you sign;
 - researches what already exists (products, studies, trials, safety problems) in the public sources Jayon chose, with search words you confirm.
@@ -67,7 +67,7 @@ The full log, with reasons, is in [decisions.md](./decisions.md).
 - **Parts:** a separate backend, website and mobile app, with shared code (D1). Web first; the app comes in a later phase (D12).
 - **Hosting:** local first; a test deployment on Railway for demos (D13, D20); the domain and production hosting are decided at the end (D13).
 - **AI:** Claude (Anthropic) behind one gateway (D17, replacing D2), with a budget of US$5 per person per day (D18); the Copilot SDK stands in on one development laptop for now (D19). Basic AI in the first release, only when asked (D3). The chat also comes to WhatsApp (D14).
-- **Templates:** a template for each step's documents, kept in COAL's template library; the AI checks it every time (D15).
+- **Templates:** a template for each step's documents is Jayon's Word form as it is, kept in COAL's template library; the AI uses the approved one every time (D15, P109).
 - **Signing:** Face ID or fingerprint passkeys, with the device PIN as fallback (D4), built last (D16). A confirmed click until then.
 - **Accounts:** name and role sign-up, and name sign-in, for now; no admin (D5).
 - **Visibility:** project status visible to everyone (D6).

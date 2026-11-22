@@ -32,7 +32,7 @@ export default function WorkstationPage() {
 function Workstation() {
   const t = useTranslations('workstation');
   const router = useRouter();
-  const { chatId, pin } = fromParams(useSearchParams());
+  const { chatId, pin, say } = fromParams(useSearchParams());
   const [pane, setPane] = useState<Pane>('chat');
   const [picked, setPicked] = useState<string | null>(null);
   const chat = useChat(chatId);
@@ -110,6 +110,7 @@ function Workstation() {
           <Conversation
             chatId={chatId}
             pin={pin}
+            say={say}
             onClearPin={() => router.replace(workstationHref({}))}
             onChatCreated={(id) => router.replace(`/workstation?chat=${id}`)}
             selectedMessageId={selected?.id ?? null}

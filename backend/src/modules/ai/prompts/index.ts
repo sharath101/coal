@@ -5,7 +5,7 @@ import { PLATFORM_RULES } from './platform';
 import { RESEARCH_RULES } from './research';
 import { roleSummary } from './role';
 import { OUTSIDE_TEXT_RULES, SAMPLE_RULES } from './template';
-import { WRITING_RULES } from './writing';
+import { DRAFTING_RULES, FORM_RULES, WRITING_RULES } from './writing';
 
 /**
  * A short fingerprint of the fixed instructions: it changes whenever their text does, and is
@@ -15,6 +15,8 @@ export const PROMPT_VERSION = `v1-${createHash('sha256')
   .update(
     PLATFORM_RULES +
       COMPANY_FACTS +
+      DRAFTING_RULES +
+      FORM_RULES +
       WRITING_RULES +
       RESEARCH_RULES +
       OUTSIDE_TEXT_RULES +
@@ -34,6 +36,11 @@ export interface InstructionInputs {
   cards: string[];
   /** A file from outside is in the chat: the rules for reading it, and for making a template from it. */
   hasFile?: boolean;
+  /**
+   * Filling templates in COAL is switched on: the assistant also drafts from a specification, and
+   * makes templates from samples (docs/documents-and-signing.md#parked-filling-templates-in-coal).
+   */
+  templateFilling?: boolean;
 }
 
 /** The layers of the AI's instructions, in order (docs/workstation-and-ai.md#how-the-ai-is-told-what-to-do). */
@@ -59,10 +66,12 @@ export function buildInstructions(i: InstructionInputs): string {
     person,
     pinned,
     waiting,
+    i.templateFilling ? DRAFTING_RULES : '',
+    FORM_RULES,
     WRITING_RULES,
     RESEARCH_RULES,
     i.hasFile ? OUTSIDE_TEXT_RULES : '',
-    i.hasFile ? SAMPLE_RULES : '',
+    i.hasFile && i.templateFilling ? SAMPLE_RULES : '',
   ]
     .filter(Boolean)
     .join('\n\n');

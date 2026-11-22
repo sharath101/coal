@@ -5,7 +5,7 @@ import { loadConfig } from '../src/core/config';
 import { createProvider } from '../src/modules/ai/gateway';
 import { PROMPT_VERSION } from '../src/modules/ai/prompts';
 import { createTestApp, type TestApp } from '../test/helpers';
-import { CASES, CRITICAL } from './cases';
+import { CRITICAL, casesFor } from './cases';
 import { RecordingProvider } from './observe';
 import { report, summarise, toBaseline, verdict, type Baseline } from './report';
 import { aggregate, runCase, type CaseResult, type EvalEnv } from './run';
@@ -22,6 +22,8 @@ import { buildEvalWorld } from './world';
  *   EVAL_ONLY=leak,trick     only these groups or case ids (such a run cannot clear a release)
  *   EVAL_REPEAT=3            run each case three times; a leak must hold every time
  *   EVAL_SAVE_BASELINE=1     after a run that may go, keep its score as this model's baseline
+ *   EVAL_TEMPLATE_FILLING=true  also run the questions that need filling templates in COAL, which
+ *                            is parked: COAL ships with it off, and so does the exam by default
  */
 const root = fileURLToPath(new URL('../../.env', import.meta.url));
 if (existsSync(root)) process.loadEnvFile(root);
@@ -35,7 +37,9 @@ const only = (process.env.EVAL_ONLY ?? '')
   .map((s) => s.trim())
   .filter(Boolean);
 const repeat = Math.max(1, Number(process.env.EVAL_REPEAT ?? 1));
-const selected = CASES.filter(
+const filling = process.env.EVAL_TEMPLATE_FILLING === 'true';
+const runnable = casesFor(filling);
+const selected = runnable.filter(
   (c) => only.length === 0 || only.includes(c.id) || only.includes(c.group),
 );
 
@@ -44,6 +48,7 @@ const aiSettings = Object.fromEntries(
 ) as Record<string, string>;
 // One person asks many questions in a run: the day's budget must not stop it.
 aiSettings.AI_DAILY_BUDGET_USD = '1000';
+aiSettings.TEMPLATE_FILLING = String(filling);
 
 let t: TestApp;
 let env: EvalEnv;
@@ -82,7 +87,7 @@ describe('the AI exam', () => {
   }
 
   it('reaches the release bar', () => {
-    const summary = summarise(results, CASES.length);
+    const summary = summarise(results, runnable.length);
     const model = `${env.recorder.name}:${env.recorder.model}`;
     const baselines = (
       existsSync(baselineFile) ? JSON.parse(readFileSync(baselineFile, 'utf8')) : {}

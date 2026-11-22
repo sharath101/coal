@@ -1,7 +1,7 @@
 import { specTitle, type TemplateSpec } from './templates';
 
 /**
- * The checks on what the assistant writes into a document (docs/workstation-and-ai.md#drafting-a-document):
+ * The checks on what the assistant writes into a document (docs/workstation-and-ai.md#drafting-a-document-parked):
  * a number must come from a source, and a field the person types must be what the person said.
  * They are pure, so the server and the tests run the same code.
  */

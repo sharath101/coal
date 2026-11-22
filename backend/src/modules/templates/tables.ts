@@ -48,13 +48,16 @@ export const templates = pgTable(
     version: integer('version').notNull(),
     status: text('status', { enum: ['draft', 'active', 'retired'] }).notNull(),
     name: text('name').notNull(),
-    spec: jsonb('spec').$type<TemplateSpec>().notNull(),
-    /** The tags COAL read from the Word file. */
+    /** Null for a plain Word form: Jayon's form as it is, with nothing for COAL to fill (docs/documents-and-signing.md#the-template-library). */
+    spec: jsonb('spec').$type<TemplateSpec>(),
+    /** The tags COAL read from the Word file. Empty for a plain form. */
     placeholders: jsonb('placeholders').$type<string[]>().notNull().default([]),
     docxFileId: uuid('docx_file_id')
       .notNull()
       .references(() => files.id),
     samplePdfFileId: uuid('sample_pdf_file_id').references(() => files.id),
+    /** The blank Word form people download and fill in: the file with any placeholders emptied. Made when first needed for older rows. */
+    formFileId: uuid('form_file_id').references(() => files.id),
     notes: text('notes').notNull().default(''),
     /** Null for the sample templates COAL loads itself. */
     addedBy: uuid('added_by'),

@@ -12,7 +12,7 @@ const ai = new ScriptedAi();
 let projectId: string;
 
 beforeAll(async () => {
-  t = await createTestApp({ AI_MAX_TOOL_CALLS: '8' }, { ai });
+  t = await createTestApp({ AI_MAX_TOOL_CALLS: '8', TEMPLATE_FILLING: 'true' }, { ai });
   w = await createWorld(t);
   await loadSampleTemplates(t.deps, systemContext(DEFAULT_ORG_ID));
   projectId = await w.go('Quokka cervical plate');

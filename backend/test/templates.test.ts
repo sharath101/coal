@@ -18,7 +18,7 @@ let w: World;
 const sample = (code: string) => SAMPLE_TEMPLATES.find((s) => s.spec.document_type === code)!;
 
 beforeAll(async () => {
-  t = await createTestApp();
+  t = await createTestApp({ TEMPLATE_FILLING: 'true' });
   w = await createWorld(t);
   await loadSampleTemplates(t.deps, systemContext(DEFAULT_ORG_ID));
 });

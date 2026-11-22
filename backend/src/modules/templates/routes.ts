@@ -75,7 +75,10 @@ export const templatesRoutes = [
         const [origin] = docx?.derivedFrom
           ? await findFiles(deps.db, orgId, [docx.derivedFrom])
           : [];
-        const pdf = await findDerivedFile(deps.db, orgId, body.docxFileId);
+        const pdf = await findDerivedFile(deps.db, orgId, body.docxFileId, 'application/pdf');
+        const spec = template.spec;
+        const plan = (await findTypeByCode(deps.db, orgId, template.documentType.code))
+          ?.signaturePlan ?? { rows: [], reviewedBy: [], approvedBy: [] };
 
         const detail: ActionDetail = {
           kind: 'template',
@@ -90,10 +93,10 @@ export const templatesRoutes = [
           layout: origin ? (origin.name.toLowerCase().endsWith('.pdf') ? 'rebuilt' : 'kept') : null,
           madeFrom: origin?.name ?? null,
           sampleFileId: pdf?.id ?? null,
-          signatureRows: template.spec.signature_rows,
-          reviewedBy: roleNames(template.spec.reviewed_by),
-          approvedBy: roleNames(template.spec.approved_by),
-          sections: template.spec.sections.map((s) => ({
+          signatureRows: spec?.signature_rows ?? plan.rows,
+          reviewedBy: roleNames(spec?.reviewed_by ?? plan.reviewedBy),
+          approvedBy: roleNames(spec?.approved_by ?? plan.approvedBy),
+          sections: (spec?.sections ?? []).map((s) => ({
             id: s.id,
             title: specTitle(s),
             kind: s.kind,
@@ -111,7 +114,9 @@ export const templatesRoutes = [
           })),
         };
         return {
-          summary: `Add the ${template.documentType.name} template as a draft (version ${template.version}, ${template.spec.sections.length} sections)`,
+          summary: spec
+            ? `Add the ${template.documentType.name} template as a draft (version ${template.version}, ${spec.sections.length} sections)`
+            : `Add the ${template.documentType.name} Word form as a draft (version ${template.version})`,
           effects: noEffects(),
           notified: [],
           detail,
@@ -149,10 +154,12 @@ export const templatesRoutes = [
     const row = await findTemplate(deps.db, ctx.orgId, params.id);
     if (!row) throw notFound('template');
     assertCanAccess('templates.read', actor, { status: row.status });
-    const files = await templateFiles(deps.db, ctx.orgId, row);
+    const files = await templateFiles(deps, ctx.orgId, row);
     return {
       sample: files.sample ? await linkTo(deps, files.sample) : null,
-      // The Word file is for the people who manage the library.
+      // The blank form is for everyone who may read the template: the approved one is what people fill in.
+      form: files.form ? await linkTo(deps, files.form) : null,
+      // The Word file as it was uploaded is for the people who manage the library.
       docx: files.docx && canManageTemplates(actor) ? await linkTo(deps, files.docx) : null,
     };
   }),

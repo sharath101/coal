@@ -89,15 +89,13 @@ export default function TemplatesPage() {
               {versions.length === 0 ? (
                 <p className="text-sm text-muted-foreground">{t('noVersions')}</p>
               ) : (
-                <>
-                  <ul className="grid gap-2">
-                    {versions.map((template) => (
-                      <TemplateVersionRow key={template.id} template={template} />
-                    ))}
-                  </ul>
-                  <TemplateUpload type={type} />
-                </>
+                <ul className="grid gap-2">
+                  {versions.map((template) => (
+                    <TemplateVersionRow key={template.id} template={template} />
+                  ))}
+                </ul>
               )}
+              <TemplateUpload type={type} />
             </section>
           );
         })}

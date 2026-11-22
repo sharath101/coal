@@ -170,7 +170,7 @@ export function buildToolbox(env: ToolboxEnv) {
     return text;
   }
 
-  const tools: AiTool[] = aiToolDefs().map((def) => ({
+  const tools: AiTool[] = aiToolDefs({ filling: env.deps.config.templateFilling }).map((def) => ({
     name: def.name,
     description: def.description,
     inputSchema: inputSchemaOf(def),

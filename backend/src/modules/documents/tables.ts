@@ -66,7 +66,7 @@ export const documentVersions = pgTable(
     createdBy: uuid('created_by').notNull(),
     viaAi: boolean('via_ai').notNull().default(false),
     aiRequestId: uuid('ai_request_id'),
-    /** The written sections the assistant wrote and no person has changed since (docs/workstation-and-ai.md#drafting-a-document). */
+    /** The written sections the assistant wrote and no person has changed since (docs/workstation-and-ai.md#drafting-a-document-parked). */
     aiSections: jsonb('ai_sections').$type<string[]>().notNull().default([]),
     /** Set when a send-back copied this version forward unchanged. */
     carriedFromVersionId: uuid('carried_from_version_id'),

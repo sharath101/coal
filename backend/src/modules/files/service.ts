@@ -59,16 +59,26 @@ export async function findFiles(ex: Executor, orgId: string, ids: string[]): Pro
     .where(and(eq(files.orgId, orgId), inArray(files.id, [...new Set(ids)])));
 }
 
-/** The newest file made from another, such as the sample PDF of a built template's Word file. */
+/**
+ * The newest file made from another, such as the sample PDF of a built template's Word file.
+ * `mimeType` picks one kind when several were made from the same file (a PDF and a Word copy).
+ */
 export async function findDerivedFile(
   ex: Executor,
   orgId: string,
   fromId: string,
+  mimeType?: string,
 ): Promise<FileRow | null> {
   const [row] = await ex
     .select()
     .from(files)
-    .where(and(eq(files.orgId, orgId), eq(files.derivedFrom, fromId)))
+    .where(
+      and(
+        eq(files.orgId, orgId),
+        eq(files.derivedFrom, fromId),
+        mimeType ? eq(files.mimeType, mimeType) : undefined,
+      ),
+    )
     .orderBy(desc(files.createdAt))
     .limit(1);
   return row ?? null;

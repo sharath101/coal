@@ -5,7 +5,7 @@ import {
   type Element as XmlElement,
 } from '@xmldom/xmldom';
 import type PizZip from 'pizzip';
-import type { Anchor, PrepareTemplateBody, SamplePart } from '@coal/shared';
+import type { Anchor, FormFill, PrepareTemplateBody, SamplePart } from '@coal/shared';
 import { openZip } from './docx';
 
 /**
@@ -447,4 +447,88 @@ export function applyPlan(
     docx: index.zip.generate({ type: 'nodebuffer', compression: 'DEFLATE' }),
     problems,
   };
+}
+
+// Filling a form
+
+/** The form as a numbered outline, for the assistant to read: the same parts, ids and words as a sample. */
+export function formOutline(docx: Buffer): { parts: SamplePart[]; notes: string[] } {
+  return outlineOf(indexDocx(docx));
+}
+
+/** The paragraphs a text becomes: each line is one, and blank lines are not paragraphs. */
+const linesOf = (text: string): string[] =>
+  text
+    .replace(/\r\n?/g, '\n')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+/**
+ * Puts text into a Word form in place, the way a person typing into it would: the layout, styles
+ * and everything else in the file stay. The parts are those of `formOutline` for the same file.
+ * Anything it cannot do is a problem for the caller to report, and then nothing is changed.
+ */
+export function fillParts(
+  docx: Buffer,
+  fills: Pick<FormFill, 'part' | 'text' | 'mode'>[],
+): { docx: Buffer; problems: string[] } {
+  const index = indexDocx(docx);
+  const problems: string[] = [];
+  /** The last paragraph put after each part, so several lines stay in order. */
+  const lastAfter = new Map<El, El>();
+
+  for (const fill of fills) {
+    const para = paragraph(index, fill.part, problems);
+    if (!para) continue;
+    if (para.part.name !== 'word/document.xml') {
+      problems.push(`${fill.part} is in a header or footer, which is not filled.`);
+      continue;
+    }
+    const lines = linesOf(fill.text);
+    if (lines.length === 0) {
+      problems.push(`${fill.part} has no text to put in.`);
+      continue;
+    }
+    const [first, ...more] = lines as [string, ...string[]];
+    const text = para.text;
+    // Words that are headings or bold are not copied into the paragraphs made after them.
+    const plain = styleOf(para.el) === '' && !isBold(para.el);
+    let anchor: El = para.el;
+    let rest = more;
+    if (fill.mode === 'replace') {
+      replaceRange(para.part, para.el, 0, text.length, first);
+    } else if (fill.mode === 'append') {
+      const spaced = text.length > 0 && !/\s$/.test(text) ? ` ${first}` : first;
+      replaceRange(para.part, para.el, text.length, text.length, spaced);
+    } else {
+      anchor = lastAfter.get(para.el) ?? para.el;
+      rest = lines;
+    }
+    para.text = paraText(para.el);
+
+    const doc = para.part.doc;
+    const parent = para.el.parentNode as El;
+    const props = children(para.el).find((c) => local(c) === 'pPr');
+    const like = plain ? ownRuns(para.el)[0] : undefined;
+    for (const line of rest) {
+      const p = doc.createElementNS(W, 'w:p');
+      if (props && plain) p.appendChild(props.cloneNode(true));
+      p.appendChild(newRun(doc, line, like));
+      parent.insertBefore(p, anchor.nextSibling);
+      anchor = p;
+    }
+    if (rest.length > 0) lastAfter.set(para.el, anchor);
+  }
+  if (problems.length > 0) return { docx, problems };
+
+  const serializer = new XMLSerializer();
+  for (const part of index.parts) index.zip.file(part.name, serializer.serializeToString(part.doc));
+  const filled = index.zip.generate({ type: 'nodebuffer', compression: 'DEFLATE' });
+  try {
+    indexDocx(filled);
+  } catch {
+    return { docx, problems: ['The Word file could not be filled without damaging it.'] };
+  }
+  return { docx: filled, problems };
 }

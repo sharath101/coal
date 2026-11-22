@@ -1,10 +1,12 @@
 import {
   compareVersions as compareVersionsEndpoint,
   createDocument as createDocumentEndpoint,
+  fillForm as fillFormEndpoint,
   getDocument as getDocumentEndpoint,
   getVersionLinks,
   listProjectDocuments as listProjectDocumentsEndpoint,
   listSignatureRequests,
+  readForm as readFormEndpoint,
   returnRequest as returnRequestEndpoint,
   saveVersion as saveVersionEndpoint,
   signRequest as signRequestEndpoint,
@@ -28,6 +30,14 @@ export const documentsRoutes = [
 
   implement(saveVersionEndpoint, ({ deps, ctx, actor, params, body }) =>
     service.saveVersion(deps, ctx, actor, params.id, body),
+  ),
+
+  implement(readFormEndpoint, ({ deps, ctx, actor, params }) =>
+    service.readForm(deps, ctx, actor, params.id),
+  ),
+
+  implement(fillFormEndpoint, ({ deps, ctx, actor, params, body }) =>
+    service.fillForm(deps, ctx, actor, params.id, body),
   ),
 
   implement(getVersionLinks, ({ deps, ctx, actor, params }) =>

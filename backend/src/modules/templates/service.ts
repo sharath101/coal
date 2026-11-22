@@ -31,12 +31,43 @@ import { listRoles } from '../org/service';
 import { listLatestVersions } from '../process/service';
 import { findUsersByIds } from '../users/service';
 import { DOCUMENT_TYPES } from './catalogue';
-import { DocxError, fillDocx, readTags } from './docx';
+import { DocxError, fillDocx, openZip, readTags } from './docx';
 import { SAMPLE_TEMPLATES, sampleDocx } from './samples';
 import { documentTypes, templates } from './tables';
 
 export type TypeRow = typeof documentTypes.$inferSelect;
 export type TemplateRow = typeof templates.$inferSelect;
+
+const DOCX = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+
+/**
+ * The specification of a template that is filled in COAL. A plain Word form has none, and no
+ * document made from it asks for one, so this is reached only through a template with a specification.
+ */
+export function specOf(row: TemplateRow): TemplateSpec {
+  if (!row.spec) {
+    throw new AppError(
+      500,
+      'INTERNAL',
+      'This template is a plain Word form: it has no specification.',
+    );
+  }
+  return row.spec;
+}
+
+/**
+ * The blank form people fill in: the Word file with any placeholders emptied, so a prepared form
+ * (the sample templates, a file with `{tags}`) reads as a clean form. A file whose braces can't be
+ * read is Jayon's form as it is, and is served as it is.
+ */
+export function blankForm(docx: Buffer): Buffer {
+  try {
+    return fillDocx(docx, {});
+  } catch (error) {
+    if (error instanceof DocxError) return docx;
+    throw error;
+  }
+}
 
 /** Word files are forms, not archives. */
 export const MAX_TEMPLATE_BYTES = 10 * 1024 * 1024;
@@ -152,7 +183,7 @@ const presentType = (t: TypeRow, template: TemplateRow | undefined): DocumentTyp
   stepKeys: t.stepKeys,
   signatureRows: t.signaturePlan.rows,
   activeTemplate: template
-    ? { id: template.id, version: template.version, name: template.name }
+    ? { id: template.id, version: template.version, name: template.name, hasSpec: !!template.spec }
     : null,
 });
 
@@ -227,7 +258,7 @@ export async function presentTemplates(
       name: row.name,
       version: row.version,
       status: row.status,
-      steps: row.spec.steps,
+      steps: row.spec?.steps ?? type.stepKeys,
       // A template COAL loaded itself has no person behind it.
       addedBy: person(row.addedBy) ?? COAL_PERSON,
       addedAt: row.createdAt.toISOString(),
@@ -341,6 +372,8 @@ export async function checkTemplateFile(
 
 export interface AddTemplateInput {
   documentType: string;
+  /** The uploaded file's name, which names a plain form. */
+  docxFileName?: string | undefined;
   /** The Word file's bytes, already read from storage, or made by COAL. */
   docx: Buffer;
   /** The stored Word file. */
@@ -350,8 +383,12 @@ export interface AddTemplateInput {
 }
 
 /**
- * Checks a Word file against its specification and saves it as a draft version
+ * Saves a Word file as a draft version of a document type's template
  * (docs/documents-and-signing.md#adding-a-template). Nothing is saved unless every check passes.
+ *
+ * Filling templates in COAL is parked (`TEMPLATE_FILLING`): a template is then Jayon's Word form
+ * as it is, with no specification, so the only checks are on the file. A specification from COAL
+ * itself (the sample templates, the import command) is kept, and used once filling is switched on.
  */
 export async function addTemplate(
   deps: AppDeps,
@@ -368,6 +405,13 @@ export async function addTemplate(
   if (input.docx.length > MAX_TEMPLATE_BYTES) {
     throw checkFailed(['The Word file is larger than 10 MB.']);
   }
+  const filling = deps.config.templateFilling;
+  if (actor && input.spec && !filling) {
+    throw validationFailed(
+      'Filling templates in COAL is switched off for now. Upload the Word form as it is, without a specification.',
+      'spec',
+    );
+  }
 
   if (deps.scanner) {
     const verdict = await deps.scanner.scan(input.docx).catch(() => null);
@@ -381,28 +425,44 @@ export async function addTemplate(
     if (!verdict.clean) throw checkFailed(['The virus scan found a problem with this file.']);
   }
 
-  // The specification: the one given, or the previous version's.
-  const [previous] = await deps.db
-    .select()
-    .from(templates)
-    .where(and(eq(templates.orgId, orgId), eq(templates.documentTypeId, type.id)))
-    .orderBy(desc(templates.version))
-    .limit(1);
-  const spec = input.spec ?? previous?.spec;
-  if (!spec) {
-    throw validationFailed(
-      `This is the first template for ${type.name}, so it needs a specification. COAL's team prepares it from the sample documents.`,
-      'spec',
-    );
+  // The specification: the one given, or the previous version's. A plain form has none.
+  let spec: TemplateSpec | null = null;
+  let previewBytes: Buffer;
+  let form: Buffer;
+  if (filling || input.spec) {
+    const [previous] = await deps.db
+      .select()
+      .from(templates)
+      .where(and(eq(templates.orgId, orgId), eq(templates.documentTypeId, type.id)))
+      .orderBy(desc(templates.version))
+      .limit(1);
+    spec = input.spec ?? previous?.spec ?? null;
+    if (!spec) {
+      throw validationFailed(
+        `This is the first template for ${type.name}, so it needs a specification. COAL's team prepares it from the sample documents.`,
+        'spec',
+      );
+    }
+    previewBytes = await checkTemplateFile(deps, orgId, {
+      code: type.code,
+      type,
+      spec,
+      docx: input.docx,
+    });
+    form = blankForm(input.docx);
+  } else {
+    // Only the file is checked: it must open as a Word file. What is in it is Jayon's own.
+    try {
+      openZip(input.docx);
+    } catch (error) {
+      if (error instanceof DocxError) throw checkFailed(error.problems);
+      throw error;
+    }
+    form = blankForm(input.docx);
+    previewBytes = form;
   }
-  const sampleDocxBytes = await checkTemplateFile(deps, orgId, {
-    code: type.code,
-    type,
-    spec,
-    docx: input.docx,
-  });
 
-  const samplePdf = await deps.pdf.fromDocx(sampleDocxBytes, `${type.code}-sample.docx`);
+  const samplePdf = await deps.pdf.fromDocx(previewBytes, `${type.code}-sample.docx`);
 
   return change(deps.db, ctx, async (tx, log) => {
     // One at a time per type, so versions are numbered without gaps or repeats.
@@ -418,6 +478,16 @@ export async function addTemplate(
       contentType: 'application/pdf',
       userId: actor?.userId ?? null,
     });
+    // A file with nothing to empty is its own blank form.
+    const formFile = form.equals(input.docx)
+      ? null
+      : await storeGeneratedFile(deps, tx, orgId, {
+          name: `${type.code}-v${version}-form.docx`,
+          bytes: form,
+          contentType: DOCX,
+          userId: actor?.userId ?? null,
+          derivedFrom: input.docxFileId,
+        });
     const [row] = await tx
       .insert(templates)
       .values({
@@ -425,10 +495,11 @@ export async function addTemplate(
         documentTypeId: type.id,
         version,
         status: 'draft',
-        name: spec.template,
+        name: spec?.template ?? templateNameOf(type, input.docxFileName),
         spec,
-        placeholders: specPlaceholders(spec).map((p) => p.name),
+        placeholders: spec ? specPlaceholders(spec).map((p) => p.name) : [],
         docxFileId: input.docxFileId,
+        formFileId: formFile?.id ?? input.docxFileId,
         samplePdfFileId: sample.id,
         notes: input.notes,
         addedBy: actor?.userId ?? null,
@@ -439,7 +510,13 @@ export async function addTemplate(
       action: 'template.added',
       recordType: 'template',
       recordId: added.id,
-      after: { documentType: type.code, version, name: spec.template, status: 'draft' },
+      after: {
+        documentType: type.code,
+        version,
+        name: added.name,
+        status: 'draft',
+        plainForm: !spec,
+      },
     });
     log.event({
       type: 'template.added',
@@ -448,6 +525,13 @@ export async function addTemplate(
     return added;
   });
 }
+
+/** A plain form has no specification to name it, so it is named for its file, or its kind of document. */
+const templateNameOf = (type: TypeRow, fileName: string | undefined) => {
+  const base = fileName?.replace(/\.docx$/i, '').trim();
+  if (!base) return type.name;
+  return base.toLowerCase().includes(type.name.toLowerCase()) ? base : `${type.name} (${base})`;
+};
 
 /** The API's way in: the Word file was uploaded first, and is read back from storage. */
 export async function addTemplateFromUpload(
@@ -477,7 +561,12 @@ export async function addTemplateFromUpload(
   if (scanned.scanStatus === 'infected')
     throw checkFailed(['The virus scan found a problem with this file.']);
   const docx = await readFileBytes(deps, file);
-  return addTemplate(deps, ctx, actor, { ...input, docx, notes: input.notes });
+  return addTemplate(deps, ctx, actor, {
+    ...input,
+    docxFileName: file.name,
+    docx,
+    notes: input.notes,
+  });
 }
 
 /** Makes a draft or retired version active, retiring the one that was. */
@@ -547,7 +636,10 @@ export async function activateTemplate(
   });
 }
 
-/** Whether a person may open a template's Word file or sample: the VP and the Head always; the sample of an active one for all. */
+/**
+ * Whether a person may open a template's file: the VP and the Head always; the PDF and the blank
+ * form of the approved version for everyone, because anyone making a document needs them.
+ */
 export async function templateFileAccess(
   ex: Executor,
   orgId: string,
@@ -560,20 +652,88 @@ export async function templateFileAccess(
     .where(
       and(
         eq(templates.orgId, orgId),
-        sql`${templates.docxFileId} = ${fileId} or ${templates.samplePdfFileId} = ${fileId}`,
+        sql`${templates.docxFileId} = ${fileId} or ${templates.samplePdfFileId} = ${fileId} or ${templates.formFileId} = ${fileId}`,
       ),
     );
   return rows.some(
-    (t) => canManageTemplates(actor) || (t.status === 'active' && t.samplePdfFileId === fileId),
+    (t) =>
+      canManageTemplates(actor) ||
+      (t.status === 'active' && (t.samplePdfFileId === fileId || t.formFileId === fileId)),
   );
 }
 
-export async function templateFiles(ex: Executor, orgId: string, row: TemplateRow) {
+/**
+ * The blank form of a template. Versions added since plain forms began have it; an older row gets
+ * it the first time it is asked for, and keeps it.
+ */
+export async function ensureFormFile(deps: AppDeps, orgId: string, row: TemplateRow) {
+  if (row.formFileId) return (await findFiles(deps.db, orgId, [row.formFileId]))[0] ?? null;
+  const [original] = await findFiles(deps.db, orgId, [row.docxFileId]);
+  if (!original) return null;
+  const form = blankForm(await readFileBytes(deps, original));
+  return deps.db.transaction(async (tx) => {
+    const [current] = await tx
+      .select({ id: templates.formFileId })
+      .from(templates)
+      .where(eq(templates.id, row.id))
+      .for('update');
+    if (current?.id) return (await findFiles(tx, orgId, [current.id]))[0] ?? null;
+    const file = await storeGeneratedFile(deps, tx, orgId, {
+      name: `${original.name.replace(/\.docx$/i, '')}-form.docx`,
+      bytes: form,
+      contentType: DOCX,
+      userId: null,
+      derivedFrom: row.docxFileId,
+    });
+    await tx.update(templates).set({ formFileId: file.id }).where(eq(templates.id, row.id));
+    return file;
+  });
+}
+
+/**
+ * The hashes of every blank form of each document type, for telling a form nobody has filled in
+ * from one that is: the Word file as it was uploaded, and its blank form.
+ */
+export async function blankFormHashes(
+  ex: Executor,
+  orgId: string,
+  typeCodes: string[],
+): Promise<Map<string, Set<string>>> {
+  const out = new Map<string, Set<string>>();
+  if (typeCodes.length === 0) return out;
+  const rows = await ex
+    .select({
+      code: documentTypes.code,
+      docxFileId: templates.docxFileId,
+      formFileId: templates.formFileId,
+    })
+    .from(templates)
+    .innerJoin(documentTypes, eq(templates.documentTypeId, documentTypes.id))
+    .where(and(eq(templates.orgId, orgId), inArray(documentTypes.code, typeCodes)));
+  const found = await findFiles(
+    ex,
+    orgId,
+    rows.flatMap((r) => [r.docxFileId, r.formFileId].filter((id): id is string => !!id)),
+  );
+  const shaOf = new Map(found.map((f) => [f.id, f.sha256]));
+  for (const row of rows) {
+    const set = out.get(row.code) ?? new Set<string>();
+    for (const id of [row.docxFileId, row.formFileId]) {
+      const sha = id ? shaOf.get(id) : null;
+      if (sha) set.add(sha);
+    }
+    out.set(row.code, set);
+  }
+  return out;
+}
+
+export async function templateFiles(deps: AppDeps, orgId: string, row: TemplateRow) {
   const ids = [row.docxFileId, row.samplePdfFileId].filter((id): id is string => !!id);
-  const rows = await findFiles(ex, orgId, ids);
+  const rows = await findFiles(deps.db, orgId, ids);
   return {
     docx: rows.find((f) => f.id === row.docxFileId) ?? null,
     sample: rows.find((f) => f.id === row.samplePdfFileId) ?? null,
+    form: await ensureFormFile(deps, orgId, row),
   };
 }
 

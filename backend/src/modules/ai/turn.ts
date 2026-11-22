@@ -197,6 +197,7 @@ async function run(args: TurnArgs, ai: AppDeps['config']['ai']) {
           `Card ${p.id} (version ${p.version}): ${p.title}. It would: ${p.preview.actions.map((a) => a.summary).join('; ')}.`,
       ),
     hasFile,
+    templateFilling: deps.config.templateFilling,
   });
 
   const toolbox = buildToolbox({

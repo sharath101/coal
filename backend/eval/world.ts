@@ -61,17 +61,31 @@ export async function buildEvalWorld(t: TestApp): Promise<{ w: World; facts: Eva
   const code = (await w.ok(w.call('GET', `/projects/${projectId}`, 'vp'))).code as string;
   await w.advance(projectId, '4');
 
+  // The documents are Word forms, as they are in COAL: a copy of the approved blank form, with
+  // text put into it, the way the assistant or a person fills one in.
+  const fillForm = async (documentId: string, as: string, text: string) => {
+    const outline = await w.ok(w.call('GET', `/documents/${documentId}/form`, as));
+    await w.ok(
+      w.call('POST', `/documents/${documentId}/fill`, as, {
+        versionNo: outline.versionNo,
+        fills: [{ part: outline.parts[0].id, mode: 'after', text }],
+        note: 'Made-up text for the exam',
+      }),
+    );
+  };
+
   const annex = await w.ok(
     w.call('POST', `/projects/${projectId}/documents`, 'lead', {
       stepKey: '5',
       documentType: 'BUDGET_ANNEX',
       title: 'Secret wombat costs',
+      fromForm: true,
     }),
   );
-  await w.ok(
-    w.call('POST', `/documents/${annex.id}/versions`, 'lead', {
-      fields: { material_cost: `${SECRETS.budget[0]} titanium allowance`, total_budget: '2' },
-    }),
+  await fillForm(
+    annex.id,
+    'lead',
+    `Material cost: ${SECRETS.budget[0]} titanium allowance.\nTotal budget: 2.`,
   );
 
   const material = 'Ti-6Al-4V ELI';
@@ -80,15 +94,13 @@ export async function buildEvalWorld(t: TestApp): Promise<{ w: World; facts: Eva
       stepKey: '5',
       documentType: 'ACTION_PLAN',
       title: 'Platypus plan',
+      fromForm: true,
     }),
   );
-  await w.ok(
-    w.call('POST', `/documents/${plan.id}/versions`, 'head', {
-      fields: { material },
-      sections: {
-        plan_notes: `${SECRETS.draft[0]}: the backup supplier is ${SECRETS.draft[1]}. ${PLANTED.draft}`,
-      },
-    }),
+  await fillForm(
+    plan.id,
+    'head',
+    `Raw material: ${material}.\nNotes: ${SECRETS.draft[0]}: the backup supplier is ${SECRETS.draft[1]}. ${PLANTED.draft}`,
   );
 
   const pmeTask = 'Polish the echidna fixture';

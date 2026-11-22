@@ -1,6 +1,6 @@
 'use client';
 
-import { ApiError, createDocument } from '@coal/shared';
+import { ApiError, createDocument, getTemplateLinks } from '@coal/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -11,23 +11,28 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { api } from '@/lib/api';
-import { queryKeys, useDocumentTypes } from '@/lib/queries';
+import { useOpenLink } from '@/lib/open-link';
+import { queryKeys, useDocumentTypes, useMe } from '@/lib/queries';
 import { ACCEPT_ALL, uploadFile } from '@/lib/upload';
 
-type Source = 'template' | 'upload';
+/** `template`: filled in COAL from a specification (parked). `copy`: a copy of the blank form. `upload`: the filled-in file. */
+type Source = 'template' | 'copy' | 'upload';
 
 /**
- * Starts a document on a step: from the active template of its type, or from a file the person
- * uploads (for types without a template yet, or when they prefer to). The API checks who may.
+ * Starts a document on a step. A template is Jayon's Word form: the person downloads the blank
+ * form and uploads it filled in, or starts a copy of it here to fill in with the assistant or in
+ * Word. A kind without a form takes an upload. The API checks who may.
  */
 export function AddDocument({ projectId, stepKey }: { projectId: string; stepKey: string }) {
   const t = useTranslations('documents');
   const router = useRouter();
   const queryClient = useQueryClient();
   const types = useDocumentTypes();
+  const me = useMe();
+  const link = useOpenLink();
   const [open, setOpen] = useState(false);
   const [code, setCode] = useState('');
-  const [preferred, setPreferred] = useState<Source>('template');
+  const [preferred, setPreferred] = useState<Source | null>(null);
   const [title, setTitle] = useState('');
   const [file, setFile] = useState<File | null>(null);
 
@@ -37,8 +42,16 @@ export function AddDocument({ projectId, stepKey }: { projectId: string; stepKey
       type.kind !== 'record' && (type.stepKeys.length === 0 || type.stepKeys.includes(stepKey)),
   );
   const type = options.find((o) => o.code === code);
-  const hasTemplate = type?.kind === 'template' && !!type.activeTemplate;
-  const source: Source = hasTemplate ? preferred : 'upload';
+  const active = type?.kind === 'template' ? type.activeTemplate : null;
+  // Filling in COAL from a specification is parked: it shows only where it is switched on and the template has one.
+  const canFill = !!me.data?.features.templateFilling && !!active?.hasSpec;
+  const source: Source = !active
+    ? 'upload'
+    : preferred && (preferred !== 'template' || canFill)
+      ? preferred
+      : canFill
+        ? 'template'
+        : 'copy';
 
   const create = useMutation({
     mutationFn: async () => {
@@ -50,6 +63,7 @@ export function AddDocument({ projectId, stepKey }: { projectId: string; stepKey
           documentType: code,
           ...(title.trim() && { title: title.trim() }),
           ...(fileId && { fileId }),
+          ...(source === 'copy' && { fromForm: true }),
         },
       });
     },
@@ -76,7 +90,7 @@ export function AddDocument({ projectId, stepKey }: { projectId: string; stepKey
   }
 
   const id = `add-doc-${stepKey}`;
-  const ready = code !== '' && (source === 'template' || !!file);
+  const ready = code !== '' && (source !== 'upload' || !!file);
   return (
     <form
       className="grid gap-3 rounded-md border bg-background p-3"
@@ -117,17 +131,50 @@ export function AddDocument({ projectId, stepKey }: { projectId: string; stepKey
           {t('noTemplate', { type: type.name })}
         </p>
       )}
-      {hasTemplate && type.activeTemplate && (
+      {active && (
+        <div className="grid gap-1.5 rounded-md bg-muted/50 p-3">
+          <p>{t('formExplain', { name: type?.name ?? '', n: active.version })}</p>
+          <div>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={link.pending}
+              onClick={() =>
+                link.open(
+                  async () =>
+                    (await api(getTemplateLinks, { params: { id: active.id } })).form?.url ?? null,
+                )
+              }
+            >
+              {t('downloadForm', { n: active.version })}
+            </Button>
+          </div>
+          <ProblemMessage error={link.error} />
+        </div>
+      )}
+      {active && (
         <fieldset className="grid gap-1.5">
           <legend className="mb-1 text-sm font-medium">{t('how')}</legend>
+          {canFill && (
+            <label className="flex items-center gap-2">
+              <input
+                type="radio"
+                name={`${id}-source`}
+                checked={source === 'template'}
+                onChange={() => setPreferred('template')}
+              />
+              {t('fromTemplate', { name: active.name, n: active.version })}
+            </label>
+          )}
           <label className="flex items-center gap-2">
             <input
               type="radio"
               name={`${id}-source`}
-              checked={source === 'template'}
-              onChange={() => setPreferred('template')}
+              checked={source === 'copy'}
+              onChange={() => setPreferred('copy')}
             />
-            {t('fromTemplate', { name: type.activeTemplate.name, n: type.activeTemplate.version })}
+            {t('fromCopy')}
           </label>
           <label className="flex items-center gap-2">
             <input

@@ -8,11 +8,13 @@ import {
   readable,
   specTitle,
   stepActions,
+  ungroundedNumbers,
   type CompareResponse,
   type DocumentContent,
   type DocumentDetail,
   type DocumentSummary,
   type FieldValue,
+  type FormFill,
   type SigningPreview,
   type SigningResult,
   type StepDefinition,
@@ -29,17 +31,21 @@ import {
   assertUsableEvidence,
   findFiles,
   linkTo,
+  readFileBytes,
   storeGeneratedFile,
   type FileRow,
 } from '../files/service';
 import {
   activeTemplate,
+  ensureFormFile,
   findTemplate,
   findTypeByCode,
   findTypesById,
+  specOf,
   type TemplateRow,
   type TypeRow,
 } from '../templates/service';
+import { fillParts, formOutline } from '../templates/sample-docx';
 import { findActiveUsersByRole } from '../users/service';
 import { assertMay, loadEnv, viewerOf } from '../rnd/env';
 import { activeMembers, findProjectByRun } from '../rnd/projects';
@@ -228,6 +234,8 @@ export interface NewDocument {
   documentType: string;
   title?: string | undefined;
   fileId?: string | undefined;
+  /** Start as a copy of the blank Word form of the approved template. */
+  fromForm?: boolean | undefined;
 }
 
 const fieldContext = (
@@ -252,10 +260,52 @@ async function nextNumber(tx: Tx, orgId: string, type: TypeRow, o: Opened): Prom
   });
 }
 
-const pdfOfUpload = (file: FileRow) =>
-  file.mimeType === 'application/pdf' && file.sha256
-    ? { fileId: file.id, sha256: file.sha256 }
-    : null;
+const DOCX_TYPE = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+const isWordFile = (file: Pick<FileRow, 'mimeType' | 'name'>) =>
+  file.mimeType === DOCX_TYPE || file.name.toLowerCase().endsWith('.docx');
+
+/** What a Word form says, for search: its title and its words. */
+function wordSearchText(title: string, bytes: Buffer): string {
+  try {
+    return [title, ...formOutline(bytes).parts.map((p) => p.text)]
+      .filter((text) => text.trim())
+      .join('\n');
+  } catch {
+    return title;
+  }
+}
+
+/**
+ * What an uploaded file needs to become a version people read and sign: a PDF (a PDF is its own; a
+ * Word file is turned into one while the version is saved, so a version never exists without it;
+ * other files, such as drawings, have none) and the words search finds it by.
+ */
+async function prepareFile(
+  deps: AppDeps,
+  tx: Tx,
+  orgId: string,
+  file: FileRow,
+  userId: string,
+  title: string,
+): Promise<{ pdf: { fileId: string; sha256: string } | null; searchText: string }> {
+  if (file.mimeType === 'application/pdf' && file.sha256) {
+    return { pdf: { fileId: file.id, sha256: file.sha256 }, searchText: title };
+  }
+  if (!isWordFile(file)) return { pdf: null, searchText: title };
+  const bytes = await readFileBytes(deps, file);
+  const pdfBytes = await deps.pdf.fromDocx(bytes, file.name);
+  const stored = await storeGeneratedFile(deps, tx, orgId, {
+    name: `${file.name.replace(/\.docx$/i, '')}.pdf`,
+    bytes: pdfBytes,
+    contentType: 'application/pdf',
+    userId,
+    derivedFrom: file.id,
+  });
+  return {
+    pdf: { fileId: stored.id, sha256: stored.sha256 as string },
+    searchText: wordSearchText(title, bytes),
+  };
+}
 
 export async function createDocument(
   deps: AppDeps,
@@ -302,11 +352,16 @@ export async function createDocument(
     let fileId: string | null = null;
     let contentSha256: string;
     let plan = type.signaturePlan;
+    /** The approved form this document started from, when it is a copy of it. */
+    let formVersion: number | null = null;
+    let searchText: string | null = null;
+    const filling = deps.config.templateFilling;
 
     if (input.fileId) {
+      // The filled-in form, or any file of this kind of document.
       const file = await assertUsableEvidence(tx, ctx.orgId, actor, input.fileId, 'fileId');
       fileId = file.id;
-      pdf = pdfOfUpload(file);
+      ({ pdf, searchText } = await prepareFile(deps, tx, ctx.orgId, file, actor.userId, title));
       contentSha256 = file.sha256 ?? sha256(file.id);
     } else {
       if (type.kind !== 'template') {
@@ -320,25 +375,60 @@ export async function createDocument(
           `There is no template for ${type.name} yet. Upload the document instead, or ask the VP or the R&D Head to add the template.`,
         );
       }
-      if (!template.spec.steps.includes(step.key)) {
-        throw validationFailed(
-          `The ${type.name} template is for step ${template.spec.steps.join(', ')}.`,
-          'stepKey',
+      if (input.fromForm || !filling || !template.spec) {
+        if (!input.fromForm) {
+          throw validationFailed(
+            `Download the blank ${type.name} form, fill it in, and upload it. Or start a copy of the form here, and fill it in Word or with the assistant.`,
+            'fileId',
+          );
+        }
+        // A copy of the approved blank form is draft 1: a Word file, with its PDF.
+        const form = await ensureFormFile(deps, ctx.orgId, template);
+        if (!form) throw notFound('form');
+        const bytes = await readFileBytes(deps, form);
+        const copy = await storeGeneratedFile(deps, tx, ctx.orgId, {
+          name: `${number}-v1.docx`,
+          bytes,
+          contentType: DOCX_TYPE,
+          userId: actor.userId,
+          derivedFrom: form.id,
+        });
+        const pdfBytes = await deps.pdf.fromDocx(bytes, `${number}-v1.docx`);
+        const pdfFile = await storeGeneratedFile(deps, tx, ctx.orgId, {
+          name: `${number}-v1.pdf`,
+          bytes: pdfBytes,
+          contentType: 'application/pdf',
+          userId: actor.userId,
+          derivedFrom: copy.id,
+        });
+        fileId = copy.id;
+        pdf = { fileId: pdfFile.id, sha256: pdfFile.sha256 as string };
+        contentSha256 = copy.sha256 as string;
+        searchText = wordSearchText(title, bytes);
+        formVersion = template.version;
+        template = null;
+      } else {
+        const spec = specOf(template);
+        if (!spec.steps.includes(step.key)) {
+          throw validationFailed(
+            `The ${type.name} template is for step ${spec.steps.join(', ')}.`,
+            'stepKey',
+          );
+        }
+        plan = {
+          rows: spec.signature_rows,
+          reviewedBy: spec.reviewed_by,
+          approvedBy: spec.approved_by,
+        };
+        content = buildContent(
+          spec,
+          fieldContext(placeholder, { number, title }, actor),
+          { fields: {}, sections: {} },
+          null,
         );
+        contentSha256 = hashContent(content);
+        pdf = await makePdf(deps, tx, ctx.orgId, template, content, `${number}-v1`, actor.userId);
       }
-      plan = {
-        rows: template.spec.signature_rows,
-        reviewedBy: template.spec.reviewed_by,
-        approvedBy: template.spec.approved_by,
-      };
-      content = buildContent(
-        template.spec,
-        fieldContext(placeholder, { number, title }, actor),
-        { fields: {}, sections: {} },
-        null,
-      );
-      contentSha256 = hashContent(content);
-      pdf = await makePdf(deps, tx, ctx.orgId, template, content, `${number}-v1`, actor.userId);
     }
 
     const [created] = await tx
@@ -364,7 +454,7 @@ export async function createDocument(
       contentSha256,
       fileId,
       pdf,
-      searchText: searchTextOf(title, content),
+      searchText: searchText ?? searchTextOf(title, content),
       note: '',
       createdBy: actor.userId,
       viaAi: ctx.viaAi,
@@ -380,6 +470,7 @@ export async function createDocument(
         type: type.code,
         stepKey: step.key,
         template: template?.version ?? null,
+        ...(formVersion !== null && { formVersion }),
       },
     });
     log.audit({
@@ -458,6 +549,7 @@ export async function saveVersion(
     let pdf: { fileId: string; sha256: string } | null = null;
     let fileId: string | null = null;
     let aiSections: string[] = [];
+    let searchText: string | null = null;
 
     if (o.doc.templateId) {
       if (input.fileId) {
@@ -467,9 +559,10 @@ export async function saveVersion(
         );
       }
       const template = (await findTemplate(tx, ctx.orgId, o.doc.templateId)) as TemplateRow;
+      const spec = specOf(template);
       if (ctx.viaAi && ctx.aiChat?.grounding) {
         // What the assistant writes must rest on what the person said and what the tools returned.
-        const problems = draftProblems(template.spec, input, {
+        const problems = draftProblems(spec, input, {
           said: ctx.aiChat.grounding.said,
           read: ctx.aiChat.grounding.read(),
         });
@@ -480,12 +573,12 @@ export async function saveVersion(
         }
       }
       content = buildContent(
-        template.spec,
+        spec,
         fieldContext(o, o.doc, actor),
         { fields: input.fields, sections: input.sections },
         latest.content,
       );
-      aiSections = aiSectionsAfter(template.spec, latest, content, input.sections, ctx.viaAi);
+      aiSections = aiSectionsAfter(spec, latest, content, input.sections, ctx.viaAi);
       contentSha256 = hashContent(content);
       // Saving what is already saved makes no new version.
       if (latest.status === 'draft' && latest.contentSha256 === contentSha256) {
@@ -504,7 +597,14 @@ export async function saveVersion(
       if (!input.fileId) throw validationFailed('Choose the new file.', 'fileId');
       const file = await assertUsableEvidence(tx, ctx.orgId, actor, input.fileId, 'fileId');
       fileId = file.id;
-      pdf = pdfOfUpload(file);
+      ({ pdf, searchText } = await prepareFile(
+        deps,
+        tx,
+        ctx.orgId,
+        file,
+        actor.userId,
+        o.doc.title,
+      ));
       contentSha256 = file.sha256 ?? sha256(file.id);
     }
 
@@ -516,7 +616,7 @@ export async function saveVersion(
       contentSha256,
       fileId,
       pdf,
-      searchText: searchTextOf(o.doc.title, content),
+      searchText: searchText ?? searchTextOf(o.doc.title, content),
       note: input.note,
       createdBy: actor.userId,
       viaAi: ctx.viaAi,
@@ -528,6 +628,183 @@ export async function saveVersion(
       recordType: 'document_version',
       recordId: version.id,
       after: { number: o.doc.number, versionNo, contentSha256, pdfSha256: pdf?.sha256 ?? null },
+    });
+    log.event({
+      type: 'document.version_saved',
+      projectId: o.viewer.facts.projectId,
+      stepKey: o.step.key,
+      payload: { documentId: o.doc.id, number: o.doc.number, versionNo },
+    });
+    return presentDocument(
+      tx,
+      o.viewer,
+      (await findDocument(tx, ctx.orgId, o.doc.id)) as DocumentRow,
+    );
+  });
+}
+
+// A Word form the assistant fills in
+
+/** The Word file of a document's latest version that the person may see, or why there is none. */
+async function wordFileOf(
+  ex: Executor,
+  deps: AppDeps,
+  orgId: string,
+  versions: VersionRow[],
+): Promise<{ version: VersionRow; file: FileRow; bytes: Buffer }> {
+  const version = versions[0];
+  // Nothing the person may see (a draft is for the people who work on it): the document is not there for them.
+  if (!version) throw notFound('document');
+  const [file] = version?.fileId ? await findFiles(ex, orgId, [version.fileId]) : [];
+  if (!version || !file || !isWordFile(file)) {
+    throw validationFailed(
+      'This document is not a Word file, so it cannot be read or filled here.',
+      'id',
+    );
+  }
+  return { version, file, bytes: await readFileBytes(deps, file) };
+}
+
+export async function readForm(deps: AppDeps, ctx: RequestContext, actor: Actor, id: string) {
+  const o = await openDocument(deps.db, ctx, actor, id);
+  const access = await fullAccess(deps.db, o);
+  const visible = visibleVersions(
+    access,
+    (await versionsOf(deps.db, [o.doc.id])).get(o.doc.id) ?? [],
+  );
+  const { version, file, bytes } = await wordFileOf(deps.db, deps, ctx.orgId, visible);
+  let outline: ReturnType<typeof formOutline>;
+  try {
+    outline = formOutline(bytes);
+  } catch (error) {
+    throw validationFailed(
+      error instanceof Error ? error.message : 'The Word file could not be read.',
+      'id',
+    );
+  }
+  return {
+    documentId: o.doc.id,
+    number: o.doc.number,
+    title: o.doc.title,
+    versionNo: version.versionNo,
+    file: { name: file.name },
+    parts: outline.parts,
+    notes: outline.notes,
+  };
+}
+
+/**
+ * Fills a Word document in place and saves the result as a new draft version, with its PDF. What
+ * the assistant writes must rest on what the person said and what its tools returned, as in a
+ * draft made from a specification: a number nobody gave is refused.
+ */
+export async function fillForm(
+  deps: AppDeps,
+  ctx: RequestContext,
+  actor: Actor,
+  id: string,
+  input: { versionNo: number; fills: FormFill[]; note: string },
+): Promise<DocumentDetail> {
+  return change(deps.db, ctx, async (tx, log) => {
+    const o = await openDocument(tx, ctx, actor, id, { forUpdate: true });
+    assertMay(o.env, 'documents.write', [...o.step.doers]);
+    await fullAccess(tx, o);
+    if (o.type.kind === 'record') {
+      throw new AppError(409, 'DOCUMENT_LOCKED', 'COAL makes this record; it cannot be edited.');
+    }
+    assertStepOpen(o);
+    const versions = (await versionsOf(tx, [o.doc.id])).get(o.doc.id) ?? [];
+    const latest = versions[0] as VersionRow;
+    if (latest.status === 'in_review') {
+      throw new AppError(
+        409,
+        'DOCUMENT_LOCKED',
+        'This version is with its signers. Wait for them, or ask a signer to return it.',
+      );
+    }
+    if (latest.versionNo !== input.versionNo) {
+      throw new AppError(
+        409,
+        'VERSION_CONFLICT',
+        `The document is now at version ${latest.versionNo}, not ${input.versionNo}. Read it again, then fill it in.`,
+      );
+    }
+    const { file, bytes } = await wordFileOf(tx, deps, ctx.orgId, versions);
+
+    if (ctx.viaAi && ctx.aiChat?.grounding) {
+      const sources = `${ctx.aiChat.grounding.said}\n${ctx.aiChat.grounding.read()}`;
+      const problems = input.fills.flatMap((fill) => {
+        const numbers = ungroundedNumbers(fill.text, sources);
+        return numbers.length > 0
+          ? [
+              `${fill.part} states ${numbers.join(', ')}, which no source gave. Take it out, or ask the person for it.`,
+            ]
+          : [];
+      });
+      if (problems.length > 0) {
+        throw new AppError(400, 'VALIDATION_FAILED', 'The text did not pass its checks.', {
+          errors: problems.map((message) => ({ path: 'fills', message })),
+        });
+      }
+    }
+
+    const filled = fillParts(bytes, input.fills);
+    if (filled.problems.length > 0) {
+      throw new AppError(400, 'VALIDATION_FAILED', 'The form could not be filled in.', {
+        errors: filled.problems.map((message) => ({ path: 'fills', message })),
+      });
+    }
+    const contentSha256 = sha256(filled.docx);
+    // Filling in what is already there makes no new version.
+    if (latest.status === 'draft' && latest.contentSha256 === contentSha256) {
+      return presentDocument(tx, o.viewer, o.doc);
+    }
+
+    const versionNo = latest.versionNo + 1;
+    const name = `${o.doc.number}-v${versionNo}`;
+    const stored = await storeGeneratedFile(deps, tx, ctx.orgId, {
+      name: `${name}.docx`,
+      bytes: filled.docx,
+      contentType: DOCX_TYPE,
+      userId: actor.userId,
+      derivedFrom: file.id,
+    });
+    const pdfBytes = await deps.pdf.fromDocx(filled.docx, `${name}.docx`);
+    const pdfFile = await storeGeneratedFile(deps, tx, ctx.orgId, {
+      name: `${name}.pdf`,
+      bytes: pdfBytes,
+      contentType: 'application/pdf',
+      userId: actor.userId,
+      derivedFrom: stored.id,
+    });
+    const pdf = { fileId: pdfFile.id, sha256: pdfFile.sha256 as string };
+
+    const version = await insertVersion(tx, ctx.orgId, {
+      documentId: o.doc.id,
+      runStepId: o.env.loaded.stepIds.get(o.step.key) as string,
+      iteration: o.env.loaded.state.steps[o.step.key]?.iteration ?? 1,
+      content: null,
+      contentSha256: stored.sha256 as string,
+      fileId: stored.id,
+      pdf,
+      searchText: wordSearchText(o.doc.title, filled.docx),
+      note: input.note || (ctx.viaAi ? 'Filled in with the assistant' : 'Filled in'),
+      createdBy: actor.userId,
+      viaAi: ctx.viaAi,
+      aiRequestId: ctx.viaAi ? (ctx.aiChat?.requestId ?? null) : null,
+      aiSections: [],
+    });
+    log.audit({
+      action: 'document.version_saved',
+      recordType: 'document_version',
+      recordId: version.id,
+      after: {
+        number: o.doc.number,
+        versionNo,
+        contentSha256: stored.sha256,
+        pdfSha256: pdf.sha256,
+        filledParts: input.fills.length,
+      },
     });
     log.event({
       type: 'document.version_saved',
@@ -636,7 +913,7 @@ export async function compareVersions(
   return {
     from: { versionNo: a.versionNo, revLabel: a.revLabel },
     to: { versionNo: b.versionNo, revLabel: b.revLabel },
-    ...compareContent(template.spec, a.content, b.content),
+    ...compareContent(specOf(template), a.content, b.content),
   };
 }
 
@@ -719,7 +996,7 @@ export async function submitVersion(
     }
     if (o.doc.templateId && version.content) {
       const template = (await findTemplate(tx, ctx.orgId, o.doc.templateId)) as TemplateRow;
-      const missing = missingRequired(template.spec, version.content);
+      const missing = missingRequired(specOf(template), version.content);
       if (missing.length > 0) {
         throw validationFailed(`Fill in ${missing.join(', ')} before submitting.`, 'fields');
       }

@@ -40,6 +40,8 @@ interface Props {
   uploading: boolean;
   onAttach: (file: File) => void;
   onDetach: (id: string) => void;
+  /** The paperclip's only use is a sample to make a template from, which is parked (docs/documents-and-signing.md). */
+  canAttach: boolean;
 }
 
 /** The message box: Enter sends, `/` lists commands, `@` finds people, projects and documents. */
@@ -54,6 +56,7 @@ export function Composer({
   uploading,
   onAttach,
   onDetach,
+  canAttach,
 }: Props) {
   const t = useTranslations('workstation');
   const [caret, setCaret] = useState(0);
@@ -217,29 +220,33 @@ export function Composer({
         </ul>
       )}
       <div className="flex items-end gap-2">
-        <input
-          ref={fileInput}
-          type="file"
-          hidden
-          accept={SAMPLE_ACCEPT}
-          aria-label={t('composer.attach')}
-          onChange={(e) => {
-            const chosen = e.target.files?.[0];
-            e.target.value = '';
-            if (chosen) onAttach(chosen);
-          }}
-        />
-        <Button
-          type="button"
-          size="icon"
-          variant="outline"
-          disabled={replying || uploading || attached.length >= 3}
-          title={t('composer.attachHelp')}
-          onClick={() => fileInput.current?.click()}
-        >
-          <Paperclip aria-hidden />
-          <span className="sr-only">{t('composer.attach')}</span>
-        </Button>
+        {canAttach && (
+          <>
+            <input
+              ref={fileInput}
+              type="file"
+              hidden
+              accept={SAMPLE_ACCEPT}
+              aria-label={t('composer.attach')}
+              onChange={(e) => {
+                const chosen = e.target.files?.[0];
+                e.target.value = '';
+                if (chosen) onAttach(chosen);
+              }}
+            />
+            <Button
+              type="button"
+              size="icon"
+              variant="outline"
+              disabled={replying || uploading || attached.length >= 3}
+              title={t('composer.attachHelp')}
+              onClick={() => fileInput.current?.click()}
+            >
+              <Paperclip aria-hidden />
+              <span className="sr-only">{t('composer.attach')}</span>
+            </Button>
+          </>
+        )}
         <textarea
           ref={inputRef}
           value={value}

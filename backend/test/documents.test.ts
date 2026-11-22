@@ -17,7 +17,7 @@ let t: TestApp;
 let w: World;
 
 beforeAll(async () => {
-  t = await createTestApp();
+  t = await createTestApp({ TEMPLATE_FILLING: 'true' });
   w = await createWorld(t);
   await loadSampleTemplates(t.deps, systemContext(DEFAULT_ORG_ID));
 });

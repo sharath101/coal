@@ -28,7 +28,15 @@ export const DocumentTypeView = TypeRef.extend({
   stepKeys: z.array(StepKey),
   signatureRows: z.array(z.string()),
   /** The version people use to make new documents, if the library has one. */
-  activeTemplate: z.object({ id: Id, version: z.number().int(), name: z.string() }).nullable(),
+  activeTemplate: z
+    .object({
+      id: Id,
+      version: z.number().int(),
+      name: z.string(),
+      /** A specification says what to fill in COAL; a plain form is Jayon's Word file as it is. */
+      hasSpec: z.boolean(),
+    })
+    .nullable(),
 });
 export type DocumentTypeView = z.infer<typeof DocumentTypeView>;
 
@@ -61,7 +69,8 @@ export const TemplateSummary = z.object({
 export type TemplateSummary = z.infer<typeof TemplateSummary>;
 
 export const TemplateDetail = TemplateSummary.extend({
-  spec: TemplateSpec,
+  /** Null for a plain Word form, which has no specification (docs/documents-and-signing.md#the-template-library). */
+  spec: TemplateSpec.nullable(),
   notes: z.string(),
   can: z.object({ activate: z.boolean() }),
 });
@@ -140,7 +149,7 @@ export const activateTemplate = defineEndpoint({
   id: 'templates.activate',
   method: 'POST',
   path: '/templates/{id}/activate',
-  summary: 'Make a draft version active. The previous active version is retired, and kept',
+  summary: 'Approve a version: it becomes the one in use, and the previous one is retired and kept',
   auth: 'session',
   permission: 'templates.activate',
   aiTier: 'never',
@@ -153,12 +162,17 @@ export const getTemplateLinks = defineEndpoint({
   method: 'GET',
   path: '/templates/{id}/links',
   summary:
-    "Short-lived links to a template's sample PDF, and its Word file for the VP and the Head",
+    "Short-lived links to a template's PDF, to its blank Word form (for everyone, once it is the approved version) and to the Word file as it was uploaded (the VP and the Head)",
   auth: 'session',
   permission: 'templates.read',
   aiTier: 'read',
   params: IdParams,
-  response: z.object({ sample: FileLink.nullable(), docx: FileLink.nullable() }),
+  response: z.object({
+    sample: FileLink.nullable(),
+    /** The blank Word form people fill in: the approved version, with any placeholders emptied. */
+    form: FileLink.nullable(),
+    docx: FileLink.nullable(),
+  }),
 });
 
 // Making a template from a sample document (docs/workstation-and-ai.md#making-a-template-from-a-sample-document)

@@ -141,7 +141,6 @@ describe('scanning uploads', () => {
     const res = await w.call('POST', '/templates', 'vp', {
       documentType: 'PID',
       docxFileId: fileId,
-      spec,
     });
     expect(res.status).toBe(201);
     // The file was scanned when it was uploaded, and the bytes COAL checks are scanned again.

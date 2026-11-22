@@ -1,6 +1,7 @@
 'use client';
 
 import { getVersionLinks, type DocumentDetail } from '@coal/shared';
+import { Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -21,6 +22,10 @@ import { api } from '@/lib/api';
 import { formatDateTime, formatSize } from '@/lib/format';
 import { useOpenLink } from '@/lib/open-link';
 import { useAfterDocumentChange, useDocument, useProjectRoute } from '@/lib/queries';
+import { workstationHref } from '@/lib/workstation';
+
+const isPdf = (mimeType: string) => mimeType === 'application/pdf';
+const isWord = (mimeType: string) => mimeType.includes('wordprocessingml');
 
 /**
  * One document: its versions, the form (or the read-only view) of the version you're on, its PDF,
@@ -135,14 +140,14 @@ export default function DocumentPage() {
                       {t('openPdf')}
                     </Button>
                   )}
-                  {current.file && !current.hasPdf && (
+                  {current.file && (!current.hasPdf || !isPdf(current.file.mimeType)) && (
                     <Button
                       size="sm"
                       variant="outline"
                       disabled={link.pending}
                       onClick={() => open('file')}
                     >
-                      {t('openFile')}
+                      {isWord(current.file.mimeType) ? t('downloadWord') : t('openFile')}
                     </Button>
                   )}
                 </div>
@@ -190,6 +195,21 @@ export default function DocumentPage() {
                     {current.file.mimeType} · {formatSize(current.file.size)}
                   </p>
                 </div>
+                {doc.can.edit && isWord(current.file.mimeType) && (
+                  <div className="grid gap-2 rounded-lg border bg-muted/40 p-4 text-sm">
+                    <p>{t('wordHow')}</p>
+                    <div>
+                      <Button asChild size="sm" variant="outline">
+                        <Link
+                          href={workstationHref({ projectId, documentId: doc.id }, t('fillSay'))}
+                        >
+                          <Sparkles aria-hidden />
+                          {t('fillWithAssistant')}
+                        </Link>
+                      </Button>
+                    </div>
+                  </div>
+                )}
                 {doc.can.edit && <UploadVersion doc={doc} onChanged={changed} />}
               </div>
             ) : current.content ? (
