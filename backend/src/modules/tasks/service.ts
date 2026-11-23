@@ -1,9 +1,10 @@
-import { dateOfInstant, workingDaysBetween, type Task } from '@coal/shared';
+import { dateOfInstant, workingDaysBetween, type SignOffWait, type Task } from '@coal/shared';
 import { and, desc, eq, ilike, inArray, isNull, ne, or, sql, type SQL } from 'drizzle-orm';
 import type { Executor, Tx } from '../../core/db/client';
 import { msOf } from '../../core/db/columns';
 import { containing, wordsQuery } from '../../core/db/search';
 import { notFound, validationFailed } from '../../core/http/errors';
+import { latestEventsOfRunSteps } from '../events/service';
 import { listRoles } from '../org/service';
 import { loadCalendar } from '../schedule/calendar';
 import { findUsersByIds } from '../users/service';
@@ -93,6 +94,116 @@ export async function closeTasks(
     })
     .where(and(...conditions))
     .returning();
+}
+
+/** The event written when the doers remind a step's signers. */
+export const SIGNERS_REMINDED = 'signature.reminded';
+
+/** The sign-off tasks nobody has signed yet, for each of these run steps. */
+export async function unsignedSignTasks(
+  ex: Executor,
+  runStepIds: string[],
+): Promise<Map<string, TaskRow[]>> {
+  if (runStepIds.length === 0) return new Map();
+  const rows = await ex
+    .select()
+    .from(tasks)
+    .where(
+      and(
+        inArray(tasks.runStepId, runStepIds),
+        eq(tasks.kind, 'sign'),
+        inArray(tasks.status, ['open', 'in_progress']),
+      ),
+    )
+    .orderBy(tasks.createdAt, tasks.id);
+  const byStep = new Map<string, TaskRow[]>();
+  for (const row of rows) {
+    const key = row.runStepId as string;
+    byStep.set(key, [...(byStep.get(key) ?? []), row]);
+  }
+  return byStep;
+}
+
+/**
+ * What a step that is with its signers waits on (docs/dashboard.md#widgets): the signers who have
+ * not signed yet, since when, their date, how late they are, and the last reminder since it was
+ * handed in. Steps with no unsigned sign-off task are left out.
+ */
+export async function signOffWaits(
+  ex: Executor,
+  orgId: string,
+  runStepIds: string[],
+  now: Date = new Date(),
+): Promise<Map<string, SignOffWait>> {
+  const unsigned = await unsignedSignTasks(ex, [...new Set(runStepIds)]);
+  if (unsigned.size === 0) return new Map();
+  const [reminders, roleList, cal, handedIn] = await Promise.all([
+    latestEventsOfRunSteps(ex, orgId, SIGNERS_REMINDED, [...unsigned.keys()]),
+    listRoles(ex, orgId),
+    loadCalendar(ex, orgId),
+    // When the doers handed it in: their tasks have waited since then.
+    ex
+      .select({
+        runStepId: tasks.runStepId,
+        at: sql<string>`min(${tasks.handedInAt})`,
+      })
+      .from(tasks)
+      .where(and(inArray(tasks.runStepId, [...unsigned.keys()]), eq(tasks.status, 'waiting')))
+      .groupBy(tasks.runStepId),
+  ]);
+  const handedInAt = new Map(
+    handedIn.flatMap((r) => (r.runStepId && r.at ? [[r.runStepId, new Date(r.at)] as const] : [])),
+  );
+  const people = await findUsersByIds(ex, orgId, [
+    ...[...unsigned.values()].flat().flatMap((t) => (t.assigneeId ? [t.assigneeId] : [])),
+    ...[...reminders.values()].flatMap((e) => (e.actorId ? [e.actorId] : [])),
+  ]);
+  const nameOf = new Map(people.map((p) => [p.id, p.name]));
+  const roleName = new Map(roleList.map((r) => [r.key, r.name]));
+  const today = dateOfInstant(now);
+  const waits = new Map<string, SignOffWait>();
+  for (const [runStepId, signTasks] of unsigned) {
+    const first = signTasks[0] as TaskRow;
+    const signer = first.roleKey ?? first.queueRole ?? '';
+    const since =
+      handedInAt.get(runStepId) ??
+      signTasks.reduce((a, t) => (t.createdAt < a ? t.createdAt : a), first.createdAt);
+    const dueOn = signTasks.reduce<string | null>(
+      (a, t) => (t.dueOn && (!a || t.dueOn < a) ? t.dueOn : a),
+      null,
+    );
+    const reminder = reminders.get(runStepId);
+    // When it was reminded, by the clock of the request (tests move it), else when it was written.
+    const at = reminder ? (reminder.payload as { at?: unknown }).at : undefined;
+    const remindedAt = reminder
+      ? typeof at === 'string'
+        ? new Date(at)
+        : reminder.createdAt
+      : null;
+    const lastReminder =
+      reminder && remindedAt && remindedAt >= since
+        ? {
+            at: remindedAt.toISOString(),
+            by: {
+              id: reminder.actorId ?? '',
+              name: (reminder.actorId && nameOf.get(reminder.actorId)) || 'Someone',
+            },
+          }
+        : null;
+    waits.set(runStepId, {
+      signer: { key: signer, name: roleName.get(signer) ?? signer },
+      pending: signTasks.flatMap((t) =>
+        t.assigneeId ? [{ id: t.assigneeId, name: nameOf.get(t.assigneeId) ?? 'Unknown' }] : [],
+      ),
+      queued: signTasks.some((t) => !t.assigneeId),
+      since: since.toISOString(),
+      dueOn,
+      daysLate: dueOn && today > dueOn ? workingDaysBetween(cal, dueOn, today) : 0,
+      lastReminder,
+      remindedToday: !!lastReminder && dateOfInstant(new Date(lastReminder.at)) === today,
+    });
+  }
+  return waits;
 }
 
 export async function countOpenCorrectiveActions(ex: Executor, runId: string): Promise<number> {
@@ -435,6 +546,12 @@ export async function presentTasks(
   const nameOf = new Map(people.map((p) => [p.id, p.name]));
   const roleName = new Map(roleList.map((r) => [r.key, r.name]));
   const today = dateOfInstant(now);
+  const waits = await signOffWaits(
+    ex,
+    orgId,
+    rows.flatMap((r) => (r.status === 'waiting' && r.runStepId ? [r.runStepId] : [])),
+    now,
+  );
   return rows.map((row) => ({
     id: row.id,
     kind: row.kind,
@@ -460,6 +577,7 @@ export async function presentTasks(
         : null,
     onPlan: row.runStepId !== null,
     followsStep: followsStep(row),
+    waitingOn: (row.status === 'waiting' && row.runStepId && waits.get(row.runStepId)) || null,
     // Someone else gave it; a task I claimed or made for myself has no giver to show.
     assignedBy:
       row.assignedBy && row.assignedBy !== row.assigneeId

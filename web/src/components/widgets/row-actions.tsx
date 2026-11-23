@@ -1,10 +1,11 @@
 'use client';
 
-import { markNotificationRead, updateTask, type WidgetRow } from '@coal/shared';
+import { markNotificationRead, remindSigners, updateTask, type WidgetRow } from '@coal/shared';
 import { useMutation } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { RecordDeviationDialog } from '@/components/deviation-dialog';
 import { ProblemMessage } from '@/components/problem-message';
 import { ReturnRequestDialog, SignRequestDialog } from '@/components/row-signing-dialogs';
@@ -14,7 +15,7 @@ import { api } from '@/lib/api';
 import { isDeviationRequired } from '@/lib/deviation';
 import { useRefreshWork } from '@/lib/queries';
 
-type Dialog = 'late' | 'time' | 'sign' | 'return' | null;
+type Dialog = 'late' | 'time' | 'sign' | 'return' | 'remind' | null;
 
 /** Whether the row has anything to do on it: reassigning needs a page to go to. */
 export function rowHasActions(row: WidgetRow): boolean {
@@ -28,9 +29,10 @@ export function rowHasActions(row: WidgetRow): boolean {
  */
 export function RowActions({ row }: { row: WidgetRow }) {
   const t = useTranslations('widgets');
+  const tWait = useTranslations('signOffWait');
   const refresh = useRefreshWork();
   const [dialog, setDialog] = useState<Dialog>(null);
-  const { taskId, requestId, notificationId } = row.ref;
+  const { taskId, requestId, notificationId, projectId, stepKey } = row.ref;
   const has = (action: string) => row.actions.includes(action);
 
   const setStatus = (status: 'in_progress' | 'done') =>
@@ -61,6 +63,13 @@ export function RowActions({ row }: { row: WidgetRow }) {
     mutationFn: () => api(markNotificationRead, { params: { id: notificationId ?? '' } }),
     onSuccess: refresh,
   });
+  const remind = useMutation({
+    mutationFn: () => api(remindSigners, { params: { id: projectId ?? '', key: stepKey ?? '' } }),
+    onSuccess: () => {
+      setDialog(null);
+      void refresh();
+    },
+  });
   const busy = start.isPending || done.isPending || read.isPending;
   const error = start.error ?? done.error ?? read.error;
   const hideError = confirming !== null || (dialog === 'late' && isDeviationRequired(done.error));
@@ -87,6 +96,11 @@ export function RowActions({ row }: { row: WidgetRow }) {
         {taskId && has('more_time') && (
           <Button {...small} onClick={() => setDialog('time')}>
             {t('actions.more_time')}
+          </Button>
+        )}
+        {projectId && stepKey && has('remind') && (
+          <Button {...small} onClick={() => setDialog('remind')}>
+            {t('actions.remind')}
           </Button>
         )}
         {requestId && has('sign') && (
@@ -132,6 +146,26 @@ export function RowActions({ row }: { row: WidgetRow }) {
             }}
           />
         </>
+      )}
+      {projectId && stepKey && has('remind') && (
+        <ConfirmDialog
+          open={dialog === 'remind'}
+          onOpenChange={(open) => {
+            if (!open) {
+              setDialog(null);
+              remind.reset();
+            }
+          }}
+          title={tWait('confirmTitle', { step: stepKey })}
+          text={tWait('confirmText', {
+            names: String(row.cells.waitingOn ?? ''),
+            step: stepKey,
+          })}
+          confirmLabel={tWait('remind')}
+          onConfirm={() => remind.mutate()}
+          pending={remind.isPending}
+          error={remind.error}
+        />
       )}
       {requestId && (
         <>

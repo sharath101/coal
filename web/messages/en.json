@@ -318,7 +318,9 @@
     "upload_transfer": "The file couldn't be sent. Check your connection and try again.",
     "generic": "Something went wrong. Try again.",
     "USE_THE_STEP": "This task belongs to a step, so it follows the step. Start the step and submit it for sign-off from the step, and the task closes when the step is signed off.",
-    "SOURCE_UNAVAILABLE": "A public source didn't answer. Try again later."
+    "SOURCE_UNAVAILABLE": "A public source didn't answer. Try again later.",
+    "NOT_WITH_SIGNERS": "This step isn't waiting for a sign-off, so there is nobody to remind.",
+    "ALREADY_REMINDED": "They were already reminded today. They can be reminded again tomorrow."
   },
   "confirm": {
     "cancel": "Cancel",
@@ -478,6 +480,7 @@
     "tasks": "Tasks",
     "noTasks": "No open tasks.",
     "queued": "{role} queue",
+    "notSignedYet": "Not signed yet",
     "checkpoint": "Checkpoint",
     "newStep": "New",
     "decisions": "Decisions",
@@ -601,6 +604,19 @@
     "followsStepWaiting": "With the signer for step {key}. This task closes when the step is signed off.",
     "followsStepSign": "Sign this off from step {key}. The task closes when you have signed."
   },
+  "signOffWait": {
+    "with": "With the {role} since {since}.",
+    "notSigned": "Not signed yet: {names}.",
+    "queue": "the {role} queue",
+    "dueBy": "Their date is {date}.",
+    "late": "Their date was {date}, {count, plural, one {# working day} other {# working days}} ago.",
+    "lateBadge": "{role}: {count, plural, one {# working day} other {# working days}} late",
+    "remindedToday": "{name} reminded them today.",
+    "remindedOn": "{name} last reminded them on {date}.",
+    "remind": "Remind them",
+    "confirmTitle": "Remind the signers of step {step}?",
+    "confirmText": "{names} will get a notification that the sign-off on step {step} is waiting for them. They can be reminded once a day."
+  },
   "activity": {
     "by": "{name}",
     "system": "COAL",
@@ -636,6 +652,7 @@
       "document_carried_forward": "A document was carried forward into the new iteration",
       "signature_requested": "A document is waiting for a signature",
       "signature_signed": "A document was signed",
+      "signature_reminded": "The signers of step {step} were reminded",
       "attachment_added": "A file was attached",
       "source_added": "A source was added"
     },
@@ -1155,6 +1172,7 @@
       "kind": "Kind",
       "due": "Due",
       "status": "State",
+      "waitingOn": "Waiting on",
       "what": "What",
       "row": "Signs as",
       "waiting": "Waiting",
@@ -1194,6 +1212,7 @@
       "start": "Start",
       "done": "Mark done",
       "more_time": "More time",
+      "remind": "Remind them",
       "sign": "Sign",
       "return": "Return",
       "mark_read": "Mark as read",

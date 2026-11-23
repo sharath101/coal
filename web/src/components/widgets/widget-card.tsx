@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils';
 
 /** The cells shown under a row on the compact card: the date or number that matters most. */
 const COMPACT_CELLS: Record<WidgetKey, string[]> = {
-  'my-tasks': ['due'],
+  'my-tasks': ['due', 'waitingOn'],
   'waiting-signature': ['row', 'waiting'],
   'coming-up': ['starts'],
   'upcoming-checkpoints': ['date'],
@@ -118,11 +118,15 @@ export function WidgetCard({ info, onOpen }: { info: WidgetInfo; onOpen: () => v
                         </span>
                       )}
                       <span className="flex flex-wrap gap-x-3 text-xs text-muted-foreground">
-                        {COMPACT_CELLS[info.key].map((column) => (
-                          <span key={column}>
-                            {t(`columns.${column}` as never)} {cellText(column, row.cells[column])}
-                          </span>
-                        ))}
+                        {/* A cell with nothing in it is left out, so a row says only what it has. */}
+                        {COMPACT_CELLS[info.key]
+                          .filter((column) => (row.cells[column] ?? '') !== '')
+                          .map((column) => (
+                            <span key={column}>
+                              {t(`columns.${column}` as never)}{' '}
+                              {cellText(column, row.cells[column])}
+                            </span>
+                          ))}
                       </span>
                     </div>
                     <RowBadges badges={row.badges} />

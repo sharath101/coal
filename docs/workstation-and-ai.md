@@ -232,8 +232,8 @@ Each tool is a thin wrapper over one endpoint, takes that endpoint's AI tier, an
 | Tool | Endpoint | Tier | For |
 |---|---|---|---|
 | `search` | `GET /search` | read | Finding a project, document, task or person without an id |
-| `my_tasks` | `GET /tasks` | read | What is assigned to the person, waiting in their queue, or given by them |
-| `list_projects`, `get_project`, `get_route`, `get_timeline` | projects, route and timeline | read | Where a project is, what comes next, its dates and delays |
+| `my_tasks` | `GET /tasks` | read | What is assigned to the person, waiting in their queue, or given by them; a task waiting on its signers says who has not signed and how late they are |
+| `list_projects`, `get_project`, `get_route`, `get_timeline` | projects, route and timeline | read | Where a project is, what comes next, its dates and delays, and who a handed-in step waits on |
 | `list_deviations` | `GET /deviations` | read | Why work is late |
 | `list_documents`, `read_document`, `compare_versions` | documents | read | What a document says, and what changed |
 | `active_template` | `GET /templates/active` | read | The template in use for a document type (asked for every time): its name and version, and whether it is a plain Word form |

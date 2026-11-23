@@ -254,6 +254,94 @@ describe('reminders and escalation', () => {
   });
 });
 
+describe('reminding the signers', () => {
+  it('shows the doers who a handed-in step waits on, and lets them remind the signers once a day', async () => {
+    const id = await w.go(fresh('Board wait'));
+    await w.advance(id, '3');
+    await w.attach(id, '4');
+    await ok(call('POST', `/projects/${id}/steps/4/submit`, 'vp'));
+
+    const step = await w.stepOf(id, '4', 'vp');
+    expect(step.withSigners).toMatchObject({
+      signer: { key: 'board', name: 'Board' },
+      pending: [{ name: 'Mira Example' }, { name: 'Chet Example' }],
+      queued: false,
+      daysLate: 0,
+      lastReminder: null,
+      remindedToday: false,
+    });
+    expect(step.actions.remind).toBe(true);
+    // The VP's own task waits on the Board, and says so.
+    const mine = (await ok(call('GET', '/tasks?limit=100', 'vp'))).items.find(
+      (x: any) => x.subject?.id === id && x.stepKey === '4' && x.kind === 'work',
+    );
+    expect(mine).toMatchObject({ status: 'waiting', daysLate: 0 });
+    expect(mine.waitingOn.pending.map((p: any) => p.name)).toEqual([
+      'Mira Example',
+      'Chet Example',
+    ]);
+
+    // Only the doers may remind: not the signers, nor anyone else.
+    for (const as of ['md', 'head', 'designer']) {
+      expect((await call('POST', `/projects/${id}/steps/4/remind`, as)).status, as).toBe(403);
+    }
+    // Step 5 is the Lead's, and it is not with its signer.
+    expect((await call('POST', `/projects/${id}/steps/5/remind`, 'lead')).body.code).toBe(
+      'NOT_WITH_SIGNERS',
+    );
+
+    // One member signs; only the other is still to sign, and only they are reminded.
+    await ok(call('POST', `/projects/${id}/steps/4/approve`, 'md'));
+    const reminded = await ok(call('POST', `/projects/${id}/steps/4/remind`, 'vp'));
+    expect(reminded.reminded.map((p: any) => p.name)).toEqual(['Chet Example']);
+    await drain();
+    const toCeo = (await inbox('ceo')).items.filter(
+      (n) => n.projectId === id && n.eventType === 'signature.reminded',
+    );
+    expect(toCeo).toHaveLength(1);
+    expect(toCeo[0]).toMatchObject({
+      kind: 'reminder',
+      title: 'Vera Example reminded you to sign off step 4',
+      link: `/projects/${id}?step=4`,
+    });
+    expect(toCeo[0].body).toMatch(
+      /^A signature on SPN-\d\d-\d+, step 4, Board approval, has waited \d+ working days\.$/,
+    );
+    expect(
+      (await inbox('md')).items.some(
+        (n) => n.projectId === id && n.eventType === 'signature.reminded',
+      ),
+    ).toBe(false);
+
+    // Once a day: the second is refused, and everyone sees who reminded them.
+    const again = await call('POST', `/projects/${id}/steps/4/remind`, 'vp');
+    expect(again.status).toBe(409);
+    expect(again.body.code).toBe('ALREADY_REMINDED');
+    const after = await w.stepOf(id, '4', 'vp');
+    expect(after.withSigners).toMatchObject({
+      pending: [{ name: 'Chet Example' }],
+      remindedToday: true,
+      lastReminder: { by: { name: 'Vera Example' } },
+    });
+    expect(after.actions.remind).toBe(false);
+
+    // Days later the Board is late: that is theirs, so the step asks the VP for no reason, and the
+    // VP may remind them again.
+    const real = t.deps.now;
+    t.deps.now = () => new Date(Date.now() + 10 * 86_400_000);
+    try {
+      const late = await w.stepOf(id, '4', 'vp');
+      expect(late.daysLate).toBeGreaterThan(0);
+      expect(late.needsDeviation).toBe(false);
+      expect(late.withSigners.daysLate).toBeGreaterThan(0);
+      expect(late.withSigners.remindedToday).toBe(false);
+      await ok(call('POST', `/projects/${id}/steps/4/remind`, 'vp'));
+    } finally {
+      t.deps.now = real;
+    }
+  });
+});
+
 describe('the live stream', () => {
   it('needs a session, and sends hints, never content', async () => {
     const address = await t.app.listen({ host: '127.0.0.1', port: 0 });

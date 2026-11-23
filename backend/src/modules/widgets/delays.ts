@@ -1,7 +1,7 @@
-import { workingDaysBetween } from '@coal/shared';
+import { workingDaysBetween, type SignOffWait } from '@coal/shared';
 import { presentDeviations } from '../deviations/service';
 import { latestDeviationOfSteps, listDeviationRows } from '../deviations/store';
-import { activeTasksOf } from '../tasks/service';
+import { activeTasksOf, signOffWaits } from '../tasks/service';
 import { findUsersByIds } from '../users/service';
 import {
   count,
@@ -13,6 +13,7 @@ import {
   type WidgetContext,
 } from './context';
 import { loadPortfolio } from './portfolio';
+import { waitingOnText } from './tasks';
 
 /**
  * W7: late and at-risk steps, with the reason and the cause. The sentence of explanation and the
@@ -47,6 +48,13 @@ export async function delaysAndRisks(w: WidgetContext): Promise<WidgetBody> {
     tasks.flatMap((t) => (t.assigneeId ? [t.assigneeId] : [])),
   );
   const ownerName = new Map(owners.map((u) => [u.id, u.name]));
+  // A step that is with its signers is theirs to finish: they are its owners, not the doers.
+  const waits = await signOffWaits(
+    w.deps.db,
+    orgId,
+    stepRows.filter((s) => s.status === 'in_review').map((s) => s.id),
+    w.now,
+  );
   const ownersOfStep = (runStepId: string) =>
     [
       ...new Set(
@@ -88,7 +96,9 @@ export async function delaysAndRisks(w: WidgetContext): Promise<WidgetBody> {
           cells: {
             project: p.project.code,
             step: step.key,
-            owner: ownersOfStep(s.id),
+            owner: waits.has(s.id)
+              ? `${(waits.get(s.id) as SignOffWait).signer.name} sign-off: ${waitingOnText(waits.get(s.id) as SignOffWait)}`
+              : ownersOfStep(s.id),
             planned: s.plannedEnd,
             forecast: s.forecastEnd,
             daysLate: late,

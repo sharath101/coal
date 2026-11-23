@@ -110,6 +110,7 @@ Everyone with an account can see the **status** of every project. For now, that 
 | Create a project (Go), and see what Go would do for a concept (`POST /projects/preview`, which the assistant may use) | VP ⚠. Go itself is never the assistant's |
 | Make or change a step's documents (save versions, submit them for signing) | That step's doers, while the step is open and the project is running |
 | Start or submit a step | Any doer of the step, and the project team where the route names it |
+| Remind the signers of a handed-in step | Any doer of the step (once a day per step) |
 | Sign a document row (Prepared, Reviewed, Approved) | The person the row names, or anyone holding its role within the project's scope; never Approved by the person who prepared the version ([documents-and-signing.md](./documents-and-signing.md#signature-rows)) |
 | Sign off a step | The step's signer ([workflow.md](./workflow.md#the-steps)) |
 | Decide at a checkpoint, choose the step-15 path, send work back | As in [workflow.md](./workflow.md#decisions-recorded-at-steps) |

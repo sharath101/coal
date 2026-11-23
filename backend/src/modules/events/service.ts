@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import type { Executor, Tx } from '../../core/db/client';
 import { msOf } from '../../core/db/columns';
 import { validationFailed } from '../../core/http/errors';
@@ -69,4 +69,32 @@ export async function listProjectEvents(
         ? Buffer.from(JSON.stringify([last.createdAt.toISOString(), last.id])).toString('base64url')
         : null,
   };
+}
+
+/** The newest event of a type for each run step, by the `runStepId` in its payload. */
+export async function latestEventsOfRunSteps(
+  ex: Executor,
+  orgId: string,
+  type: string,
+  runStepIds: string[],
+): Promise<Map<string, ProjectEvent>> {
+  if (runStepIds.length === 0) return new Map();
+  const runStepId = sql<string>`${outboxEvents.payload}->>'runStepId'`;
+  const rows = await ex
+    .select()
+    .from(outboxEvents)
+    .where(
+      and(
+        eq(outboxEvents.orgId, orgId),
+        eq(outboxEvents.type, type),
+        inArray(runStepId, runStepIds),
+      ),
+    )
+    .orderBy(desc(msOf(outboxEvents.createdAt)), desc(outboxEvents.id));
+  const latest = new Map<string, ProjectEvent>();
+  for (const row of rows) {
+    const id = (row.payload as { runStepId?: unknown }).runStepId;
+    if (typeof id === 'string' && !latest.has(id)) latest.set(id, row);
+  }
+  return latest;
 }

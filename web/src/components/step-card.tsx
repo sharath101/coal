@@ -23,6 +23,7 @@ import { RecordDeviationDialog } from '@/components/deviation-dialog';
 import { StepHealthBadge } from '@/components/health-badge';
 import { PreviewPanel } from '@/components/preview-panel';
 import { ProblemMessage } from '@/components/problem-message';
+import { RemindSigners, SignOffWaitText } from '@/components/remind-signers';
 import { DocumentStatusBadge, StepStatusBadge } from '@/components/status-badge';
 import { StepDocuments } from '@/components/step-documents';
 import { selectClass } from '@/components/role-fields';
@@ -58,6 +59,7 @@ interface Props {
 
 export function StepCard({ projectId, step, route, documents, focused = false, onChanged }: Props) {
   const t = useTranslations('step');
+  const tTask = useTranslations('tasks');
   const conditionText = useConditionText(route);
   const me = useMe();
   const params = { id: projectId, key: step.key };
@@ -192,6 +194,24 @@ export function StepCard({ projectId, step, route, documents, focused = false, o
           <Button size="sm" variant="destructive" onClick={() => setDeviationFor('banner')}>
             {t('recordWhy')}
           </Button>
+        </div>
+      )}
+      {step.withSigners && (
+        <div
+          role="status"
+          className={cn(
+            'flex flex-wrap items-center gap-3 rounded-t-lg border-b p-3',
+            step.withSigners.daysLate > 0
+              ? 'border-amber-200 bg-amber-50 text-amber-950'
+              : 'bg-muted/50',
+          )}
+        >
+          <p className="min-w-0 flex-1">
+            <SignOffWaitText wait={step.withSigners} />
+          </p>
+          {a.remind && (
+            <RemindSigners projectId={projectId} stepKey={step.key} wait={step.withSigners} />
+          )}
         </div>
       )}
       <details open={isOpen || focused} className="group">
@@ -350,15 +370,27 @@ export function StepCard({ projectId, step, route, documents, focused = false, o
                 {t('tasks')}
               </h4>
               <ul className="grid gap-0.5">
-                {step.tasks.map((task) => (
-                  <li key={task.id}>
-                    {task.title} <span className="text-muted-foreground">→</span>{' '}
-                    <span className="font-medium">
-                      {task.assignee?.name ??
-                        (task.queueRole ? t('queued', { role: task.queueRole.name }) : '')}
-                    </span>
-                  </li>
-                ))}
+                {step.tasks.map((task) => {
+                  const unsigned = task.kind === 'sign' && !!step.withSigners;
+                  return (
+                    <li key={task.id}>
+                      {task.title} <span className="text-muted-foreground">→</span>{' '}
+                      <span className="font-medium">
+                        {task.assignee?.name ??
+                          (task.queueRole ? t('queued', { role: task.queueRole.name }) : '')}
+                      </span>
+                      <span className="text-muted-foreground">
+                        {' · '}
+                        {unsigned ? t('notSignedYet') : tTask(`status.${task.status}` as never)}
+                      </span>
+                      {unsigned && (step.withSigners?.daysLate ?? 0) > 0 && (
+                        <span className="ml-1 font-medium text-amber-700">
+                          {t('daysLate', { count: step.withSigners?.daysLate ?? 0 })}
+                        </span>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           )}

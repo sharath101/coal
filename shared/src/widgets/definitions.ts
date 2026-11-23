@@ -21,7 +21,7 @@ export type Question = 'needs_me' | 'coming' | 'how';
 
 /** What can be done to a row in an expanded view. The website shows the ones it has. */
 export type WidgetAction =
-  'start' | 'done' | 'more_time' | 'sign' | 'return' | 'open' | 'mark_read' | 'reassign';
+  'start' | 'done' | 'more_time' | 'remind' | 'sign' | 'return' | 'open' | 'mark_read' | 'reassign';
 
 export interface WidgetDefinition {
   key: WidgetKey;
@@ -76,9 +76,15 @@ export const WIDGETS: readonly WidgetDefinition[] = [
     question: 'needs_me',
     tabs: ['todo', 'in_progress', 'waiting', 'done'],
     filters: ['project', 'step', 'kind', 'due'],
-    columns: ['project', 'step', 'kind', 'due', 'status'],
-    actions: ['start', 'done', 'more_time', 'open'],
-    refreshOn: [...TASK_EVENTS, 'timeline.changed', 'deviation.recorded'],
+    columns: ['project', 'step', 'kind', 'due', 'status', 'waitingOn'],
+    actions: ['start', 'done', 'more_time', 'remind', 'open'],
+    refreshOn: [
+      ...TASK_EVENTS,
+      'timeline.changed',
+      'deviation.recorded',
+      'step.signed',
+      'signature.reminded',
+    ],
   },
   {
     key: 'waiting-signature',

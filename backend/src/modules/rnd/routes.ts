@@ -17,6 +17,7 @@ import {
   putTeam,
   reassignTask,
   recordMilestone,
+  remindSigners,
   resumeProject,
   returnStep,
   runActionRoles,
@@ -35,7 +36,15 @@ import { implement, noEffects, type ActionDescription } from '../../core/http/en
 import { AppError, notFound, validationFailed } from '../../core/http/errors';
 import { assertUsableEvidence } from '../files/service';
 import { assertCanAccess } from '../permissions';
-import { assignTask, findTask, presentTask, previewTaskOf, whereOf } from '../tasks/service';
+import {
+  SIGNERS_REMINDED,
+  assignTask,
+  findTask,
+  presentTask,
+  previewTaskOf,
+  signOffWaits,
+  whereOf,
+} from '../tasks/service';
 import { findActiveUsersByRole, findUser } from '../users/service';
 import { goProject, performAction, raiseCorrectiveAction, toPreview, type Env } from './actions';
 import { assertMay, loadEnv, type ScopedPermission } from './env';
@@ -365,6 +374,65 @@ export const rndRoutes = [
         reason: body.reason,
         ...(body.evidenceFileId && { evidenceFileId: body.evidenceFileId }),
       },
+    }),
+  ),
+
+  implement(remindSigners, ({ deps, ctx, actor, params }) =>
+    change(deps.db, ctx, async (tx, log) => {
+      const env = await loadEnv(tx, ctx.orgId, actor, params.id, { forUpdate: true });
+      const step = env.loaded.route.steps.find((s) => s.key === params.key);
+      if (!step) throw notFound('step');
+      assertMay(env, 'steps.remind', step.doers);
+      if (env.loaded.state.status !== 'active') {
+        throw new AppError(
+          409,
+          'PROJECT_NOT_ACTIVE',
+          "The project is on hold or finished, so this can't be done now.",
+        );
+      }
+      const runStepId = env.loaded.stepIds.get(step.key);
+      const now = deps.now();
+      const wait =
+        runStepId && env.loaded.state.steps[step.key]?.status === 'in_review'
+          ? (await signOffWaits(tx, ctx.orgId, [runStepId], now)).get(runStepId)
+          : undefined;
+      if (!runStepId || !wait) {
+        throw new AppError(409, 'NOT_WITH_SIGNERS', 'This step is not waiting for a sign-off.');
+      }
+      if (wait.remindedToday && wait.lastReminder) {
+        throw new AppError(
+          409,
+          'ALREADY_REMINDED',
+          `${wait.lastReminder.by.name} already reminded them today. They can be reminded again tomorrow.`,
+        );
+      }
+      // A sign-off still in a queue is everyone's who holds the role, as when it was asked for.
+      const queued = wait.queued
+        ? await findActiveUsersByRole(tx, ctx.orgId, wait.signer.key, {
+            productLineId: wait.signer.key === 'rd_lead' ? env.project.productLineId : null,
+          })
+        : [];
+      const reminded = [
+        ...new Map(
+          [...wait.pending, ...queued.map((u) => ({ id: u.id, name: u.name }))].map((p) => [
+            p.id,
+            p,
+          ]),
+        ).values(),
+      ];
+      log.audit({
+        action: 'step.signers_reminded',
+        recordType: 'run_step',
+        recordId: runStepId,
+        after: { stepKey: step.key, userIds: reminded.map((p) => p.id) },
+      });
+      log.event({
+        type: SIGNERS_REMINDED,
+        projectId: env.project.id,
+        stepKey: step.key,
+        payload: { runStepId, userIds: reminded.map((p) => p.id), at: now.toISOString() },
+      });
+      return { reminded, at: now.toISOString() };
     }),
   ),
 

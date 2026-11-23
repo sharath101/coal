@@ -4,10 +4,17 @@ import {
   dateOfInstant,
   directInputs,
   FINISHED_STATUSES,
+  type SignOffWait,
 } from '@coal/shared';
 import { listWaiting } from '../documents/service';
 import { roleName } from '../rnd/routing';
-import { activeTasksOf, followsStep, recentDoneTasks, type TaskRow } from '../tasks/service';
+import {
+  activeTasksOf,
+  followsStep,
+  recentDoneTasks,
+  signOffWaits,
+  type TaskRow,
+} from '../tasks/service';
 import {
   codeOf,
   count,
@@ -23,6 +30,12 @@ import { loadPortfolio } from './portfolio';
 
 const TASK_TABS = ['todo', 'in_progress', 'waiting', 'done'] as const;
 
+/** Who a step with its signers waits on: the people who have not signed, or the role's queue. */
+export const waitingOnText = (wait: SignOffWait) =>
+  [...wait.pending.map((p) => p.name), ...(wait.queued ? [`${wait.signer.name} queue`] : [])].join(
+    ', ',
+  );
+
 function matchesFilters(w: WidgetContext, t: TaskRow): boolean {
   const f = w.filters;
   if (f.project && t.subjectId !== f.project && codeOf(t.subjectLabel) !== f.project) return false;
@@ -30,7 +43,7 @@ function matchesFilters(w: WidgetContext, t: TaskRow): boolean {
   if (f.kind && t.kind !== f.kind) return false;
   if (f.due) {
     const due = t.dueOn;
-    if (f.due === 'overdue' && !(due && due < w.today)) return false;
+    if (f.due === 'overdue' && !(t.status !== 'waiting' && due && due < w.today)) return false;
     if (f.due === 'week' && !(due && due >= w.today && due <= weekEnd(w.today))) return false;
     if (f.due === 'later' && !(due && due > weekEnd(w.today))) return false;
     if (f.due === 'none' && due) return false;
@@ -70,9 +83,22 @@ export async function myTasks(w: WidgetContext): Promise<WidgetBody> {
   }));
   const tab =
     w.view === 'expanded' ? (w.tab && TASK_TABS.includes(w.tab as never) ? w.tab : 'todo') : null;
-  const source = tab === 'done' ? done : tab ? mine.filter((t) => tabOf(t) === tab) : mine;
+  // My own work first; what waits on a signer comes after it.
+  const source =
+    tab === 'done'
+      ? done
+      : tab
+        ? mine.filter((t) => tabOf(t) === tab)
+        : [...running, ...mine.filter((t) => t.status === 'waiting')];
   const filtered = source.filter((t) => matchesFilters(w, t));
   const shown = filtered.slice(0, rowLimit(w));
+  // A doer's task that waits shows who it waits on and how late they are, not the doer's own date.
+  const waits = await signOffWaits(
+    w.deps.db,
+    orgId,
+    shown.flatMap((t) => (t.status === 'waiting' && t.runStepId ? [t.runStepId] : [])),
+    w.now,
+  );
 
   return {
     counts,
@@ -84,19 +110,40 @@ export async function myTasks(w: WidgetContext): Promise<WidgetBody> {
         t.status !== 'waiting' && t.dueOn && t.dueOn < w.today
           ? calendarDaysBetween(t.dueOn, w.today)
           : 0;
+      const wait = t.status === 'waiting' && t.runStepId ? waits.get(t.runStepId) : undefined;
+      const tone = wait
+        ? wait.daysLate > 0
+          ? 'warning'
+          : 'neutral'
+        : t.status === 'done' || t.status === 'waiting'
+          ? 'neutral'
+          : dueTone(w, t.dueOn);
       return row({
         id: t.id,
         title: t.title,
         subtitle: t.subjectLabel,
         link: t.subjectId ? projectLink(t.subjectId, t.stepKey) : null,
-        tone: t.status === 'done' || t.status === 'waiting' ? 'neutral' : dueTone(w, t.dueOn),
-        badges: late > 0 ? [{ label: `${late}d late`, tone: 'danger' }] : [],
+        tone,
+        badges: wait
+          ? [
+              // Days late on this widget are calendar days, as for the person's own tasks.
+              wait.daysLate > 0 && wait.dueOn
+                ? {
+                    label: `${wait.signer.name} ${calendarDaysBetween(wait.dueOn, w.today)}d late`,
+                    tone: 'warning',
+                  }
+                : { label: `With the ${wait.signer.name}`, tone: 'neutral' },
+            ]
+          : late > 0
+            ? [{ label: `${late}d late`, tone: 'danger' }]
+            : [],
         cells: {
           project: codeOf(t.subjectLabel),
           step: t.stepKey,
           kind: t.kind,
-          due: t.dueOn,
+          due: t.status === 'waiting' ? null : t.dueOn,
           status: t.status,
+          waitingOn: wait ? waitingOnText(wait) : null,
         },
         // A step's task follows its step: it is started and handed in from the step ("open"), not here.
         actions:
@@ -104,7 +151,9 @@ export async function myTasks(w: WidgetContext): Promise<WidgetBody> {
             ? ['open']
             : followsStep(t)
               ? t.status === 'waiting'
-                ? ['open']
+                ? wait && !wait.remindedToday
+                  ? ['remind', 'open']
+                  : ['open']
                 : ['more_time', 'open']
               : t.status === 'in_progress'
                 ? ['done', 'more_time', 'open']

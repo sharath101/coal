@@ -1,10 +1,16 @@
-import { WIDGETS, addWorkingDays, dateOfInstant, type MessageKey } from '@coal/shared';
+import {
+  WIDGETS,
+  addWorkingDays,
+  dateOfInstant,
+  workingDaysBetween,
+  type MessageKey,
+} from '@coal/shared';
 import type { Tx } from '../../core/db/client';
 import { findDeviation } from '../deviations/store';
 import { pendingSignersOf } from '../documents/service';
 import type { OutboxEvent, Subscription } from '../events/dispatcher';
 import { loadCalendar, loadSettings } from '../schedule/calendar';
-import { findTask, activeTasksOfStep } from '../tasks/service';
+import { SIGNERS_REMINDED, findTask, activeTasksOfStep, signOffWaits } from '../tasks/service';
 import { findUser, findActiveUsersByRole, findUsersByIds, type UserRow } from '../users/service';
 import { roleAbove } from '../permissions/rules';
 import { holdersOf, projectContext, nextRoleUp, type ProjectContext } from './audience';
@@ -305,6 +311,48 @@ async function onSignatureRequested(event: OutboxEvent, tx: Tx) {
   await notify(tx, event.orgId, items);
 }
 
+/**
+ * The doers reminded a step's signers: each one who still has not signed hears who reminded them
+ * and how long it has waited. The words are the route's signature reminder; nothing the doer wrote.
+ */
+async function onSignersReminded(event: OutboxEvent, tx: Tx) {
+  const p = event.payload as Payload;
+  const runStepId = str(p.runStepId);
+  const ctx = await context(tx, event);
+  const step = ctx?.route.steps.find((s) => s.key === event.stepKey);
+  if (!runStepId || !ctx || !step) return;
+  const at = new Date(str(p.at) ?? event.createdAt.toISOString());
+  const wait = (await signOffWaits(tx, event.orgId, [runStepId], at)).get(runStepId);
+  if (!wait) return;
+  // Someone who signed after the click isn't reminded; a queue stays everyone's who holds the role.
+  const stillToSign = new Set(wait.pending.map((x) => x.id));
+  const asked = Array.isArray(p.userIds) ? p.userIds.filter((id) => typeof id === 'string') : [];
+  const people = await findUsersByIds(
+    tx,
+    event.orgId,
+    asked.filter((id) => wait.queued || stillToSign.has(id)),
+  );
+  const by = event.actorId ? await findUser(tx, event.orgId, event.actorId) : null;
+  const days = workingDaysBetween(
+    await loadCalendar(tx, event.orgId),
+    dateOfInstant(new Date(wait.since)),
+    dateOfInstant(at),
+  );
+  await notify(
+    tx,
+    event.orgId,
+    messageTo(people, event, ctx, {
+      key: 'signature_waiting',
+      kind: 'reminder',
+      title: `${by?.name ?? 'The team'} reminded you to sign off step ${step.key}`,
+      vars: {
+        ...stepVars(ctx.route, step, ctx.project, ctx.lineName),
+        days: String(Math.max(0, days)),
+      },
+    }),
+  );
+}
+
 /** Tells open websites which widgets to fetch again. A hint only, never content. */
 async function sendWidgetHints(event: OutboxEvent, tx: Tx) {
   const keys = WIDGETS.filter((w) => w.refreshOn.includes(event.type)).map((w) => w.key);
@@ -323,5 +371,6 @@ export const NOTIFICATION_SUBSCRIPTIONS: Subscription[] = [
   { type: 'project.dropped', handle: onProject('project_dropped', 'dropped') },
   { type: 'deviation.recorded', handle: onDeviationRecorded },
   { type: 'signature.requested', handle: onSignatureRequested },
+  { type: SIGNERS_REMINDED, handle: onSignersReminded },
   { type: '*', handle: sendWidgetHints },
 ];

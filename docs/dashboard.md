@@ -69,12 +69,12 @@ interface WidgetDefinition {
 
 ### What each widget counts, as built
 
-- **W1** my assigned tasks (signatures are on W2). "This week" runs to the coming Sunday. Tabs: To do, In progress, Waiting (the step is with its signer: not late, [P69](./decisions.md)), Done (the last 50). Filters: project, step, kind, due (overdue, this week, later, none). A step's task offers **More time** and **Open step**, not Start or Mark done: it follows its step ([workflow.md](./workflow.md#starting-steps)). Start and Mark done are for work given by hand, own tasks and corrective actions, and a late corrective action can't be marked done until its deviation is recorded.
+- **W1** my assigned tasks (signatures are on W2). "This week" runs to the coming Sunday. Tabs: To do, In progress, Waiting (the step is with its signer: not late, [P69](./decisions.md)), Done (the last 50). My own work comes first. A waiting task shows **who it waits on** instead of its own date: "With the Board" while the signers are on time, or "Board 4d late" in amber once they aren't, since that lateness is theirs; and it offers **Remind them** ([P110](./decisions.md)). Filters: project, step, kind, due (overdue, this week, later, none). A step's task offers **More time** and **Open step**, not Start or Mark done: it follows its step ([workflow.md](./workflow.md#starting-steps)). Start and Mark done are for work given by hand, own tasks and corrective actions, and a late corrective action can't be marked done until its deviation is recorded.
 - **W2** the document rows waiting for me, and the step sign-offs assigned to me, oldest first.
 - **W3** the steps of mine that are still locked, in projects I'm on (or lead): the step's doers include my role, or "the project team" and I'm on it. "Waits for" names the unfinished steps it depends on, with the expected date.
 - **W4** the next unfinished checkpoint of each running project, with whether its inputs are finished, and who signs. Open to everyone: it is status.
 - **W5** the projects I'm on, or lead. **W6** every project, with its stage, the steps open now, the Lead, days in stage, health and forecast launch; filters: product line, stage, health. Both are status, so open to everyone.
-- **W7** every running project's overdue and at-risk steps, with the owner (the people holding the step's work tasks), the planned and forecast dates, days late, and the reason and cause of the latest deviation. The cause shows by name only to those allowed; the sentence of explanation appears on the Deviations tab only for people in the project's scope ([roles-and-access.md](./roles-and-access.md#content-is-need-to-know)).
+- **W7** every running project's overdue and at-risk steps, with the owner (the people holding the step's work tasks; once the step is handed in, the signers who have not signed yet, as "Board sign-off: Mira, Chet"), the planned and forecast dates, days late, and the reason and cause of the latest deviation. The cause shows by name only to those allowed; the sentence of explanation appears on the Deviations tab only for people in the project's scope ([roles-and-access.md](./roles-and-access.md#content-is-need-to-know)).
 - **W8** (VP, R&D Head, R&D Lead only) the open tasks of each person below me, by when they fall due. A Lead's people are those on their product line's projects.
 - **W9** my measures, then each person below me. The Board sees department totals, not people.
 - **W10** my notifications, newest first.
@@ -157,6 +157,7 @@ All thresholds are settings.
 | 2 working days late | Tell the next role up the ladder ([roles-and-access.md](./roles-and-access.md#assigning-work-and-making-requests)) |
 | 5 working days late | The task joins the exception list: one notification to the R&D Head and the VP, and a row in the Delays widget ([W24](./open-questions.md#workflow)) |
 | A signature waiting | Reminders when due and every 2 working days after. An overdue VP or Board signature isn't escalated above them; the people who asked for it (those still holding the step's tasks) are told instead |
+| Whenever the doers choose | **Remind them**, on the step, the doer's task or W1: each signer who has not signed yet gets the route's signature reminder, naming who sent it. Once a day per step, and recorded ([P110](./decisions.md)) |
 
 Reminders aren't sent for a project on hold, or for a task nobody holds yet (one waiting in a queue).
 
@@ -166,7 +167,7 @@ Reminders aren't sent for a project on hold, or for a task nobody holds yet (one
 - **the cause:** a person, a role or department, or an outside party (vendor, lab, surgeon).
 - **the new expected date.**
 
-The new date becomes the task's due date (its *first* due date stays) and, while that work is open, holds the step's forecast. **A late step can't be submitted, and a late task of the route can't be closed, until a deviation explains the miss** (`DEVIATION_REQUIRED`): for a step, a person's new date that hasn't passed yet; for a task, a deviation made for the due date it missed. Work given by hand (own tasks, assignments and requests) isn't on the plan, so it needs none ⚠ ([W25](./open-questions.md#workflow)). When the new date is missed too, the doer says why again. The project page and My tasks offer the form at that moment. The next role up the ladder, or anyone above in the project's scope (never the person who recorded it), confirms or corrects it: a correction is a new record pointing at the old one. The person or role named as the cause can add a comment. Who sees the named cause is in [roles-and-access.md](./roles-and-access.md#content-is-need-to-know).
+The new date becomes the task's due date (its *first* due date stays) and, while that work is open, holds the step's forecast. **A late step can't be submitted, and a late task of the route can't be closed, until a deviation explains the miss** (`DEVIATION_REQUIRED`). Once a step is handed in, the wait is its signers': the step stops asking its doers why it is late, and says instead who has not signed and how late they are ([P110](./decisions.md)). What explains a miss: for a step, a person's new date that hasn't passed yet; for a task, a deviation made for the due date it missed. Work given by hand (own tasks, assignments and requests) isn't on the plan, so it needs none ⚠ ([W25](./open-questions.md#workflow)). When the new date is missed too, the doer says why again. The project page and My tasks offer the form at that moment. The next role up the ladder, or anyone above in the project's scope (never the person who recorded it), confirms or corrects it: a correction is a new record pointing at the old one. The person or role named as the cause can add a comment. Who sees the named cause is in [roles-and-access.md](./roles-and-access.md#content-is-need-to-know).
 
 ## Notifications and work messages
 
@@ -175,6 +176,7 @@ The new date becomes the task's due date (its *first* due date stays) and, while
 | A task is made for me; my part of a step opens | The assignee, or everyone who can claim it from a queue, with a work message |
 | A task is claimed or given to me by someone else | Me |
 | A signature is requested | The signer |
+| The doers remind the signers of a handed-in step | The signers who have not signed yet |
 | Work is returned for rework | The people still holding the step's tasks |
 | Reminders and escalations | As in the table above |
 | A checkpoint is decided; a project is put on hold, resumed or dropped | The project team |

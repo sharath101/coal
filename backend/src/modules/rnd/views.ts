@@ -19,7 +19,7 @@ import { explainedSteps } from '../deviations/store';
 import { listProjectEvents } from '../events/service';
 import { currentSteps, getRuns, stepHistory } from '../process/service';
 import { loadCalendar } from '../schedule/calendar';
-import { activeTasksOfRun, presentTasks } from '../tasks/service';
+import { activeTasksOfRun, presentTasks, signOffWaits } from '../tasks/service';
 import { findUsersByIds, present } from '../users/service';
 import type { Env } from './actions';
 import { documentNeedsOfSteps } from '../documents/needs';
@@ -112,10 +112,15 @@ export async function presentRoute(
   const { route, state, run, stepIds, version } = env.loaded;
   const taskRows = await activeTasksOfRun(ex, run.id);
   const tasks = await presentTasks(ex, env.orgId, taskRows, now);
-  const [stepRows, cal, explained] = await Promise.all([
+  const inReview = route.steps.flatMap((s) => {
+    const id = state.steps[s.key]?.status === 'in_review' ? stepIds.get(s.key) : undefined;
+    return id ? [id] : [];
+  });
+  const [stepRows, cal, explained, waits] = await Promise.all([
     currentSteps(ex, run.id),
     loadCalendar(ex, env.orgId),
     explainedSteps(ex, [...stepIds.values()], dateOfInstant(now)),
+    signOffWaits(ex, env.orgId, inReview, now),
   ]);
   const rowOf = new Map(stepRows.map((r) => [r.stepKey, r]));
   const documentNeeds = await documentNeedsOfSteps(
@@ -160,6 +165,7 @@ export async function presentRoute(
     const pastDue = !!dates?.plannedEnd && unfinished && today > dates.plannedEnd;
     const stepHealth = unfinished ? (pastDue ? 'overdue' : (dates?.health ?? null)) : null;
     const stepRowId = stepIds.get(step.key);
+    const withSigners = (s.status === 'in_review' && stepRowId && waits.get(stepRowId)) || null;
     return {
       key: step.key,
       name: step.name,
@@ -203,7 +209,10 @@ export async function presentRoute(
       forecastEnd: dates?.forecastEnd ?? null,
       health: stepHealth,
       daysLate: pastDue && dates?.plannedEnd ? workingDaysBetween(cal, dates.plannedEnd, today) : 0,
-      needsDeviation: pastDue && !!stepRowId && !explained.has(stepRowId),
+      // Once handed in, the wait is the signers': the doers have nothing left to explain.
+      needsDeviation:
+        pastDue && s.status !== 'in_review' && !!stepRowId && !explained.has(stepRowId),
+      withSigners,
       actions: {
         start: a.start && may(env, 'steps.start', step.doers),
         submit: a.submit && may(env, 'steps.submit', step.doers),
@@ -212,6 +221,11 @@ export async function presentRoute(
         decide: a.decide.filter((key) => may(env, 'steps.decide', deciders(key))),
         sendBack: a.sendBack.filter((to) => sendBackTargets.includes(to)),
         correctiveActions: a.correctiveActions && may(env, 'correctiveActions.create', ['rd_lead']),
+        remind:
+          !!withSigners &&
+          !withSigners.remindedToday &&
+          state.status === 'active' &&
+          may(env, 'steps.remind', step.doers),
       },
     };
   });

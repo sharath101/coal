@@ -8,6 +8,7 @@ import { useId, useState } from 'react';
 import { AskAiLink } from '@/components/ask-ai';
 import { RecordDeviationDialog } from '@/components/deviation-dialog';
 import { ProblemMessage } from '@/components/problem-message';
+import { RemindSigners, SignOffWaitText } from '@/components/remind-signers';
 import { Pill } from '@/components/status-badge';
 import { TaskConfirm, type TaskAction } from '@/components/task-confirm';
 import { Button } from '@/components/ui/button';
@@ -27,6 +28,7 @@ import { queryKeys, useRefreshWork } from '@/lib/queries';
  */
 export function TaskRow({ task, sent = false }: { task: Task; sent?: boolean }) {
   const t = useTranslations('tasks');
+  const tWait = useTranslations('signOffWait');
   const tWorkstation = useTranslations('workstation');
   const queryClient = useQueryClient();
   const refreshWork = useRefreshWork();
@@ -79,6 +81,8 @@ export function TaskRow({ task, sent = false }: { task: Task; sent?: boolean }) 
   const open = ['open', 'in_progress', 'waiting'].includes(task.status);
   const unanswered = task.request?.state === 'pending';
   const busy = update.isPending || accept.isPending;
+  // Handed in and with the signers: who it waits on matters, not this task's own date.
+  const wait = task.status === 'waiting' ? task.waitingOn : null;
 
   return (
     <li className="grid gap-1 rounded-lg border p-3 text-sm">
@@ -99,7 +103,7 @@ export function TaskRow({ task, sent = false }: { task: Task; sent?: boolean }) 
             {t(`kind.${task.kind}`)}
             {queued && task.queueRole && <> · {t('queueFor', { role: task.queueRole.name })}</>}
             {(!open || task.status === 'waiting') && <> · {t(`status.${task.status}`)}</>}
-            {open && task.dueOn && <> · {t('due', { date: formatDate(task.dueOn) })}</>}
+            {open && !wait && task.dueOn && <> · {t('due', { date: formatDate(task.dueOn) })}</>}
           </span>
           {sent && task.assignee && (
             <span className="text-xs text-muted-foreground">
@@ -122,7 +126,19 @@ export function TaskRow({ task, sent = false }: { task: Task; sent?: boolean }) 
               {t('declinedBecause', { reason: task.request.declineReason })}
             </span>
           )}
-          {open && task.followsStep && (
+          {wait && (
+            <span className="text-xs text-muted-foreground">
+              <SignOffWaitText wait={wait} />
+            </span>
+          )}
+          {wait && wait.daysLate > 0 && (
+            <span className="mt-1">
+              <Pill tone="waiting">
+                {tWait('lateBadge', { role: wait.signer.name, count: wait.daysLate })}
+              </Pill>
+            </span>
+          )}
+          {open && !wait && task.followsStep && (
             <span className="text-xs text-muted-foreground">
               {t(
                 task.kind === 'sign'
@@ -180,6 +196,9 @@ export function TaskRow({ task, sent = false }: { task: Task; sent?: boolean }) 
                   >
                     {t('moreTime')}
                   </Button>
+                )}
+                {wait && task.subject && task.stepKey && (
+                  <RemindSigners projectId={task.subject.id} stepKey={task.stepKey} wait={wait} />
                 )}
                 {task.subject && task.stepKey && (
                   <Button size="sm" asChild>

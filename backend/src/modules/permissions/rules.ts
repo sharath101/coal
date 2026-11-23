@@ -387,6 +387,8 @@ export const RULES = {
   'projects.drop': { endpoint: onlyRoles('vp', 'board'), resource: inRoles },
   'steps.start': { endpoint: signedIn, resource: inRoles },
   'steps.submit': { endpoint: signedIn, resource: inRoles },
+  // The doers who handed the step in (docs/dashboard.md#deadlines-alerts-and-deviations).
+  'steps.remind': { endpoint: signedIn, resource: inRoles },
   'steps.approve': { endpoint: signedIn, resource: inRoles },
   'steps.return': { endpoint: signedIn, resource: inRoles },
   'steps.decide': { endpoint: signedIn, resource: inRoles },

@@ -38,6 +38,7 @@ import {
   type EndpointOutput,
   type EndpointSpec,
   type IdeaRef,
+  type SignOffWait,
 } from '@coal/shared';
 import { z } from 'zod';
 import type { EndpointCall } from '../../core/http/call';
@@ -98,6 +99,21 @@ function aiTool<E extends EndpointSpec, I extends z.ZodObject>(def: {
 
 const id = (what: string) => z.uuid().describe(`The id of the ${what}`);
 const names = (people: { name: string }[]) => people.map((p) => p.name).join(', ');
+
+/** Who a handed-in step waits on, as the model sees it. */
+const signOffWaitData = (w: SignOffWait) => ({
+  signer: w.signer.name,
+  notSignedYet: w.queued
+    ? [...w.pending.map((p) => p.name), `${w.signer.name} queue`]
+    : w.pending.map((p) => p.name),
+  since: w.since.slice(0, 10),
+  theirDate: w.dueOn,
+  theirDaysLate: w.daysLate,
+  lastReminder: w.lastReminder && {
+    on: w.lastReminder.at.slice(0, 10),
+    by: w.lastReminder.by.name,
+  },
+});
 
 const project = (p: { id: string; code: string; name: string }): ToolSource => ({
   type: 'project',
@@ -163,7 +179,7 @@ const TOOLS: AiToolDef[] = [
     name: 'my_tasks',
     endpoint: listTasks,
     description:
-      "The person's tasks: assigned to them (mine), waiting in their role's queue (queue), or work and requests they gave others (sent). Open ones unless `closed` is set. Each has a due date and how many working days late it is.",
+      "The person's tasks: assigned to them (mine), waiting in their role's queue (queue), or work and requests they gave others (sent). Open ones unless `closed` is set. Each has a due date and how many working days late it is. A task with status `waiting` was handed in and waits on its signers: `waitingOn` says who has not signed yet and how late they are; that lateness is the signers', not the person's.",
     input: z.object({
       scope: z.enum(['mine', 'queue', 'sent']).default('mine'),
       closed: z.boolean().default(false).describe('Show finished, declined and cancelled ones'),
@@ -188,6 +204,7 @@ const TOOLS: AiToolDef[] = [
         followsStep: t.followsStep,
         dueOn: t.dueOn,
         daysLate: t.daysLate,
+        waitingOn: t.waitingOn && signOffWaitData(t.waitingOn),
         assignee: t.assignee?.name ?? null,
         givenBy: t.assignedBy?.name ?? null,
         request: t.request,
@@ -281,6 +298,7 @@ const TOOLS: AiToolDef[] = [
           forecastEnd: s.forecastEnd,
           health: s.health,
           daysLate: s.daysLate,
+          withSigners: s.withSigners && signOffWaitData(s.withSigners),
         })),
         milestones: r.milestones.map((m) => ({ name: m.name, reached: m.reached })),
       },

@@ -40,6 +40,7 @@ export const canSeeProjectContent = (env: Env): boolean => canSeeContent(env.act
 export type ScopedPermission =
   | 'steps.start'
   | 'steps.submit'
+  | 'steps.remind'
   | 'steps.approve'
   | 'steps.return'
   | 'steps.decide'

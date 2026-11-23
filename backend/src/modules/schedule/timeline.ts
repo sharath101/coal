@@ -82,7 +82,8 @@ export async function presentTimeline(ex: Executor, env: Env, now: Date): Promis
         forecastEnd: row?.forecastEnd ?? null,
         health: unfinished ? (pastDue ? ('overdue' as const) : (row?.health ?? null)) : null,
         daysLate: pastDue && row?.plannedEnd ? workingDaysBetween(cal, row.plannedEnd, today) : 0,
-        needsDeviation: pastDue && !!row && !explained.has(row.id),
+        // Once handed in, the wait is the signers': the doers have nothing left to explain.
+        needsDeviation: pastDue && status !== 'in_review' && !!row && !explained.has(row.id),
       };
     }),
     draft: draft.map(view),

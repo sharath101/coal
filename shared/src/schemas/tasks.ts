@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { defineEndpoint } from '../api/contract';
 import { StepKey } from '../process/definition';
 import { DateOnly, Id, IdParams, PageQuery, Timestamp, pageOf } from './common';
-import { Person, RoleRef } from './projects';
+import { Person, RoleRef, SignOffWait } from './projects';
 
 export const TASK_KINDS = [
   'work',
@@ -45,6 +45,8 @@ export const Task = z.object({
    * tasks, assignments and requests are not like this.
    */
   followsStep: z.boolean(),
+  /** A doer's task that is waiting: the signers it waits on. Null otherwise. */
+  waitingOn: SignOffWait.nullable(),
   /** Who gave it or asked for it; empty for work the route made. */
   assignedBy: Person.nullable(),
   /** Prepared by the AI in the Workstation, and confirmed by the person who gave it. */

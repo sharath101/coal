@@ -149,20 +149,35 @@ describe('what needs me now', () => {
       'waiting',
     );
     const waiting = await expanded('my-tasks', 'ops', '&tab=waiting');
-    expect(rowsOf(waiting).some((r) => r.id === task.id)).toBe(true);
+    // It says who has it, not the doer's own date, and the doer may remind them.
+    expect(rowsOf(waiting).find((r) => r.id === task.id)).toMatchObject({
+      tone: 'neutral',
+      badges: [{ label: 'With the VP', tone: 'neutral' }],
+      cells: { due: null, waitingOn: 'Vera Example', status: 'waiting' },
+      actions: ['remind', 'open'],
+    });
     expect(
       rowsOf(await expanded('my-tasks', 'ops', '&tab=todo')).some((r) => r.id === task.id),
     ).toBe(false);
 
-    // Weeks later the signature is late, not the doers' work.
+    // Weeks later the signature is late, not the doers' work: the row shows whose lateness it is.
     daysAhead = 40;
     const late = await expanded('my-tasks', 'ops', '&tab=waiting');
-    expect(rowsOf(late).find((r) => r.id === task.id)).toMatchObject({
-      tone: 'neutral',
-      badges: [],
-    });
+    const lateRow = rowsOf(late).find((r) => r.id === task.id);
+    expect(lateRow.tone).toBe('warning');
+    expect(lateRow.badges).toEqual([
+      { label: expect.stringMatching(/^VP \d+d late$/), tone: 'warning' },
+    ]);
+    const overdue = await expanded('my-tasks', 'ops', '&tab=waiting&filter[due]=overdue');
+    expect(rowsOf(overdue).some((r) => r.id === task.id)).toBe(false);
     const asTask = await ok(call('GET', `/tasks/${task.id}`, 'ops'));
     expect(asTask).toMatchObject({ status: 'waiting', daysLate: 0 });
+    expect(asTask.waitingOn.daysLate).toBeGreaterThan(0);
+    // The late step is the signer's to finish, so Delays names them as its owner.
+    const delay = rowsOf(await expanded('delays-risks', 'vp', `&filter[project]=${id}`)).find(
+      (r) => r.ref.stepKey === '2',
+    );
+    expect(delay.cells.owner).toBe('VP sign-off: Vera Example');
     daysAhead = 0;
 
     // A return puts the work back in the doers' hands.

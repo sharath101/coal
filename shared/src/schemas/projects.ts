@@ -173,6 +173,26 @@ export const getProject = defineEndpoint({
 
 // The route view
 
+/**
+ * A step that is with its signers: who has not signed yet, since when, and the date they were asked
+ * to sign by. The doers' tasks wait on it; the lateness is the signers', not theirs.
+ */
+export const SignOffWait = z.object({
+  signer: RoleRef,
+  /** The people who have not signed yet. Empty when it waits in the signer role's queue. */
+  pending: z.array(Person),
+  queued: z.boolean(),
+  since: Timestamp,
+  dueOn: DateOnly.nullable(),
+  /** Working days past `dueOn`. */
+  daysLate: z.number().int(),
+  /** The last time the doers reminded them, and who did. */
+  lastReminder: z.object({ at: Timestamp, by: Person }).nullable(),
+  /** They can be reminded once a day. */
+  remindedToday: z.boolean(),
+});
+export type SignOffWait = z.infer<typeof SignOffWait>;
+
 export const StepTask = z.object({
   id: Id,
   title: z.string(),
@@ -199,6 +219,8 @@ export const StepActionsView = z.object({
   decide: z.array(z.string()),
   sendBack: z.array(StepKey),
   correctiveActions: z.boolean(),
+  /** Remind the signers who have not signed yet (the doers, once a day). */
+  remind: z.boolean(),
 });
 
 export const StepView = z.object({
@@ -230,8 +252,10 @@ export const StepView = z.object({
   forecastEnd: DateOnly.nullable(),
   health: StepHealthEnum.nullable(),
   daysLate: z.number().int(),
-  /** Late, and no deviation is recorded yet: the doers must record one before they submit. */
+  /** Late, not handed in yet, and no deviation is recorded: the doers must record one before they submit. */
   needsDeviation: z.boolean(),
+  /** Handed in and with its signers: who has not signed yet and how late they are. */
+  withSigners: SignOffWait.nullable(),
   /** What the signed-in person may do now. */
   actions: StepActionsView,
 });
@@ -508,6 +532,25 @@ export const sendBackStep = defineEndpoint({
     evidenceFileId: Id.optional(),
   }),
   response: ActionResult,
+});
+
+export const RemindResult = z.object({
+  /** The people told. Everyone holding the signer role, when it waits in a queue. */
+  reminded: z.array(Person),
+  at: Timestamp,
+});
+
+export const remindSigners = defineEndpoint({
+  id: 'steps.remind',
+  method: 'POST',
+  path: '/projects/{id}/steps/{key}/remind',
+  summary:
+    'Remind the signers who have not signed a step yet: each gets a notification. The doers, once a day',
+  auth: 'session',
+  permission: 'steps.remind',
+  aiTier: 'confirm',
+  params: StepParams,
+  response: RemindResult,
 });
 
 export const recordMilestone = defineEndpoint({
