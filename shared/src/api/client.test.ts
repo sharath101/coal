@@ -5,6 +5,7 @@ const user = {
   id: '01936b2e-7c3a-7cc0-8000-000000000001',
   name: 'Asha Example',
   role: { key: 'rd_lead', name: 'R&D Lead', departmentCode: 'RND' },
+  position: { key: 'rd_lead', title: 'R&D Lead' },
   productLine: null,
   status: 'active',
 };
@@ -42,7 +43,11 @@ describe('createApiClient', () => {
 
     await expect(api(signOut)).resolves.toBeUndefined();
 
-    const patch = fakeFetch(200, { ...user, updatedAt: '2026-11-18T10:00:00.000Z' });
+    const patch = fakeFetch(200, {
+      ...user,
+      updatedAt: '2026-11-18T10:00:00.000Z',
+      reportsTo: null,
+    });
     await createApiClient({ fetch: patch })(updateMe, {
       body: { name: 'Asha E' },
       ifMatch: '2026-11-18T09:00:00.000Z',

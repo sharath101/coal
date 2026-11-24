@@ -3,7 +3,7 @@ import { and, eq, gt, isNull } from 'drizzle-orm';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import type { Db, Tx } from '../../core/db/client';
 import type { Actor } from '../../core/http/context';
-import { findUser } from '../users/service';
+import { findUser, positionOf } from '../users/service';
 import { sessions } from './tables';
 
 // Name-only sign-in is a placeholder (docs/roles-and-access.md#accounts-for-now). Everything
@@ -17,13 +17,20 @@ export async function startSession(
   tx: Tx,
   orgId: string,
   userId: string,
-  options: { days: number; device: string | null },
+  options: { days: number; device: string | null; switchedById?: string | null },
 ) {
   const token = randomBytes(32).toString('base64url');
   const expiresAt = new Date(Date.now() + options.days * 24 * 3600_000);
   const [row] = await tx
     .insert(sessions)
-    .values({ orgId, userId, tokenHash: hashToken(token), device: options.device, expiresAt })
+    .values({
+      orgId,
+      userId,
+      tokenHash: hashToken(token),
+      device: options.device,
+      expiresAt,
+      switchedById: options.switchedById ?? null,
+    })
     .returning({ id: sessions.id });
   return { id: row!.id, token, expiresAt };
 }
@@ -35,13 +42,22 @@ export async function endSession(tx: Tx, orgId: string, sessionId: string) {
     .where(and(eq(sessions.orgId, orgId), eq(sessions.id, sessionId), isNull(sessions.revokedAt)));
 }
 
+/**
+ * The person behind a session token. `adminSwitching` is the demo's setting: off, the admin can't
+ * be signed in, and a session reached by switching no longer counts (P113).
+ */
 export async function resolveSession(
   db: Db,
   orgId: string,
   token: string,
+  options: { adminSwitching: boolean },
 ): Promise<{ sessionId: string; actor: Actor } | null> {
   const [session] = await db
-    .select({ id: sessions.id, userId: sessions.userId })
+    .select({
+      id: sessions.id,
+      userId: sessions.userId,
+      switchedById: sessions.switchedById,
+    })
     .from(sessions)
     .where(
       and(
@@ -54,13 +70,24 @@ export async function resolveSession(
   if (!session) return null;
   const user = await findUser(db, orgId, session.userId);
   if (!user || user.status !== 'active') return null;
+  if (!options.adminSwitching && (user.roleKey === 'admin' || session.switchedById)) return null;
+  let switcherId: string | null = null;
+  if (options.adminSwitching) {
+    if (user.roleKey === 'admin') switcherId = user.id;
+    else if (session.switchedById) {
+      const admin = await findUser(db, orgId, session.switchedById);
+      if (admin?.roleKey === 'admin' && admin.status === 'active') switcherId = admin.id;
+    }
+  }
   return {
     sessionId: session.id,
     actor: {
       userId: user.id,
       name: user.name,
       roleKey: user.roleKey,
+      positionKey: positionOf(user),
       productLineId: user.productLineId,
+      switcherId,
     },
   };
 }

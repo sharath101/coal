@@ -7,7 +7,7 @@ import { useTranslations } from 'next-intl';
 import { Suspense, useState } from 'react';
 import { PreviewPanel } from '@/components/preview-panel';
 import { ProblemMessage } from '@/components/problem-message';
-import { selectClass } from '@/components/role-fields';
+import { selectClass } from '@/components/ui/select-class';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';

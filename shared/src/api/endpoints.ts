@@ -108,7 +108,17 @@ import {
   updateResearchSource,
 } from '../schemas/research';
 import { listProductLines } from '../schemas/rnd';
-import { getMe, getUser, listUsers, signIn, signOut, signUp, updateMe } from '../schemas/users';
+import {
+  getMe,
+  getOrgChart,
+  getUser,
+  listUsers,
+  signIn,
+  signOut,
+  signUp,
+  switchPerson,
+  updateMe,
+} from '../schemas/users';
 
 /**
  * Every endpoint of the API. The backend must implement each one, and the permission
@@ -122,6 +132,8 @@ export const ENDPOINTS = [
   updateMe,
   listUsers,
   getUser,
+  getOrgChart,
+  switchPerson,
   listRoles,
   listProductLines,
   createUpload,

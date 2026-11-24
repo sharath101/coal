@@ -15,7 +15,9 @@ export function registerSessionHook(app: FastifyInstance, deps: AppDeps): void {
     };
     const token = readSessionToken(request);
     if (!token) return;
-    const session = await resolveSession(deps.db, deps.config.orgId, token);
+    const session = await resolveSession(deps.db, deps.config.orgId, token, {
+      adminSwitching: deps.config.adminSwitching,
+    });
     if (session) {
       request.ctx.actor = session.actor;
       request.ctx.sessionId = session.sessionId;

@@ -1,6 +1,6 @@
 'use client';
 
-import { signOut, type Me } from '@coal/shared';
+import { signOut, type MeView } from '@coal/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   FolderKanban,
@@ -10,12 +10,14 @@ import {
   MessagesSquare,
   Telescope,
   UserRound,
+  Users,
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { NotificationBell } from '@/components/notification-bell';
+import { PersonSwitcher } from '@/components/person-switcher';
 import { api } from '@/lib/api';
 import { canResearch } from '@/lib/roles';
 import { cn } from '@/lib/utils';
@@ -59,6 +61,7 @@ function MainLinks({ roleKey }: { roleKey: string }) {
   const links = [
     { href: '/projects', label: t('projects'), icon: FolderKanban },
     { href: '/tasks', label: t('tasks'), icon: ListChecks },
+    { href: '/people', label: t('people'), icon: Users },
     // The people of steps C, 1 and 2 research what already exists.
     ...(canResearch(roleKey) ? [{ href: '/research', label: t('research'), icon: Telescope }] : []),
   ];
@@ -83,7 +86,7 @@ function MainLinks({ roleKey }: { roleKey: string }) {
   );
 }
 
-export function TopBar({ me }: { me: Me }) {
+export function TopBar({ me }: { me: MeView }) {
   const t = useTranslations('nav');
   const tApp = useTranslations('app');
   const router = useRouter();
@@ -107,17 +110,21 @@ export function TopBar({ me }: { me: Me }) {
       </div>
       <div className="flex items-center gap-1" aria-label={t('account')}>
         <NotificationBell />
-        <Link
-          href="/profile"
-          className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent"
-        >
-          <UserRound className="size-4" aria-hidden />
-          <span className="hidden flex-col leading-tight sm:flex">
-            <span className="font-medium">{me.name}</span>
-            <span className="text-xs text-muted-foreground">{me.role.name}</span>
-          </span>
-          <span className="sr-only">{t('profile')}</span>
-        </Link>
+        {me.switcher ? (
+          <PersonSwitcher me={me} />
+        ) : (
+          <Link
+            href="/profile"
+            className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent"
+          >
+            <UserRound className="size-4" aria-hidden />
+            <span className="hidden min-w-0 max-w-[11rem] flex-col leading-tight sm:flex">
+              <span className="truncate font-medium">{me.name}</span>
+              <span className="truncate text-xs text-muted-foreground">{me.position.title}</span>
+            </span>
+            <span className="sr-only">{t('profile')}</span>
+          </Link>
+        )}
         <Button
           variant="ghost"
           size="icon"

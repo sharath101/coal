@@ -4,7 +4,7 @@ import { msOf } from '../../core/db/columns';
 import { containing, wordsQuery } from '../../core/db/search';
 import { validationFailed } from '../../core/http/errors';
 import { runsByStatus } from '../process/service';
-import { findActiveUsersByRole, findUsersByIds, type UserRow } from '../users/service';
+import { findActiveUsersByPosition, findUsersByIds, type UserRow } from '../users/service';
 import { projectMembers, projects } from './tables';
 
 export type ProjectRow = typeof projects.$inferSelect;
@@ -275,17 +275,17 @@ export async function requireActiveUsers(
 
 /**
  * The team a project starts with (docs/roles-and-access.md#project-teams): the Lead of its
- * product line, the Head and an AEMS expert, each when exactly one person holds the role.
- * Where several do, the VP or the Lead names one. Their tasks go to the role's queue until then.
+ * product line, the Head and the metallurgy expert, each when exactly one person holds the
+ * position. Where several do, the VP or the Lead names one. Their tasks go to the role's queue until then.
  */
 export async function startingTeam(ex: Executor, orgId: string, productLineId: string) {
   const team: UserRow[] = [];
-  for (const [role, line] of [
-    ['rd_lead', productLineId],
-    ['rd_head', null],
-    ['aems', null],
-  ] as const) {
-    const holders = await findActiveUsersByRole(ex, orgId, role, { productLineId: line });
+  for (const find of [
+    () => findActiveUsersByPosition(ex, orgId, 'rd_lead', { productLineId }),
+    () => findActiveUsersByPosition(ex, orgId, 'rd_head'),
+    () => findActiveUsersByPosition(ex, orgId, 'metallurgy_expert'),
+  ]) {
+    const holders = await find();
     if (holders.length === 1) team.push(holders[0] as UserRow);
   }
   return team;

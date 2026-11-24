@@ -46,7 +46,7 @@ import {
   type TypeRow,
 } from '../templates/service';
 import { fillParts, formOutline } from '../templates/sample-docx';
-import { findActiveUsersByRole } from '../users/service';
+import { actorOf, findActiveUsersByRole } from '../users/service';
 import { assertMay, loadEnv, viewerOf } from '../rnd/env';
 import { activeMembers, findProjectByRun } from '../rnd/projects';
 import type { Env } from '../rnd/actions';
@@ -945,16 +945,12 @@ async function describeRows(
       const holders = await activeHolders(tx, orgId, row.roleKeys);
       const reachable = holders.filter(
         (u) =>
-          canAccess(
-            'signatures.sign',
-            { userId: u.id, name: u.name, roleKey: u.roleKey, productLineId: u.productLineId },
-            {
-              productLineId: facts.productLineId,
-              memberIds: memberIdsOf(facts),
-              roleKeys: row.roleKeys,
-              assigneeId: null,
-            },
-          ).allowed,
+          canAccess('signatures.sign', actorOf(u), {
+            productLineId: facts.productLineId,
+            memberIds: memberIdsOf(facts),
+            roleKeys: row.roleKeys,
+            assigneeId: null,
+          }).allowed,
       );
       if (holders.length === 0) {
         warnings.push(

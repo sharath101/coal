@@ -19,7 +19,7 @@ import { howToGive } from '../permissions/rules';
 import { loadEnv, scopeOf } from '../rnd/env';
 import { onLineTeam } from '../rnd/projects';
 import { recompute } from '../schedule/service';
-import { findUser } from '../users/service';
+import { findUser, personOf } from '../users/service';
 import {
   answerRequest,
   createTasks,
@@ -142,7 +142,7 @@ export const tasksRoutes = [
           actor.roleKey === 'rd_lead' && actor.productLineId
             ? await onLineTeam(tx, ctx.orgId, assignee.id, actor.productLineId, env?.project.id)
             : false;
-        const kind = howToGive(actor, assignee, onLine);
+        const kind = howToGive(actor, { id: assignee.id, ...personOf(assignee) }, onLine);
         if (ctx.viaAi && kind !== 'own') {
           throw new AppError(
             403,

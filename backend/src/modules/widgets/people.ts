@@ -10,10 +10,10 @@ import {
   type ClosedTask,
 } from '@coal/shared';
 import { reworkCounts } from '../documents/store';
-import { isAboveOnLadder } from '../permissions/rules';
+import { isAbove } from '../permissions/rules';
 import { roleName } from '../rnd/routing';
 import { closedTasksSince, activeTasksOf, type TaskRow } from '../tasks/service';
-import { listActiveUsers, type UserRow } from '../users/service';
+import { listActiveUsers, personOf, type UserRow } from '../users/service';
 import { loadPortfolio } from './portfolio';
 import {
   codeOf,
@@ -27,20 +27,26 @@ import {
 } from './context';
 
 /**
- * The people below this person on the ladder (docs/roles-and-access.md#assigning-work-and-making-requests).
- * A Lead's are the people on the projects of their product line.
+ * The people below this person on the org chart (docs/roles-and-access.md#assigning-work-and-making-requests).
+ * A Lead's also include everyone in R&D on the projects of their product line, whom they run.
  */
 async function peopleBelow(w: WidgetContext): Promise<UserRow[]> {
   const everyone = await listActiveUsers(w.deps.db, w.ctx.orgId);
-  const below = everyone.filter((u) => isAboveOnLadder(w.actor.roleKey, u.roleKey));
-  if (w.actor.roleKey !== 'rd_lead') return below;
-  const portfolio = await loadPortfolio(w.deps.db, w.ctx.orgId);
-  const mine = new Set(
-    portfolio
-      .filter((p) => p.project.productLineId === w.actor.productLineId)
-      .flatMap((p) => p.memberIds),
-  );
-  return below.filter((u) => mine.has(u.id));
+  const me = {
+    roleKey: w.actor.roleKey,
+    positionKey: w.actor.positionKey,
+    productLineId: w.actor.productLineId,
+  };
+  let onMyLine = new Set<string>();
+  if (w.actor.roleKey === 'rd_lead') {
+    const portfolio = await loadPortfolio(w.deps.db, w.ctx.orgId);
+    onMyLine = new Set(
+      portfolio
+        .filter((p) => p.project.productLineId === w.actor.productLineId)
+        .flatMap((p) => p.memberIds),
+    );
+  }
+  return everyone.filter((u) => isAbove(me, personOf(u), onMyLine.has(u.id)));
 }
 
 /** W8: open and overdue tasks of each person below me, by when they fall due. */
@@ -86,7 +92,7 @@ export async function teamWorkload(w: WidgetContext): Promise<WidgetBody> {
             ).length,
             later: mine.filter((t) => !due(t) || (due(t) as string) > nextWeekEnd).length,
           },
-          actions: ['reassign'],
+          actions: ['vp', 'rd_head', 'rd_lead'].includes(w.actor.roleKey) ? ['reassign'] : [],
           ref: { userId: p.id },
         }),
       };

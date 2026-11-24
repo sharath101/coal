@@ -77,10 +77,19 @@ await new S3Client({ endpoint: e.S3_ENDPOINT, region: e.S3_REGION,
 Once, on an empty database, after the backend has started:
 
 ```sh
+railway variables set ADMIN_SWITCHING=true --service backend   # once, for the demo's admin
 railway ssh --service backend -- pnpm seed:demo
 ```
 
-It makes 14 made-up people and three projects, some of them late. Sign in as, for example, *Vera Demo* (the VP) or *Hari Demo* (the R&D Head). People can also sign up with their own name and a role.
+It makes 29 made-up people, one for each seat the chart's headcount fills, and three projects, some of them late. All of them have a single first name: *Vera* (the VP), *Hari* (the R&D Head), *Leela* (the Spine Lead) and so on; the People page lists them. With `ADMIN_SWITCHING` on it also makes *Admin*: sign in as Admin, and move between everyone without signing out ([roles-and-access.md](./roles-and-access.md#switching-people-for-the-demo)). People can also sign up with their own name and a position.
+
+## Before the hand-off
+
+The admin that moves between people is for the demo only ([P113](./decisions.md)). Before COAL goes to Jayon:
+
+1. Remove `ADMIN_SWITCHING` from `backend` (or set it to `false`) and redeploy. The admin can no longer sign in, `POST /auth/switch` refuses everyone, and any session reached by switching stops working.
+2. Take the demo code out: `POST /auth/switch` and its permission, `sessions.switched_by_id`, the `admin` role and position, `PersonSwitcher` and the switch on the People page, and `ADMIN_SWITCHING` itself. They are listed in P113.
+3. Empty the database of made-up data ([starting again](#starting-again)) before anyone enters real data.
 
 ## Starting again
 

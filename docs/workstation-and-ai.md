@@ -413,7 +413,7 @@ sequenceDiagram
 
 1. **Ask.** A manager writes, for example: "Ask Anil to rerun the FEA on the cage by Friday, and tell Priya to update the drawing to rev C."
 2. **Resolve.** The AI identifies each person and links each item to the right project and step, asking if it's unclear.
-3. **Assign or request.** Each item becomes an assignment, if the person is below the manager on the [ladder](./roles-and-access.md#assigning-work-and-making-requests), or a request otherwise.
+3. **Assign or request.** Each item becomes an assignment, if the person is below the manager on the [org chart](./roles-and-access.md#assigning-work-and-making-requests), or a request otherwise.
 4. **Confirm.** One action card shows both items: who, what, due date and the message. The manager confirms.
 5. **Deliver.** The tasks show "Assigned by R&D Head via the Workstation", and the assignees are notified.
 

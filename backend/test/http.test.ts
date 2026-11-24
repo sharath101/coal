@@ -61,17 +61,29 @@ describe('the public lists for the sign-up form', () => {
       'PROD',
       'MKT',
     ]);
-    expect(body.roles).toHaveLength(14);
+    expect(body.roles).toHaveLength(15);
     expect(body.roles).toContainEqual({
       key: 'rd_lead',
       name: 'R&D Lead',
       departmentCode: 'RND',
-      reportsTo: 'rd_head',
-      needsProductLine: true,
     });
     expect(body.roles).toContainEqual(
       expect.objectContaining({ key: 'board', departmentCode: null }),
     );
+    // The demo admin isn't a role anyone signs up as.
+    expect(body.roles.map((r: { key: string }) => r.key)).not.toContain('admin');
+    expect(body.positions).toContainEqual({
+      key: 'rd_lead',
+      title: 'R&D Lead',
+      roleKey: 'rd_lead',
+      departmentCode: 'RND',
+      reportsTo: 'rd_head',
+      perProductLine: true,
+      seats: 1,
+      full: false,
+      fullProductLineIds: [],
+    });
+    expect(body.positions.map((p: { key: string }) => p.key)).not.toContain('admin');
   });
 
   it('give the product lines', async () => {
@@ -94,7 +106,7 @@ describe('problems', () => {
     expect(res.statusCode).toBe(400);
     expect(res.json().code).toBe('VALIDATION_FAILED');
     expect(res.json().errors.map((e: { path: string }) => e.path)).toEqual(
-      expect.arrayContaining(['body/name', 'body/roleKey']),
+      expect.arrayContaining(['body/name', 'body/positionKey']),
     );
   });
 

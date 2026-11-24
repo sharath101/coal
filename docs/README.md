@@ -69,7 +69,7 @@ The full log, with reasons, is in [decisions.md](./decisions.md).
 - **AI:** Claude (Anthropic) behind one gateway (D17, replacing D2), with a budget of US$5 per person per day (D18); the Copilot SDK stands in on one development laptop for now (D19). Basic AI in the first release, only when asked (D3). The chat also comes to WhatsApp (D14).
 - **Templates:** a template for each step's documents is Jayon's Word form as it is, kept in COAL's template library; the AI uses the approved one every time (D15, P109).
 - **Signing:** Face ID or fingerprint passkeys, with the device PIN as fallback (D4), built last (D16). A confirmed click until then.
-- **Accounts:** name and role sign-up, and name sign-in, for now; no admin (D5).
+- **Accounts:** name and position sign-up (seats from Jayon's chart), and name sign-in, for now; a temporary demo admin who moves between people (D5, [P113](./decisions.md)).
 - **Visibility:** project status visible to everyone (D6).
 - **Dashboard:** expandable widgets (D7).
 - **Regulatory:** reference only until we have the full picture (D8).

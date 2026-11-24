@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { defineEndpoint } from '../api/contract';
 import { Id, IdParams, PageQuery, Timestamp, pageOf } from './common';
-import { RoleKey } from './org';
+import { Position, PositionKey, RoleKey } from './org';
 import { ProductLine } from './rnd';
 
 export const PersonName = z.string().trim().min(2).max(80);
@@ -12,17 +12,25 @@ export const UserRole = z.object({
   departmentCode: z.string().nullable(),
 });
 
+/** A person's box on the org chart: what they are called there. */
+export const UserPosition = z.object({ key: PositionKey, title: z.string() });
+
 export const User = z.object({
   id: Id,
   name: z.string(),
   role: UserRole,
+  position: UserPosition,
   productLine: ProductLine.nullable(),
   status: z.enum(['active', 'inactive']),
 });
 export type User = z.infer<typeof User>;
 
+/** Who someone reports to: the nearest person above them on the chart. */
+export const Manager = z.object({ id: Id, name: z.string(), positionTitle: z.string() });
+export type Manager = z.infer<typeof Manager>;
+
 /** My own profile. `updatedAt` is the version to send back in If-Match when editing. */
-export const Me = User.extend({ updatedAt: Timestamp });
+export const Me = User.extend({ updatedAt: Timestamp, reportsTo: Manager.nullable() });
 export type Me = z.infer<typeof Me>;
 
 /** What is switched on in this deployment, so the website hides what is parked (docs/architecture.md). */
@@ -32,15 +40,22 @@ export const Features = z.object({
 });
 export type Features = z.infer<typeof Features>;
 
-/** `GET /me`: my profile and what is switched on. */
-export const MeView = Me.extend({ features: Features });
+/**
+ * `GET /me`: my profile and what is switched on. `switcher` is the admin behind this session, when
+ * there is one: the demo's way of moving between people (docs/roles-and-access.md#switching-people-for-the-demo).
+ */
+export const MeView = Me.extend({
+  features: Features,
+  switcher: z.object({ id: Id, name: z.string() }).nullable(),
+});
 export type MeView = z.infer<typeof MeView>;
 
 export const SessionResponse = z.object({ user: Me });
 
 export const SignUpBody = z.object({
   name: PersonName,
-  roleKey: RoleKey,
+  positionKey: PositionKey,
+  /** For a position counted by product line (a Lead, a design engineer). */
   productLineId: Id.optional(),
 });
 export type SignUpBody = z.infer<typeof SignUpBody>;
@@ -52,7 +67,7 @@ export const SignInBody = z.object({
 export const UpdateMeBody = z
   .object({
     name: PersonName.optional(),
-    roleKey: RoleKey.optional(),
+    positionKey: PositionKey.optional(),
     productLineId: Id.nullable().optional(),
   })
   .refine((body) => Object.values(body).some((v) => v !== undefined), {
@@ -88,6 +103,25 @@ export const signIn = defineEndpoint({
   permission: 'auth.signIn',
   aiTier: 'none',
   body: SignInBody,
+  response: SessionResponse,
+});
+
+export const SwitchBody = z.object({ userId: Id });
+
+/**
+ * A stand-in for the demo, like name-only sign-in, to be removed before the hand-off
+ * (docs/roles-and-access.md#switching-people-for-the-demo).
+ */
+export const switchPerson = defineEndpoint({
+  id: 'auth.switch',
+  method: 'POST',
+  path: '/auth/switch',
+  summary:
+    'Demo only: the admin takes the place of another person, or goes back to being the admin',
+  auth: 'session',
+  permission: 'auth.switch',
+  aiTier: 'none',
+  body: SwitchBody,
   response: SessionResponse,
 });
 
@@ -135,6 +169,26 @@ export const listUsers = defineEndpoint({
   aiTier: 'read',
   query: UsersQuery,
   response: pageOf(User),
+});
+
+/** A box on the chart, with the people who hold it. */
+export const ChartPosition = Position.extend({
+  holders: z.array(z.object({ id: Id, name: z.string(), productLine: ProductLine.nullable() })),
+});
+export type ChartPosition = z.infer<typeof ChartPosition>;
+
+export const OrgChartResponse = z.object({ positions: z.array(ChartPosition) });
+export type OrgChartResponse = z.infer<typeof OrgChartResponse>;
+
+export const getOrgChart = defineEndpoint({
+  id: 'org.chart',
+  method: 'GET',
+  path: '/org-chart',
+  summary: 'The org chart: every position, who reports to whom, and who holds each',
+  auth: 'session',
+  permission: 'org.chart',
+  aiTier: 'read',
+  response: OrgChartResponse,
 });
 
 export const getUser = defineEndpoint({

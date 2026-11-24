@@ -67,6 +67,13 @@ const Env = z.object({
    * Word form as it is, and people fill it in Word.
    */
   TEMPLATE_FILLING: flag.default(false),
+  /**
+   * Demo only, to be removed before the hand-off (docs/roles-and-access.md#switching-people-for-the-demo).
+   * On, an admin account can take the place of anyone, in one click, without signing out. Off (the
+   * default), there is no way to switch: the admin account can't sign in, and a session that was
+   * reached by switching ends.
+   */
+  ADMIN_SWITCHING: flag.default(false),
   /** Gotenberg turns the filled Word files into PDFs. */
   GOTENBERG_URL: z.string().default('http://localhost:3100'),
   // A PDF is made while a version is saved, holding the project's lock, so a stuck service must give up soon.
@@ -155,6 +162,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
       linkSeconds: e.FILE_LINK_SECONDS,
     },
     templateFilling: e.TEMPLATE_FILLING,
+    adminSwitching: e.ADMIN_SWITCHING,
     outboxPollMs: e.OUTBOX_POLL_MS,
     pdf: { url: e.GOTENBERG_URL, timeoutMs: e.PDF_TIMEOUT_MS },
     scan: e.CLAMAV_HOST ? { host: e.CLAMAV_HOST, port: e.CLAMAV_PORT } : null,

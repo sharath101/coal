@@ -15,7 +15,7 @@ This is the **first-release core** only: about 40 tables. Step-specific and regu
 - **Platform and department tables.** COAL will grow from R&D to all of Jayon ([architecture.md](./architecture.md#growing-to-all-of-jayon)).
   - *Platform tables* serve every department: people, processes, tasks, documents, templates, signatures, AI, notifications and audit.
   - *Department tables* hold one department's own records. R&D's are `product_lines`, `projects` and `project_members`.
-  - Department tables may point at platform tables, never the other way round. The one exception is `users.product_line_id`, a Lead's product line, until the org chart replaces it ([A4](./open-questions.md#people-and-access)).
+  - Department tables may point at platform tables, never the other way round. The one exception is `users.product_line_id`, the product line of a Lead or a design engineer, until the org chart replaces it ([A4](./open-questions.md#people-and-access)).
 - **Processes in general.** A **process run** is one run of a process's route. For R&D, each project has exactly one run. Steps, tasks, decisions, milestones and documents point at the run, so other departments' processes reuse them unchanged.
 - **Times.** Stored in UTC, shown in Indian time.
 - **Nothing important is overwritten.** Documents, signatures, decisions and deviations are versioned or insert-only. A correction is a new row pointing at the old one. Tables marked *insert-only* can't be changed or deleted: a trigger (`coal_refuse_change`) refuses every `UPDATE`, `DELETE` and `TRUNCATE`, and in production the backend's database account will also lack those privileges.
@@ -69,11 +69,12 @@ In words:
 | Table | Holds | Key columns |
 |---|---|---|
 | `departments` | Jayon's departments: R&D first, and the ones R&D works with (Quality Assurance, Quality Control, Production, Marketing) | code, name, sort_order |
-| `roles` | Every role ([roles-and-access.md](./roles-and-access.md#roles)) | key, name, department_id (empty for the Board and the VP, who sit above departments), reports_to_key (the role ladder until there's an org chart), needs_product_line (the R&D Lead), sort_order |
-| `users` | Everyone with an account | name (unique, case-insensitive), role_key (must be a role), product_line_id (Leads), status |
-| `sessions` | Sign-in sessions | user_id, token_hash (SHA-256 of the token), device, expires_at, revoked_at |
+| `roles` | Every role: what a person may do on the route ([roles-and-access.md](./roles-and-access.md#roles)) | key, name, department_id (empty for the Board and the VP, who sit above departments), sort_order |
+| `positions` | The boxes of Jayon's org chart ([roles-and-access.md](./roles-and-access.md#the-org-chart)) | key, title, role_key (the role it holds), reports_to_key (the position above it), per_product_line (seats are counted for each line), seats (empty: no limit), self_service (false for the demo admin), sort_order |
+| `users` | Everyone with an account | name (unique, case-insensitive), role_key (the role of their position), position_key (their box on the chart; empty only for an account made before positions, until the loader places it), product_line_id (Leads and design engineers), status |
+| `sessions` | Sign-in sessions | user_id, token_hash (SHA-256 of the token), device, expires_at, revoked_at, switched_by_id (the demo admin who started it by switching, [P113](./decisions.md); temporary) |
 
-Departments, roles and product lines are reference data. Their rows are listed in `backend/src/modules/org/catalogue.ts` and `backend/src/modules/rnd/catalogue.ts`, and loaded into the tables by `db:migrate` on every deploy.
+Departments, roles, positions and product lines are reference data. Their rows are listed in `backend/src/modules/org/catalogue.ts` and `backend/src/modules/rnd/catalogue.ts`, and loaded into the tables by `db:migrate` on every deploy, which also places accounts made before positions in the first position of their role that has a seat.
 | `passkeys` | Devices registered for signing | user_id, credential_id, public_key, sign_count, transports, device_name, backed_up, last_used_at, revoked_at |
 
 ### Processes and the calendar

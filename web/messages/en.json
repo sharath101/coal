@@ -15,7 +15,8 @@
     "projects": "Projects",
     "tasks": "My tasks",
     "main": "Main",
-    "research": "Research"
+    "research": "Research",
+    "people": "People"
   },
   "signIn": {
     "title": "Sign in",
@@ -28,11 +29,15 @@
   },
   "signUp": {
     "title": "Create an account",
-    "intro": "Enter your name and choose your role. A Lead also chooses their product line.",
+    "intro": "Enter your name and choose your position on Jayon's R&D chart. A Lead or a design engineer also chooses their product line.",
     "name": "Your name",
     "nameHint": "Names must be unique. Add an initial or a surname if someone shares your name.",
-    "role": "Your role",
-    "chooseRole": "Choose your role",
+    "position": "Your position",
+    "choosePosition": "Choose your position",
+    "fullPosition": "{title} (no seat left)",
+    "fullLine": "{line} (no seat left)",
+    "seats": "{count, plural, one {One person holds this position.} other {Up to # people hold this position.}}",
+    "seatsPerLine": "{count, plural, one {One person per product line.} other {Up to # people per product line.}}",
     "aboveDepartments": "Board and VP",
     "productLine": "Product line",
     "chooseProductLine": "Choose a product line",
@@ -42,9 +47,36 @@
   },
   "profile": {
     "title": "Your profile",
-    "intro": "Until there's an admin, you can change your own name, role and product line.",
+    "intro": "Until there's real sign-in, you can change your own name, position and product line. A position with no seat left can't be chosen.",
+    "reportsTo": "You report to {name}, {title}.",
+    "reportsToNobody": "Nobody is above you on the chart.",
     "save": "Save changes",
     "saved": "Saved."
+  },
+  "switcher": {
+    "open": "Switch to another person",
+    "demoOnly": "Demo: switch to anyone, no sign-out",
+    "search": "Search by name or position",
+    "people": "People",
+    "backTo": "Back to {name}",
+    "current": "You are this person",
+    "nobody": "Nobody matches.",
+    "chart": "Org chart"
+  },
+  "people": {
+    "title": "People",
+    "intro": "Jayon's R&D chart: who reports to whom, who holds each position, and the seats still open.",
+    "switchHint": "Demo: click a name to take that person's place. You can switch again from the circle at the top.",
+    "rnd": "Research & Development",
+    "outside": "Departments R&D works with",
+    "boardNote": "The Managing Director and the CEO both sign as the Board, at steps 4 and 23.",
+    "seats": "{taken} of {total}",
+    "openSeat": "Open seat",
+    "nobody": "Nobody yet",
+    "you": "(you)",
+    "switchTitle": "Switch to {name}?",
+    "switchText": "You will see COAL as {name}, {title}. Everything you do is done as them, until you switch again.",
+    "switch": "Switch"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -287,6 +319,7 @@
     "NOT_FOUND": "We couldn't find that. It may have been removed.",
     "NAME_TAKEN": "Someone already has that name. Add an initial or a surname.",
     "PRODUCT_LINE_REQUIRED": "Choose your product line.",
+    "POSITION_FULL": "That position has no seat left. Choose another one, or ask who holds it.",
     "VERSION_CONFLICT": "Your profile changed since you opened it. Reload and try again.",
     "VALIDATION_FAILED": "Some of the values aren't valid. Check them and try again.",
     "RATE_LIMITED": "Too many tries. Wait a minute and try again.",

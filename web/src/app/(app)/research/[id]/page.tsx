@@ -9,7 +9,7 @@ import { useTranslations } from 'next-intl';
 import { Fragment, useId, useState, type ReactNode } from 'react';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { ProblemMessage } from '@/components/problem-message';
-import { selectClass } from '@/components/role-fields';
+import { selectClass } from '@/components/ui/select-class';
 import { RESEARCH_TONE } from '@/components/research/research-card';
 import { Pill } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';

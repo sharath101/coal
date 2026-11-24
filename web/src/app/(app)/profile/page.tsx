@@ -4,8 +4,8 @@ import { updateMe, type Me } from '@coal/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
+import { PositionFields } from '@/components/position-fields';
 import { ProblemMessage } from '@/components/problem-message';
-import { RoleFields } from '@/components/role-fields';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -27,12 +27,12 @@ function ProfileForm({ me, saved, onSaved }: { me: Me; saved: boolean; onSaved: 
   const roles = useRoles();
   const productLines = useProductLines();
   const [name, setName] = useState(me.name);
-  const [roleKey, setRoleKey] = useState(me.role.key);
+  const [positionKey, setPositionKey] = useState(me.position.key);
   const [productLineId, setProductLineId] = useState(me.productLine?.id ?? '');
 
   const changes = {
     ...(name.trim() !== me.name && { name }),
-    ...(roleKey !== me.role.key && { roleKey }),
+    ...(positionKey !== me.position.key && { positionKey }),
     ...(productLineId !== (me.productLine?.id ?? '') && { productLineId: productLineId || null }),
   };
   const changed = Object.keys(changes).length > 0;
@@ -41,7 +41,13 @@ function ProfileForm({ me, saved, onSaved }: { me: Me; saved: boolean; onSaved: 
     mutationFn: () => api(updateMe, { body: changes, ifMatch: me.updatedAt }),
     onSuccess: (updated) => {
       onSaved();
-      queryClient.setQueryData(queryKeys.me, updated);
+      // The cache holds the whole profile, so keep what only `GET /me` adds.
+      queryClient.setQueryData(queryKeys.me, (old: Record<string, unknown> | undefined) => ({
+        ...old,
+        ...updated,
+      }));
+      void queryClient.invalidateQueries({ queryKey: queryKeys.roles });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.orgChart });
     },
   });
 
@@ -71,15 +77,21 @@ function ProfileForm({ me, saved, onSaved }: { me: Me; saved: boolean; onSaved: 
             />
           </div>
           {roles.data && productLines.data && (
-            <RoleFields
+            <PositionFields
               roles={roles.data}
               productLines={productLines.data}
-              roleKey={roleKey}
+              positionKey={positionKey}
               productLineId={productLineId}
-              onRoleChange={setRoleKey}
+              onPositionChange={setPositionKey}
               onProductLineChange={setProductLineId}
+              own={{ positionKey: me.position.key, productLineId: me.productLine?.id ?? '' }}
             />
           )}
+          <p className="text-sm text-muted-foreground">
+            {me.reportsTo
+              ? t('reportsTo', { name: me.reportsTo.name, title: me.reportsTo.positionTitle })
+              : t('reportsToNobody')}
+          </p>
           <ProblemMessage error={mutation.error} />
           {saved && !changed && <p className="text-sm text-muted-foreground">{t('saved')}</p>}
         </CardContent>

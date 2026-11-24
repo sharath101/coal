@@ -86,8 +86,8 @@ COAL starts with R&D (about 60 people) and will grow to the whole company (about
 - **Several backend copies** share live updates through the database ([below](#events-and-live-updates)).
 - **Before other departments join:**
   - real company sign-in, including a way in for employees without a company email;
-  - the org chart;
-  - an admin role ([roadmap.md](./roadmap.md#after-the-first-release)).
+  - the org chart kept by Jayon (it is in COAL as drawn, from the catalogue, for now);
+  - a real admin role ([roadmap.md](./roadmap.md#after-the-first-release)); the demo admin that moves between people is removed first ([P113](./decisions.md)).
 
 **When the stack would change**
 

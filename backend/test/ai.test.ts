@@ -626,7 +626,14 @@ describe('what the AI may do', () => {
     const ctx = {
       orgId: DEFAULT_ORG_ID,
       requestId: 'r',
-      actor: { userId: id('vp'), name: 'V', roleKey: 'vp', productLineId: null },
+      actor: {
+        userId: id('vp'),
+        name: 'V',
+        roleKey: 'vp',
+        positionKey: 'vp',
+        productLineId: null,
+        switcherId: null,
+      },
       sessionId: 's',
       viaAi: true,
     };

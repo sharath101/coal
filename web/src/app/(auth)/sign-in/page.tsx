@@ -19,7 +19,6 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { api } from '@/lib/api';
-import { queryKeys } from '@/lib/queries';
 
 export default function SignInPage() {
   const t = useTranslations('signIn');
@@ -30,8 +29,10 @@ export default function SignInPage() {
   const mutation = useMutation({
     mutationFn: () => api(signIn, { body: { name } }),
     onSuccess: ({ user }) => {
-      queryClient.setQueryData(queryKeys.me, user);
-      router.replace('/dashboard');
+      // The sign-in answer lacks what only `GET /me` adds (what is switched on, the demo switcher), so the app asks again.
+      queryClient.clear();
+      // The admin has no work of their own: they start where the people are.
+      router.replace(user.role.key === 'admin' ? '/people' : '/dashboard');
     },
   });
 

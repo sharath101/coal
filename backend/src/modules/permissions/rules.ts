@@ -1,6 +1,7 @@
 import type { PermissionKey } from '@coal/shared';
 import type { Actor } from '../../core/http/context';
-import { ROLES } from '../org/catalogue';
+import { ROLES, positionSeed } from '../org/catalogue';
+import { inRnd, isAboveOnChart, positionAbove, type Placed } from '../org/chart';
 
 /**
  * The one permission module (docs/roles-and-access.md#how-access-is-enforced).
@@ -68,6 +69,13 @@ const ROLE_NAMES = new Map(ROLES.map((r) => [r.key, r.name]));
 const roleNames = (keys: string[]) =>
   keys.map((k) => (k === 'team' ? 'The project team' : (ROLE_NAMES.get(k) ?? k)));
 
+/** Demo only (P113): an admin is behind this session, because switching is on and they started it. */
+const adminBehindSession = (actor: Actor | null): Decision => {
+  const signed = signedIn(actor);
+  if (!signed.allowed) return signed;
+  return (actor as Actor).switcherId ? allow : deny('The demo admin');
+};
+
 /** Endpoint rule: signed in, with one of these roles. */
 const onlyRoles =
   (...keys: string[]) =>
@@ -124,27 +132,20 @@ const mayLinkTask = (actor: Actor, r: NewTaskResource): Decision =>
 
 /**
  * What giving someone work becomes (docs/roles-and-access.md#assigning-work-and-making-requests):
- * my `own` task, `work` assigned to someone below me on the ladder whom I may direct, or a
- * `request` they accept or decline. `onLineTeam`: the person is on a project of my product line.
+ * my `own` task, `work` assigned to someone below me whom I may direct, or a `request` they
+ * accept or decline. `onLineTeam`: the person is on a project of my product line. The Board
+ * assigns only to the VP; everyone else to the people below them on the org chart who work in
+ * R&D, and a Lead also to everyone on their line's project teams.
  */
 export function howToGive(
   actor: Actor,
-  assignee: { id: string; roleKey: string },
+  assignee: Person & { id: string },
   onLineTeam: boolean,
 ): 'own' | 'work' | 'request' {
   if (assignee.id === actor.userId) return 'own';
-  if (!isAboveOnLadder(actor.roleKey, assignee.roleKey)) return 'request';
-  switch (actor.roleKey) {
-    case 'board':
-      return assignee.roleKey === 'vp' ? 'work' : 'request';
-    case 'vp':
-    case 'rd_head':
-      return ROLE_DEPARTMENTS.get(assignee.roleKey) === 'RND' ? 'work' : 'request';
-    case 'rd_lead':
-      return onLineTeam ? 'work' : 'request';
-    default:
-      return 'request';
-  }
+  if (actor.roleKey === 'board') return assignee.roleKey === 'vp' ? 'work' : 'request';
+  if (!isAbove(actor, assignee, onLineTeam)) return 'request';
+  return inRnd(assignee.positionKey) ? 'work' : 'request';
 }
 
 /**
@@ -263,17 +264,35 @@ const mayReachRequest = (actor: Actor, r: SignatureResource): Decision => {
     : deny(...roleNames(r.roleKeys));
 };
 
-/** The role one step up the reporting line (the ladder in docs/roles-and-access.md), if any. */
-export const roleAbove = (roleKey: string): string | null =>
-  ROLES.find((r) => r.key === roleKey)?.reportsTo ?? null;
-
-/** Is `roleKey` anywhere above `belowKey` on the ladder? */
-export function isAboveOnLadder(roleKey: string, belowKey: string): boolean {
-  for (let up = roleAbove(belowKey); up; up = roleAbove(up)) {
-    if (up === roleKey) return true;
-  }
-  return false;
+/** Where a person sits: their role, their box on the org chart and their product line. */
+export interface Person extends Placed {
+  roleKey: string;
 }
+
+/** A person nobody is above: for a record whose person has gone. */
+export const NO_ONE: Person = { roleKey: '', positionKey: '', productLineId: null };
+
+/** The people a Lead runs by their line's projects, besides the ones below them on the chart. */
+export const isTeamStaff = (roleKey: string): boolean =>
+  ROLE_DEPARTMENTS.get(roleKey) === 'RND' && roleKey !== 'rd_head' && roleKey !== 'rd_lead';
+
+/**
+ * Is `actor` above `person`: on the org chart, or the Lead of the line `person` works on? A Lead
+ * runs the projects of their line, so on those they stand above everyone in R&D who is on the
+ * team (P112). `onLine`: the person works on a project of the actor's line.
+ */
+export function isAbove(actor: Person, person: Person, onLine: boolean): boolean {
+  return (
+    isAboveOnChart(actor, person) ||
+    (actor.roleKey === 'rd_lead' && onLine && isTeamStaff(person.roleKey))
+  );
+}
+
+/** The title of the position one step up the chart, if any. */
+export const titleAbove = (positionKey: string): string | null => {
+  const up = positionAbove(positionKey);
+  return up ? (positionSeed(up)?.title ?? up) : null;
+};
 
 /** A task being explained: its assignee, and the project's scope. */
 export interface DeviationRecordResource extends Scope {
@@ -286,20 +305,24 @@ const mayRecordDeviation = (actor: Actor, r: DeviationRecordResource): Decision 
   return deny('The person the task is assigned to', 'R&D Lead', 'R&D Head');
 };
 
-/** A deviation waiting to be confirmed: the role of the person who recorded it, and the project's scope. */
+/** A deviation waiting to be confirmed: who recorded it and where they sit, and the project's scope. */
 export interface DeviationReviewResource extends Scope {
-  recordedByRoleKey: string;
+  recorder: Person;
   recordedById: string;
 }
 
-/** The next role up, or anyone above, in the project's scope; never the person who recorded it. */
+/** Someone above the person who recorded it, in the project's scope; never the person who recorded it. */
 const mayReviewDeviation = (actor: Actor, r: DeviationReviewResource): Decision => {
-  const up = roleAbove(r.recordedByRoleKey);
+  const onLine = !!actor.productLineId && actor.productLineId === r.productLineId;
   const ok =
-    actor.userId !== r.recordedById &&
-    isAboveOnLadder(actor.roleKey, r.recordedByRoleKey) &&
-    inScope(actor, r);
-  return ok ? allow : deny(...(up ? roleNames([up]) : ['Nobody: it is at the top of the line']));
+    actor.userId !== r.recordedById && isAbove(actor, r.recorder, onLine) && inScope(actor, r);
+  if (ok) return allow;
+  const up = titleAbove(r.recorder.positionKey);
+  const who = [
+    ...(up ? [up] : []),
+    ...(isTeamStaff(r.recorder.roleKey) ? ['The R&D Lead of this product line'] : []),
+  ];
+  return deny(...(who.length > 0 ? who : ['Nobody: it is at the top of the line']));
 };
 
 /** A deviation's named cause, and the project's scope. */
@@ -320,21 +343,20 @@ const mayCommentOnDeviation = (actor: Actor, r: DeviationCauseResource): Decisio
 
 /**
  * Who sees a deviation's cause by name (docs/roles-and-access.md#content-is-need-to-know): the VP
- * and the Head see everyone; a Lead sees the people below them; a person sees themselves.
+ * and the Head see everyone; a person sees themselves and the people below them on the chart, and a
+ * Lead everyone of their line's projects; the Board sees no names.
  */
 export function causeNameVisible(
   actor: Actor,
-  cause: { userId: string | null; userRoleKey: string | null } & Scope,
+  cause: { userId: string | null; user: Person | null } & Scope,
 ): boolean {
   if (['vp', 'rd_head'].includes(actor.roleKey)) return true;
   if (cause.userId === null) return inScope(actor, cause);
   if (cause.userId === actor.userId) return true;
-  return (
-    actor.roleKey === 'rd_lead' &&
-    inScope(actor, cause) &&
-    cause.userRoleKey !== null &&
-    isAboveOnLadder('rd_lead', cause.userRoleKey)
-  );
+  // The Board sees department totals, never a named person (A3).
+  if (actor.roleKey === 'board' || !cause.user) return false;
+  const onLine = !!actor.productLineId && actor.productLineId === cause.productLineId;
+  return inScope(actor, cause) && isAbove(actor, cause.user, onLine);
 }
 
 /** A notification belongs to the person it was sent to. */
@@ -369,10 +391,14 @@ export const RULES = {
   'auth.signUp': { endpoint: anyone },
   'auth.signIn': { endpoint: anyone },
   'auth.signOut': { endpoint: signedIn },
+  // Demo only (P113): the admin behind this session, while switching is on.
+  'auth.switch': { endpoint: adminBehindSession },
   'me.read': { endpoint: signedIn },
   'me.update': { endpoint: signedIn },
   'users.read': { endpoint: signedIn },
   'org.read': { endpoint: anyone },
+  // Who reports to whom and who holds each position is open to everyone signed in.
+  'org.chart': { endpoint: signedIn },
   'rnd.productLines.read': { endpoint: anyone },
   'files.upload': { endpoint: signedIn, resource: uploaderOnly },
   'files.read': { endpoint: signedIn, resource: uploaderOrRecord },

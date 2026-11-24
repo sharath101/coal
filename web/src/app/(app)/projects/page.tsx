@@ -6,7 +6,7 @@ import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { HealthBadge } from '@/components/health-badge';
 import { ProblemMessage } from '@/components/problem-message';
-import { selectClass } from '@/components/role-fields';
+import { selectClass } from '@/components/ui/select-class';
 import { ProjectStatusBadge } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';

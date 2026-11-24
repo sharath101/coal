@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { Actor, RequestContext } from '../../core/http/context';
 import { assertAiTier, guard } from '../../core/http/endpoint';
 import { IMPLEMENTATIONS } from '../index';
-import { ROLES } from '../org/catalogue';
+import { POSITIONS, ROLES, firstPositionOfRole, type PositionSeed } from '../org/catalogue';
 import { canAccess, canUse } from './index';
 import {
   RULES,
@@ -11,8 +11,9 @@ import {
   causeNameVisible,
   documentAccess,
   howToGive,
-  isAboveOnLadder,
+  isAbove,
   type DocumentResource,
+  type Person,
 } from './rules';
 
 /**
@@ -28,10 +29,13 @@ const ENDPOINT_TABLE: Record<PermissionKey, Who[]> = {
   'auth.signUp': EVERYONE,
   'auth.signIn': EVERYONE,
   'auth.signOut': SIGNED_IN,
+  // Demo only (P113): only the admin behind a session can switch.
+  'auth.switch': ['admin'],
   'me.read': SIGNED_IN,
   'me.update': SIGNED_IN,
   'users.read': SIGNED_IN,
   'org.read': EVERYONE,
+  'org.chart': SIGNED_IN,
   'rnd.productLines.read': EVERYONE,
   'files.upload': SIGNED_IN,
   'files.read': SIGNED_IN,
@@ -139,8 +143,21 @@ const RESOURCE_TABLE = {
   'files.read': { 'own file': SIGNED_IN, "someone else's file": [] as Who[] },
 } as const;
 
+/** A person in a role, in the first position of that role unless a test says otherwise. */
+const actorIn = (
+  roleKey: string,
+  options: { userId?: string; positionKey?: string; line?: string | null } = {},
+): Actor => ({
+  userId: options.userId ?? 'user-1',
+  name: roleKey,
+  roleKey,
+  positionKey: options.positionKey ?? firstPositionOfRole(roleKey)?.key ?? roleKey,
+  productLineId: options.line ?? null,
+  switcherId: roleKey === 'admin' ? (options.userId ?? 'user-1') : null,
+});
+
 const actorFor = (who: Who, userId = 'user-1'): Actor | null =>
-  who === 'anonymous' ? null : { userId, name: `A ${who}`, roleKey: who, productLineId: null };
+  who === 'anonymous' ? null : actorIn(who, { userId });
 
 describe('permission table', () => {
   it('covers every permission an endpoint uses, and every role', () => {
@@ -201,7 +218,7 @@ describe('permission table', () => {
     const resource = { productLineId: 'line-spine', memberIds: [], roles: ['rd_head'] };
     for (const permission of SCOPED) {
       for (const who of ROLE_KEYS) {
-        const actor = { userId: 'user-1', name: 'A', roleKey: who, productLineId: null };
+        const actor = actorIn(who);
         const decision = canAccess(permission, actor, resource);
         if (decision.allowed) continue;
         expect(
@@ -228,12 +245,7 @@ describe('permission table', () => {
 describe('project-scoped rules', () => {
   const LINE = 'line-spine';
   const project = (memberIds: string[]) => ({ productLineId: LINE, memberIds });
-  const actor = (who: Who, line: string | null = null): Actor => ({
-    userId: 'user-1',
-    name: `A ${who}`,
-    roleKey: who,
-    productLineId: line,
-  });
+  const actor = (who: Who, line: string | null = null): Actor => actorIn(who, { line });
 
   const cases = SCOPED.flatMap((permission) =>
     ROLE_KEYS.flatMap(
@@ -348,12 +360,7 @@ describe('task rules', () => {
 
   it('claiming from the Lead queue needs the same product line as the project', () => {
     const queued = { assigneeId: null, queueRole: 'rd_lead' };
-    const lead = (line: string): Actor => ({
-      userId: 'user-1',
-      name: 'A lead',
-      roleKey: 'rd_lead',
-      productLineId: line,
-    });
+    const lead = (line: string): Actor => actorIn('rd_lead', { line });
     const spineTask = { ...queued, productLineId: 'spine' };
     expect(canAccess('tasks.claim', lead('spine'), spineTask).allowed).toBe(true);
     expect(canAccess('tasks.claim', lead('trauma'), spineTask)).toEqual({
@@ -380,50 +387,113 @@ describe('task rules', () => {
   });
 });
 
-describe('giving work: assignment or request (the ladder)', () => {
-  const RND_BELOW_LEAD = ['design_engineer', 'aems', 'pme', 'rd_ops', 'dard', 'qc_inspector'];
-  const OUTSIDE_RND = ['company_qa', 'quality_control', 'production', 'marketing'];
-  const give = (from: Who, to: Who, onLineTeam = false) =>
-    howToGive(actorFor(from) as Actor, { id: 'user-2', roleKey: to }, onLineTeam);
+describe('giving work: assignment or request (the org chart)', () => {
+  const SPINE = 'line-spine';
+  const TRAUMA = 'line-trauma';
+  const seed = (key: string) => POSITIONS.find((p) => p.key === key) as PositionSeed;
+  const at = (positionKey: string, line: string | null = null): Actor =>
+    actorIn(seed(positionKey).role, { positionKey, line });
+  const toward = (positionKey: string, line: string | null = null, id = 'user-2') => ({
+    id,
+    roleKey: seed(positionKey).role,
+    positionKey,
+    productLineId: line,
+  });
+  const give = (from: Actor, to: string, line: string | null = null, onLineTeam = false) =>
+    howToGive(from, toward(to, line), onLineTeam);
+
+  const RND_ROLES = [
+    'rd_head',
+    'rd_lead',
+    'design_engineer',
+    'aems',
+    'pme',
+    'rd_ops',
+    'dard',
+    'qc_inspector',
+    'graphics_designer',
+  ];
+  const IN_RND = POSITIONS.filter((p) => RND_ROLES.includes(p.role)).map((p) => p.key);
+  const OUTSIDE = ['company_qa', 'quality_control', 'production', 'marketing'];
 
   it('is my own task when I give it to myself', () => {
-    for (const who of ROLE_KEYS) {
-      expect(howToGive(actorFor(who) as Actor, { id: 'user-1', roleKey: who }, false)).toBe('own');
+    for (const p of POSITIONS) {
+      expect(howToGive(at(p.key), toward(p.key, null, 'user-1'), false)).toBe('own');
     }
   });
 
   it('lets the Board assign to the VP only', () => {
-    expect(give('board', 'vp')).toBe('work');
-    for (const to of ['board', 'rd_head', 'rd_lead', ...RND_BELOW_LEAD, ...OUTSIDE_RND]) {
-      expect(give('board', to)).toBe('request');
+    for (const board of ['managing_director', 'ceo']) {
+      expect(give(at(board), 'vp')).toBe('work');
+      for (const to of [...IN_RND, ...OUTSIDE, 'managing_director', 'ceo']) {
+        expect(give(at(board), to)).toBe('request');
+      }
     }
   });
 
   it('lets the VP assign to anyone in R&D, and ask everyone else', () => {
-    for (const to of ['rd_head', 'rd_lead', ...RND_BELOW_LEAD]) expect(give('vp', to)).toBe('work');
-    for (const to of ['board', 'vp', ...OUTSIDE_RND]) expect(give('vp', to)).toBe('request');
-  });
-
-  it('lets the Head assign to anyone in R&D below them', () => {
-    for (const to of ['rd_lead', ...RND_BELOW_LEAD]) expect(give('rd_head', to)).toBe('work');
-    for (const to of ['board', 'vp', 'rd_head', ...OUTSIDE_RND]) {
-      expect(give('rd_head', to)).toBe('request');
+    for (const to of IN_RND) expect(give(at('vp'), to)).toBe('work');
+    for (const to of ['managing_director', 'ceo', ...OUTSIDE]) {
+      expect(give(at('vp'), to)).toBe('request');
     }
   });
 
-  it("lets a Lead assign to people below them on their line's projects only", () => {
-    for (const to of RND_BELOW_LEAD) {
-      expect(give('rd_lead', to, true)).toBe('work');
-      expect(give('rd_lead', to, false)).toBe('request');
+  it('lets the Head assign to anyone in R&D below them, and ask everyone else', () => {
+    for (const to of IN_RND.filter((k) => k !== 'rd_head')) {
+      expect(give(at('rd_head'), to)).toBe('work');
     }
-    for (const to of ['rd_head', 'rd_lead', 'vp', ...OUTSIDE_RND]) {
-      expect(give('rd_lead', to, true)).toBe('request');
+    for (const to of ['vp', 'managing_director', 'ceo', ...OUTSIDE]) {
+      expect(give(at('rd_head'), to)).toBe('request');
     }
+  });
+
+  it("lets a Lead assign to their line's design engineers, and to anyone in R&D on their line's project teams", () => {
+    const lead = at('rd_lead', SPINE);
+    expect(give(lead, 'design_engineer', SPINE)).toBe('work');
+    expect(give(lead, 'design_engineer', TRAUMA)).toBe('request');
+    for (const to of [
+      'metallurgy_expert',
+      'ops_manager',
+      'dard_engineer',
+      'qc_inspector',
+      'pme_staff',
+    ]) {
+      expect(give(lead, to, null, true)).toBe('work');
+      expect(give(lead, to, null, false)).toBe('request');
+    }
+    for (const to of ['rd_head', 'rd_lead', 'vp', ...OUTSIDE]) {
+      expect(give(lead, to, TRAUMA, true)).toBe('request');
+    }
+  });
+
+  it('lets each manager assign to the people who report to them', () => {
+    expect(give(at('dard_lead'), 'dard_engineer')).toBe('work');
+    expect(give(at('dard_lead'), 'qc_inspector')).toBe('work');
+    expect(give(at('dard_lead'), 'design_engineer', SPINE)).toBe('request');
+    expect(give(at('ops_manager'), 'ops_analyst')).toBe('work');
+    expect(give(at('ops_manager'), 'graphics_designer')).toBe('work');
+    expect(give(at('ops_manager'), 'dard_engineer')).toBe('request');
+    expect(give(at('pme_manager'), 'pme_staff')).toBe('work');
+    expect(give(at('pme_manager'), 'ops_analyst')).toBe('request');
   });
 
   it('makes everything from everyone else a request', () => {
-    for (const from of [...RND_BELOW_LEAD, ...OUTSIDE_RND]) {
-      for (const to of ROLE_KEYS) expect(give(from, to, true)).toBe('request');
+    const everyoneElse = [
+      'design_engineer',
+      'metallurgy_expert',
+      'fea_expert',
+      'ops_analyst',
+      'graphics_designer',
+      'dard_engineer',
+      'qc_inspector',
+      'pme_staff',
+      ...OUTSIDE,
+    ];
+    for (const from of everyoneElse) {
+      for (const to of POSITIONS.map((p) => p.key)) {
+        if (to !== from)
+          expect(give(at(from, SPINE), to, SPINE, true), `${from} → ${to}`).toBe('request');
+      }
     }
   });
 });
@@ -507,7 +577,7 @@ describe('document access (need-to-know)', () => {
     roleKey: string,
     options: { line?: string; member?: boolean } = {},
   ): [Actor, string[]] => [
-    { userId: 'user-1', name: roleKey, roleKey, productLineId: options.line ?? null },
+    actorIn(roleKey, { line: options.line ?? null }),
     options.member ? ['user-1'] : [],
   ];
   const access = (
@@ -610,12 +680,8 @@ describe('signature rows', () => {
     roleKeys,
     assigneeId,
   });
-  const as = (roleKey: string): Actor => ({
-    userId: 'user-1',
-    name: roleKey,
-    roleKey,
-    productLineId: roleKey === 'rd_lead' ? 'line-spine' : null,
-  });
+  const as = (roleKey: string): Actor =>
+    actorIn(roleKey, { line: roleKey === 'rd_lead' ? 'line-spine' : null });
   const reach = (actor: Actor, r: ReturnType<typeof row>, member = false) =>
     canAccess('signatures.sign', actor, { ...r, memberIds: member ? ['user-1'] : [] }).allowed;
 
@@ -712,20 +778,49 @@ describe('AI tiers', () => {
 describe('deviation and notification rules', () => {
   const LINE = 'line-spine';
   const scope = { productLineId: LINE, memberIds: ['user-1'] };
-  const as = (roleKey: string, userId = 'user-1', line: string | null = null): Actor => ({
-    userId,
-    name: roleKey,
-    roleKey,
+  const as = (
+    roleKey: string,
+    userId = 'user-1',
+    line: string | null = null,
+    positionKey?: string,
+  ): Actor => actorIn(roleKey, { userId, line, ...(positionKey && { positionKey }) });
+  const placed = (positionKey: string, line: string | null = null): Person => ({
+    positionKey,
+    roleKey: POSITIONS.find((p) => p.key === positionKey)?.role as string,
     productLineId: line,
   });
 
-  it('knows the ladder: Board → VP → Head → Lead → team', () => {
-    expect(isAboveOnLadder('rd_lead', 'design_engineer')).toBe(true);
-    expect(isAboveOnLadder('rd_head', 'design_engineer')).toBe(true);
-    expect(isAboveOnLadder('vp', 'rd_lead')).toBe(true);
-    expect(isAboveOnLadder('design_engineer', 'rd_lead')).toBe(false);
-    expect(isAboveOnLadder('rd_lead', 'rd_lead')).toBe(false);
-    expect(isAboveOnLadder('rd_lead', 'company_qa')).toBe(false);
+  it('knows the chart: MD → VP → Head → Lead → designers, and the managers under the Head', () => {
+    const above = (
+      a: string,
+      b: string,
+      aLine: string | null = null,
+      bLine: string | null = null,
+    ) => isAbove(placed(a, aLine), placed(b, bLine), false);
+    expect(above('rd_lead', 'design_engineer', 'spine', 'spine')).toBe(true);
+    expect(above('rd_lead', 'design_engineer', 'spine', 'trauma')).toBe(false);
+    expect(above('rd_head', 'design_engineer', null, 'trauma')).toBe(true);
+    expect(above('vp', 'rd_lead', null, 'spine')).toBe(true);
+    expect(above('managing_director', 'vp')).toBe(true);
+    expect(above('ceo', 'vp')).toBe(true);
+    expect(above('design_engineer', 'rd_lead', 'spine', 'spine')).toBe(false);
+    expect(above('rd_lead', 'rd_lead', 'spine', 'spine')).toBe(false);
+    expect(above('rd_lead', 'company_qa', 'spine')).toBe(false);
+    expect(above('dard_lead', 'qc_inspector')).toBe(true);
+    expect(above('dard_lead', 'dard_engineer')).toBe(true);
+    expect(above('ops_manager', 'graphics_designer')).toBe(true);
+    expect(above('rd_head', 'pme_staff')).toBe(true);
+    expect(above('pme_manager', 'ops_analyst')).toBe(false);
+    expect(above('admin', 'vp')).toBe(false);
+    expect(above('vp', 'admin')).toBe(false);
+  });
+
+  it('puts a Lead above the R&D staff on their line projects, as the Lead runs them', () => {
+    const lead = placed('rd_lead', 'spine');
+    expect(isAbove(lead, placed('pme_staff'), true)).toBe(true);
+    expect(isAbove(lead, placed('pme_staff'), false)).toBe(false);
+    expect(isAbove(lead, placed('rd_head'), true)).toBe(false);
+    expect(isAbove(lead, placed('company_qa'), true)).toBe(false);
   });
 
   const record = (actor: Actor, assigneeId: string | null) =>
@@ -741,24 +836,46 @@ describe('deviation and notification rules', () => {
     expect(record(as('company_qa', 'user-9'), 'user-1')).toBe(false);
   });
 
-  const review = (actor: Actor, recordedByRoleKey: string, recordedById = 'user-1') =>
-    canAccess('deviations.review', actor, { ...scope, recordedByRoleKey, recordedById });
+  const review = (actor: Actor, recorder: Person, recordedById = 'user-1') =>
+    canAccess('deviations.review', actor, { ...scope, recorder, recordedById });
+  const staff = placed('pme_staff');
+  const designer = placed('design_engineer', LINE);
 
-  it('lets the next role up, and anyone above, confirm; never the person who recorded it', () => {
-    expect(review(as('rd_lead', 'user-9', LINE), 'pme').allowed).toBe(true);
-    expect(review(as('rd_head', 'user-9'), 'pme').allowed).toBe(true);
-    expect(review(as('vp', 'user-9'), 'rd_lead').allowed).toBe(true);
-    expect(review(as('pme', 'user-9'), 'pme').allowed).toBe(false);
-    expect(review(as('rd_lead', 'user-9', LINE), 'rd_lead').allowed).toBe(false);
-    expect(review(as('rd_head', 'user-1'), 'pme', 'user-1').allowed).toBe(false);
-    expect(review(as('rd_lead', 'user-9', 'line-trauma'), 'pme').allowed).toBe(false);
+  it('lets someone above the recorder on the chart, or the Lead of the line, confirm; never the person who recorded it', () => {
+    expect(review(as('rd_lead', 'user-9', LINE), staff).allowed).toBe(true);
+    expect(review(as('rd_lead', 'user-9', LINE), designer).allowed).toBe(true);
+    expect(review(as('pme', 'user-1', null, 'pme_manager'), staff, 'user-5').allowed).toBe(true);
+    expect(review(as('rd_head', 'user-9'), staff).allowed).toBe(true);
+    expect(review(as('vp', 'user-9'), placed('rd_lead', LINE)).allowed).toBe(true);
+    expect(review(as('pme', 'user-9', null, 'pme_staff'), staff).allowed).toBe(false);
+    expect(review(as('rd_lead', 'user-9', LINE), placed('rd_lead', LINE)).allowed).toBe(false);
+    expect(review(as('rd_head', 'user-1'), staff, 'user-1').allowed).toBe(false);
+    expect(review(as('rd_lead', 'user-9', 'line-trauma'), staff).allowed).toBe(false);
+    expect(review(as('dard', 'user-9', null, 'dard_lead'), placed('qc_inspector')).allowed).toBe(
+      false,
+    );
   });
 
-  it('names the role above when a review is refused', () => {
-    expect(review(as('pme', 'user-9'), 'pme')).toEqual({
+  it('lets a manager confirm for the people who report to them when they are on the project', () => {
+    expect(
+      canAccess('deviations.review', as('dard', 'user-1', null, 'dard_lead'), {
+        ...scope,
+        recorder: placed('qc_inspector'),
+        recordedById: 'user-5',
+      }).allowed,
+    ).toBe(true);
+  });
+
+  it('names who can confirm when a review is refused', () => {
+    expect(review(as('pme', 'user-9', null, 'pme_staff'), staff)).toEqual({
       allowed: false,
       code: 'NOT_ALLOWED',
-      whoCan: ['R&D Lead'],
+      whoCan: ['Asst. Manager, PME', 'The R&D Lead of this product line'],
+    });
+    expect(review(as('rd_head', 'user-9'), placed('managing_director'))).toEqual({
+      allowed: false,
+      code: 'NOT_ALLOWED',
+      whoCan: ['Nobody: it is at the top of the line'],
     });
   });
 
@@ -773,19 +890,20 @@ describe('deviation and notification rules', () => {
     expect(comment(as('pme', 'user-1'), { causeUserId: null, causeRole: 'dard' })).toBe(false);
   });
 
-  const named = (actor: Actor, userId: string | null, userRoleKey: string | null) =>
-    causeNameVisible(actor, { userId, userRoleKey, ...scope });
+  const named = (actor: Actor, userId: string | null, user: Person | null) =>
+    causeNameVisible(actor, { userId, user, ...scope });
 
-  it('shows who caused a delay only to the VP, the Head, the Lead for people below them, and the person', () => {
-    expect(named(as('vp', 'user-9'), 'user-5', 'pme')).toBe(true);
-    expect(named(as('rd_head', 'user-9'), 'user-5', 'pme')).toBe(true);
-    expect(named(as('rd_lead', 'user-9', LINE), 'user-5', 'pme')).toBe(true);
-    expect(named(as('rd_lead', 'user-9', 'line-trauma'), 'user-5', 'pme')).toBe(false);
-    expect(named(as('rd_lead', 'user-9', LINE), 'user-5', 'rd_head')).toBe(false);
-    expect(named(as('pme', 'user-5'), 'user-5', 'pme')).toBe(true);
-    expect(named(as('pme', 'user-6'), 'user-5', 'pme')).toBe(false);
-    expect(named(as('board', 'user-9'), 'user-5', 'pme')).toBe(false);
-    expect(named(as('company_qa', 'user-9'), 'user-5', 'pme')).toBe(false);
+  it('shows who caused a delay only to the VP, the Head, the people above them, and the person', () => {
+    expect(named(as('vp', 'user-9'), 'user-5', staff)).toBe(true);
+    expect(named(as('rd_head', 'user-9'), 'user-5', staff)).toBe(true);
+    expect(named(as('rd_lead', 'user-9', LINE), 'user-5', staff)).toBe(true);
+    expect(named(as('rd_lead', 'user-9', 'line-trauma'), 'user-5', staff)).toBe(false);
+    expect(named(as('rd_lead', 'user-9', LINE), 'user-5', placed('rd_head'))).toBe(false);
+    expect(named(as('pme', 'user-5'), 'user-5', staff)).toBe(true);
+    expect(named(as('pme', 'user-6'), 'user-5', staff)).toBe(false);
+    expect(named(as('pme', 'user-1', null, 'pme_manager'), 'user-5', staff)).toBe(true);
+    expect(named(as('board', 'user-9'), 'user-5', staff)).toBe(false);
+    expect(named(as('company_qa', 'user-9'), 'user-5', staff)).toBe(false);
   });
 
   it('opens a notification only for the person it was sent to', () => {

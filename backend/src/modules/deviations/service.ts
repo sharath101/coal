@@ -9,7 +9,7 @@ import { AppError, notFound, validationFailed } from '../../core/http/errors';
 import { listRoles } from '../org/service';
 import { ROLES } from '../org/catalogue';
 import { assertCanAccess, canAccess } from '../permissions';
-import { causeNameVisible, inScope } from '../permissions/rules';
+import { NO_ONE, causeNameVisible, inScope } from '../permissions/rules';
 import { loadEnv } from '../rnd/env';
 import {
   findProject,
@@ -20,7 +20,7 @@ import {
 } from '../rnd/projects';
 import { recompute } from '../schedule/service';
 import { findTask, setTaskDueDate, tasksByIds } from '../tasks/service';
-import { findUsersByIds } from '../users/service';
+import { findUsersByIds, personOf } from '../users/service';
 import {
   commentsOf,
   correctionsOf,
@@ -116,7 +116,7 @@ export async function presentDeviations(
         row.recordedBy === actor.userId ||
         causeNameVisible(actor, {
           userId: row.causeUserId,
-          userRoleKey: causeUser?.roleKey ?? null,
+          user: causeUser ? personOf(causeUser) : null,
           ...scope,
         });
       cause = {
@@ -177,7 +177,7 @@ export async function presentDeviations(
           row.kind !== 'rework' &&
           canAccess('deviations.review', actor, {
             ...scope,
-            recordedByRoleKey: recorder?.roleKey ?? '',
+            recorder: recorder ? personOf(recorder) : NO_ONE,
             recordedById: row.recordedBy,
           }).allowed,
         comment: canAccess('deviations.comment', actor, {
@@ -324,7 +324,7 @@ export async function reviewDeviation(
     assertCanAccess('deviations.review', actor, {
       productLineId: env.project.productLineId,
       memberIds: env.team.map((u) => u.id),
-      recordedByRoleKey: recorder?.roleKey ?? '',
+      recorder: recorder ? personOf(recorder) : NO_ONE,
       recordedById: row.recordedBy,
     });
     if (row.kind === 'rework') {

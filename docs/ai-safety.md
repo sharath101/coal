@@ -275,7 +275,7 @@ Said plainly, for the company and for anyone judging the risk:
 
 ## Questions people ask
 
-**Can the AI read my colleague's private chat or task?** No. Chats are private to their owner, and tasks follow the ladder: you see your own and those given to or by you.
+**Can the AI read my colleague's private chat or task?** No. Chats are private to their owner, and tasks are yours: you see your own and those given to or by you.
 
 **Can it sign something for me, or approve a step?** No. There is no tool for it, and the endpoints refuse it. Signing is your own act.
 

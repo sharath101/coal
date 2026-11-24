@@ -39,16 +39,19 @@
 | **Iteration** | One pass through a step. Sending work back opens a new iteration; earlier ones stay on record |
 | **Milestone** | A recorded fact that can open a step, such as "material received" or "trial surgeries complete" |
 | **Outside document** | A file from outside Jayon (a lab report, a vendor PDF). Treated with extra care by the AI |
+| **Org chart** | Jayon's R&D chart in COAL: positions, who reports to whom, and how many people may hold each ([roles-and-access.md](./roles-and-access.md#the-org-chart)) |
 | **Passkey** | The standard behind Face ID, fingerprint and Windows Hello sign-in. COAL will use passkeys for signing, in the last block (D16) |
 | **Placeholder** | A `{name}` in a template's Word file, replaced when a document is made. Each must match the template's specification *Parked: a plain Word form has none.* |
+| **Position** | A box on the org chart: a title such as "DARD engineer", the role it holds, who it reports to and its seats. A person chooses one when they sign up |
 | **Process run** | One run of a process's route. For R&D, each project has one run |
 | **Project** | One product idea going through R&D, from Go to launch. It has one process run |
 | **Project team** | The people on a project, named in its PID (step 1) |
 | **Proposal** | One or more actions with a preview of their effects, waiting for the user to confirm. The AI creates proposals for anything that affects other people |
 | **Queue** | Where a task waits when no one person is assigned. Anyone with the role can claim it |
 | **Research run** | One search of the source library for what already exists, started from a card that shows the words that leave COAL. The research assistant writes a **brief** citing its **results** (`[R1]`); a result becomes a record only when the person keeps it as a source of a step |
-| **Request** | A task asked of someone you can't assign work to ([the ladder](./roles-and-access.md#assigning-work-and-making-requests)). They can accept or decline it, with a reason |
+| **Request** | A task asked of someone you can't assign work to ([the org chart](./roles-and-access.md#assigning-work-and-making-requests)). They can accept or decline it, with a reason |
 | **Route** | A process's steps, who does and signs each one, and how work moves. Stored as a versioned definition. Jayon's R&D route has 28 steps |
+| **Seat** | One place in a position. A position with 2 seats can be held by 2 people; once they are taken, nobody else can choose it |
 | **Send back** | Returning work to an earlier step after a failure or a rejected checkpoint |
 | **Sign-off** | The signature that completes a step, given by the step's signer |
 | **Signature row** | One of the signatures a document needs, in order: Prepared, Reviewed, Approved |

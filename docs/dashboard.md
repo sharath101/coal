@@ -75,7 +75,7 @@ interface WidgetDefinition {
 - **W4** the next unfinished checkpoint of each running project, with whether its inputs are finished, and who signs. Open to everyone: it is status.
 - **W5** the projects I'm on, or lead. **W6** every project, with its stage, the steps open now, the Lead, days in stage, health and forecast launch; filters: product line, stage, health. Both are status, so open to everyone.
 - **W7** every running project's overdue and at-risk steps, with the owner (the people holding the step's work tasks; once the step is handed in, the signers who have not signed yet, as "Board sign-off: Mira, Chet"), the planned and forecast dates, days late, and the reason and cause of the latest deviation. The cause shows by name only to those allowed; the sentence of explanation appears on the Deviations tab only for people in the project's scope ([roles-and-access.md](./roles-and-access.md#content-is-need-to-know)).
-- **W8** (VP, R&D Head, R&D Lead only) the open tasks of each person below me, by when they fall due. A Lead's people are those on their product line's projects.
+- **W8** (VP, R&D Head, R&D Lead, and anyone with people reporting to them on the org chart: the DARD Lead and the Asst. Managers) the open tasks of each person below me, by when they fall due. A Lead's people are those below them on the chart and everyone in R&D on their product line's projects. Only the VP, the Head and the Leads can reassign from it.
 - **W9** my measures, then each person below me. The Board sees department totals, not people.
 - **W10** my notifications, newest first.
 
@@ -87,8 +87,10 @@ interface WidgetDefinition {
 | VP | W2, W1, W6, W7, W4, W8, W9, W10 |
 | R&D Head | W2, W1, W7, W6, W4, W8, W9, W10 |
 | R&D Lead | W1, W2, W5, W7, W4, W8, W3, W9, W10 |
-| Design engineer, AEMS, PME, R&D Ops, DARD, QC inspector | W1, W2, W3, W5, W10, W9 |
+| Design engineer, AEMS, PME, R&D Ops, DARD, QC inspector, Graphics designer | W1, W2, W3, W5, W10, W9 |
 | Company QA, Quality Control, Production, Marketing | W1, W2, W10 |
+
+A manager on the org chart (the DARD Lead and the two Asst. Managers) gets W8 as well, before W10, for the people who report to them.
 
 Since everyone can see every project's status, anyone can add W6 (pipeline) to their own view once personal layouts exist.
 
@@ -154,7 +156,7 @@ All thresholds are settings.
 |---|---|
 | 2 working days before the due date | A reminder to the assignee |
 | On the due date | A reminder to the assignee and to the step's signer. The task turns red. The assignee is asked for a new expected date and the reason |
-| 2 working days late | Tell the next role up the ladder ([roles-and-access.md](./roles-and-access.md#assigning-work-and-making-requests)) |
+| 2 working days late | Tell the person they report to on the [org chart](./roles-and-access.md#assigning-work-and-making-requests), and, for people in R&D, the Lead of the project's line |
 | 5 working days late | The task joins the exception list: one notification to the R&D Head and the VP, and a row in the Delays widget ([W24](./open-questions.md#workflow)) |
 | A signature waiting | Reminders when due and every 2 working days after. An overdue VP or Board signature isn't escalated above them; the people who asked for it (those still holding the step's tasks) are told instead |
 | Whenever the doers choose | **Remind them**, on the step, the doer's task or W1: each signer who has not signed yet gets the route's signature reminder, naming who sent it. Once a day per step, and recorded ([P110](./decisions.md)) |

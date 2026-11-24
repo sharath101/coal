@@ -2,8 +2,16 @@
 export interface Actor {
   userId: string;
   name: string;
+  /** What they may do: the role of their position. */
   roleKey: string;
+  /** Their box on the org chart (docs/roles-and-access.md#the-org-chart). */
+  positionKey: string;
   productLineId: string | null;
+  /**
+   * The admin behind this session, when the demo's switching is on: the admin themself, or the
+   * admin who switched to this person. Empty otherwise, so only an admin's sessions can switch.
+   */
+  switcherId: string | null;
 }
 
 export interface RequestContext {

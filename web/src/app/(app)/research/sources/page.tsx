@@ -17,7 +17,7 @@ import { useTranslations } from 'next-intl';
 import { useId, useState } from 'react';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { ProblemMessage } from '@/components/problem-message';
-import { selectClass } from '@/components/role-fields';
+import { selectClass } from '@/components/ui/select-class';
 import { Pill } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';

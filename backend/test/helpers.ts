@@ -1,9 +1,12 @@
 import type { SignUpBody } from '@coal/shared';
+import { inArray, or } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../src/app';
 import { loadConfig } from '../src/core/config';
 import { createDb } from '../src/core/db/client';
 import type { AppDeps } from '../src/core/deps';
+import { firstPositionOfRole } from '../src/modules/org/catalogue';
+import { positions } from '../src/modules/org/tables';
 import { S3FileStorage } from '../src/modules/files/storage';
 import { FakePdfRenderer } from './fakes';
 import { TEMPLATE_DB, databaseUrl, newTestDbName, withAdmin } from './databases';
@@ -91,8 +94,28 @@ export async function productLineId(app: FastifyInstance, code: string): Promise
   return line.id;
 }
 
-export async function signUp(app: FastifyInstance, body: SignUpBody): Promise<SignedIn> {
-  const res = await app.inject({ method: 'POST', url: '/api/v1/auth/sign-up', payload: body });
+/** What a test says about a new person: a position, or only a role, which takes the role's first position. */
+export type SignUpInput = {
+  name: string;
+  roleKey?: string;
+  positionKey?: string;
+  productLineId?: string;
+};
+
+export async function signUp(app: FastifyInstance, body: SignUpInput): Promise<SignedIn> {
+  const { roleKey, ...rest } = body;
+  const positionKey = body.positionKey ?? firstPositionOfRole(roleKey as string)?.key;
+  if (!positionKey) throw new Error(`No position for the role ${String(roleKey)}`);
+  const payload: SignUpBody = { ...rest, positionKey };
+  const res = await app.inject({ method: 'POST', url: '/api/v1/auth/sign-up', payload });
   if (res.statusCode !== 201) throw new Error(`Sign-up failed: ${res.statusCode} ${res.body}`);
   return { cookie: sessionCookie(res), user: res.json<{ user: SignedIn['user'] }>().user };
+}
+
+/** Removes the seat limit of these positions (or of every position of these roles), for a test that needs several holders. */
+export async function openSeats(t: Pick<TestApp, 'deps'>, ...keys: string[]) {
+  await t.deps.db
+    .update(positions)
+    .set({ seats: null })
+    .where(or(inArray(positions.key, keys), inArray(positions.roleKey, keys)));
 }

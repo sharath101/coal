@@ -6,8 +6,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
+import { PositionFields } from '@/components/position-fields';
 import { ProblemMessage } from '@/components/problem-message';
-import { RoleFields } from '@/components/role-fields';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -20,7 +20,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { api } from '@/lib/api';
-import { queryKeys, useProductLines, useRoles } from '@/lib/queries';
+import { useProductLines, useRoles } from '@/lib/queries';
 
 export default function SignUpPage() {
   const t = useTranslations('signUp');
@@ -29,14 +29,15 @@ export default function SignUpPage() {
   const roles = useRoles();
   const productLines = useProductLines();
   const [name, setName] = useState('');
-  const [roleKey, setRoleKey] = useState('');
+  const [positionKey, setPositionKey] = useState('');
   const [productLineId, setProductLineId] = useState('');
 
   const mutation = useMutation({
     mutationFn: () =>
-      api(signUp, { body: { name, roleKey, productLineId: productLineId || undefined } }),
-    onSuccess: ({ user }) => {
-      queryClient.setQueryData(queryKeys.me, user);
+      api(signUp, { body: { name, positionKey, productLineId: productLineId || undefined } }),
+    onSuccess: () => {
+      // The sign-up answer lacks what only `GET /me` adds, so the app asks again.
+      queryClient.clear();
       router.replace('/dashboard');
     },
   });
@@ -69,19 +70,19 @@ export default function SignUpPage() {
             <p className="text-xs text-muted-foreground">{t('nameHint')}</p>
           </div>
           {roles.data && productLines.data && (
-            <RoleFields
+            <PositionFields
               roles={roles.data}
               productLines={productLines.data}
-              roleKey={roleKey}
+              positionKey={positionKey}
               productLineId={productLineId}
-              onRoleChange={setRoleKey}
+              onPositionChange={setPositionKey}
               onProductLineChange={setProductLineId}
             />
           )}
           <ProblemMessage error={mutation.error ?? roles.error ?? productLines.error} />
         </CardContent>
         <CardFooter className="flex flex-col items-stretch gap-3">
-          <Button type="submit" disabled={mutation.isPending || !roleKey}>
+          <Button type="submit" disabled={mutation.isPending || !positionKey}>
             {t('submit')}
           </Button>
           <p className="text-center text-sm text-muted-foreground">

@@ -1,18 +1,36 @@
-import { getMe, getUser, listUsers as listUsersEndpoint, updateMe } from '@coal/shared';
+import {
+  getMe,
+  getOrgChart,
+  getUser,
+  listUsers as listUsersEndpoint,
+  updateMe,
+} from '@coal/shared';
 import { change } from '../../core/db/change';
 import { implement } from '../../core/http/endpoint';
 import { AppError, notFound } from '../../core/http/errors';
-import { findUser, listUsers, present, presentMe, updateUser, userSnapshot } from './service';
+import {
+  findUser,
+  listUsers,
+  orgChart,
+  present,
+  presentMe,
+  updateUser,
+  userSnapshot,
+} from './service';
 
 export const usersRoutes = [
   implement(getMe, async ({ deps, ctx, actor }) => {
     const row = await findUser(deps.db, ctx.orgId, actor.userId);
     if (!row) throw notFound('person');
+    const admin = actor.switcherId ? await findUser(deps.db, ctx.orgId, actor.switcherId) : null;
     return {
       ...(await presentMe(deps.db, ctx.orgId, row)),
       features: { templateFilling: deps.config.templateFilling },
+      switcher: admin ? { id: admin.id, name: admin.name } : null,
     };
   }),
+
+  implement(getOrgChart, ({ deps, ctx }) => orgChart(deps.db, ctx.orgId)),
 
   implement(updateMe, ({ deps, ctx, actor, body, ifMatch }) =>
     change(deps.db, ctx, async (tx, log) => {

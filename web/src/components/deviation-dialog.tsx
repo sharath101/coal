@@ -11,7 +11,7 @@ import {
   emptyDraft,
 } from '@/components/deviation-fields';
 import { ProblemMessage } from '@/components/problem-message';
-import { selectClass } from '@/components/role-fields';
+import { selectClass } from '@/components/ui/select-class';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';

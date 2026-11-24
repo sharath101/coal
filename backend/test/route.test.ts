@@ -3,14 +3,21 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { verifyAuditChain } from '../src/modules/audit/service';
 import { auditEvents } from '../src/modules/audit/tables';
 import { decisions, milestones, processRuns, sendBacks } from '../src/modules/process/tables';
-import { createTestApp, productLineId, signUp, type SignedIn, type TestApp } from './helpers';
+import {
+  createTestApp,
+  openSeats,
+  productLineId,
+  signUp,
+  type SignedIn,
+  type TestApp,
+} from './helpers';
 import { documentCalls } from './world';
 
 let t: TestApp;
 let spine: string;
 const who: Record<string, SignedIn> = {};
 
-const PEOPLE = {
+const PEOPLE: Record<string, readonly [string, string, string?]> = {
   vp: ['Vera Example', 'vp'],
   head: ['Hari Example', 'rd_head'],
   lead: ['Leela Example', 'rd_lead'],
@@ -20,19 +27,20 @@ const PEOPLE = {
   ops: ['Om Example', 'rd_ops'],
   dard: ['Dina Example', 'dard'],
   qc: ['Quin Example', 'qc_inspector'],
-  md: ['Mira Example', 'board'],
-  ceo: ['Chet Example', 'board'],
+  md: ['Mira Example', 'board', 'managing_director'],
+  ceo: ['Chet Example', 'board', 'ceo'],
   outsider: ['Olga Example', 'marketing'],
-} as const;
+};
 
 beforeAll(async () => {
   t = await createTestApp();
   spine = await productLineId(t.app, 'SPN');
-  for (const [key, [name, roleKey]] of Object.entries(PEOPLE)) {
+  for (const [key, [name, roleKey, positionKey]] of Object.entries(PEOPLE)) {
     who[key] = await signUp(t.app, {
       name,
       roleKey,
-      ...(roleKey === 'rd_lead' && { productLineId: spine }),
+      ...(positionKey && { positionKey }),
+      ...(['rd_lead', 'design_engineer'].includes(roleKey) && { productLineId: spine }),
     });
   }
 });
@@ -758,7 +766,10 @@ describe('hold, resume and drop', () => {
 
 describe('role queues, claims and reassigning', () => {
   it('sends a task to the queue when nobody on the team holds the role, and the claimer joins the team', async () => {
-    const second = await signUp(t.app, { name: 'Dana Example', roleKey: 'dard' });
+    const second = await signUp(t.app, {
+      name: 'Dana Example',
+      positionKey: 'dard_engineer',
+    });
     who.dard2 = second;
     const id = await go('Queue', ids('designer', 'pme', 'ops', 'qc'));
 
@@ -1002,6 +1013,7 @@ describe('closing at launch', () => {
 describe('claiming from a Lead queue', () => {
   it('does not let a Lead from another product line join the project', async () => {
     const trauma = await productLineId(t.app, 'TRM');
+    await openSeats(t, 'rd_lead');
     who.lead2 = await signUp(t.app, {
       name: 'Lena Example',
       roleKey: 'rd_lead',

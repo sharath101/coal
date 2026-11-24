@@ -1,6 +1,7 @@
 import { fileURLToPath } from 'node:url';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { loadOrgCatalogue } from '../../modules/org/service';
+import { placeUnplacedUsers } from '../../modules/users/service';
 import { loadProcessVersions } from '../../modules/process/service';
 import { loadDocumentTypes } from '../../modules/templates/service';
 import { loadProductLines } from '../../modules/rnd/service';
@@ -16,6 +17,7 @@ export async function migrateAndSeed(databaseUrl: string, orgId: string): Promis
     await migrate(db, { migrationsFolder: MIGRATIONS_FOLDER });
     await db.transaction(async (tx) => {
       await loadOrgCatalogue(tx, orgId);
+      await placeUnplacedUsers(tx, orgId);
       await loadProductLines(tx, orgId);
       await loadProcessVersions(tx, orgId);
       await loadDocumentTypes(tx, orgId);

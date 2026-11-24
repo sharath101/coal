@@ -15,7 +15,7 @@ This roadmap gives an **order, not dates**. Madhav's effort estimates and costs 
 
 | Area | In the first release | Doc |
 |---|---|---|
-| Accounts | Sign up by name and role; sign in by name (placeholder); no admin | [roles-and-access.md](./roles-and-access.md#accounts-for-now) |
+| Accounts | Sign up by name and position on Jayon's R&D chart, with seats; sign in by name (placeholder); a temporary admin for the demo only | [roles-and-access.md](./roles-and-access.md#accounts-for-now) |
 | The route | All 28 steps, checkpoints, milestones (recorded by hand), step 15's two paths, sending work back, hold and drop | [workflow.md](./workflow.md) |
 | Tasks | Tasks from the route; assigning work, requests, role queues, comments | [roles-and-access.md](./roles-and-access.md#assigning-work-and-making-requests) |
 | Access | Status visible to everyone; content need-to-know; one permission module with tests | [roles-and-access.md](./roles-and-access.md#how-access-is-enforced) |
@@ -63,7 +63,7 @@ Each block depends on the ones before it. Within a block, the work can run side 
    - `seed:demo` makes a Dashboard worth looking at in local work.
    - Left for later: the weekly digest of the exception list (with email), @mentions (with comments on steps), days per stage against plan and trend charts (with daily snapshots), personal layouts, and editing the settings and the calendar on a page (today: rows in `settings` and `work_calendar`).
 5. **Workstation and AI**, in six parts:
-   - **5a. Groundwork** ✅ `POST /tasks` (own tasks, assignments and requests by the ladder) with accept and decline, and a "Given by me" list; proposals (action cards) with preview, edit, confirm, `PREVIEW_CHANGED` and expiry; `GET /search` over projects, documents, tasks and people.
+   - **5a. Groundwork** ✅ `POST /tasks` (own tasks, assignments and requests by the org chart, [P111](./decisions.md)) with accept and decline, and a "Given by me" list; proposals (action cards) with preview, edit, confirm, `PREVIEW_CHANGED` and expiry; `GET /search` over projects, documents, tasks and people.
    - **5b. The AI gateway and chat** ✅ the provider adapter (Anthropic; the Copilot SDK on one laptop for now, D19; a scripted stand-in for tests), the AI tables, the tools tied to the tiers, layered instructions, budgets and logging, chats streamed over Server-Sent Events.
    - **5c. The Workstation page** ✅ three panes, citations, action cards, commands, and "Ask AI" and "Open in Workstation" from other pages.
    - **5d. The writing features** ✅ in four steps:
@@ -74,6 +74,7 @@ Each block depends on the ones before it. Within a block, the work can run side 
    - **5e. Safety and the test sets** ✅ the AI exam (`pnpm eval:ai`: known answers, leaks, tricks and injections on a made-up company with planted secrets, graded by code from COAL's own records, with a release bar and a baseline for each model, [how it works](./ai-safety.md#how-we-test-it)); a test that every refusal names who can help; the AI safety document, [ai-safety.md](./ai-safety.md). Moved to later: the reader with no tools for lab reports (P104).
    - **5f. Research from the source library** ✅ (asked for by the R&D Head, built before 5e): the source library and its page (the VP, the Head and the Leads keep it), connectors for PubMed, Europe PMC, ClinicalTrials.gov, openFDA and journals by ISSN, websites through the provider's web search, links the person opens; `/research` and a card that shows the words that will leave COAL; the research assistant in the background, with only the approved words; the brief, the results and keeping them as sources of a step ([the flow](./workstation-and-ai.md#researching-what-already-exists)).
    - **5g. Templates as plain Word forms, and the assistant fills them** ✅ (asked for after the first real upload failed): a template is Jayon's Word form as it is, uploaded and approved to replace the old one; people download the blank form, or start a copy and fill it in with the assistant (`start_form`, `read_form`, `fill_form`); everything built on placeholders is parked behind `TEMPLATE_FILLING` (P109, S18) ([the flow](./workstation-and-ai.md#filling-a-form-with-the-assistant)).
+   - **5h. Jayon's org chart, and the demo admin** ✅ (asked for before the demo to Jayon): positions with seats and reporting lines from Jayon's chart replace the guessed role ladder ([P111](./decisions.md), [P112](./decisions.md)); sign-up and profile choose a position, and a full one can't be taken; the People page; Team workload for managers; and a **temporary** admin that moves between people in one click, behind `ADMIN_SWITCHING`, removed before the hand-off ([P113](./decisions.md)). The made-up people have single first names.
 6. **Passkey signing** (last, D16)
    - Passkey registration on the website, and the signing intent: Face ID, fingerprint or Windows Hello for every signature, replacing the confirmed click.
    - One prompt signs a step's sign-off record and the step's main document together.
@@ -101,8 +102,8 @@ The likely next steps. Their order is decided as we learn, mostly by what the fi
 
 1. **Real sign-in and admin:**
    - company sign-in, with a way in for employees without a company email;
-   - an admin role;
-   - the org chart and real reporting lines;
+   - a real admin role (the demo admin is removed first);
+   - the org chart kept by Jayon, rather than from the catalogue;
    - several roles per person.
 
    This must come before any real Jayon data, and before other departments join.
@@ -135,7 +136,7 @@ Everything deliberately left out of the first release, and why:
 
 | Item | Why not now | Noted in |
 |---|---|---|
-| Real authentication, admin role, org chart, several roles per person | Not decided yet; name-only accounts let us build everything else | [roles-and-access.md](./roles-and-access.md#later) |
+| Real authentication, a real admin role, an org chart kept by Jayon, several roles per person | Not decided yet; name-only accounts and the chart as drawn let us build everything else | [roles-and-access.md](./roles-and-access.md#later) |
 | Step modules (materials, design, prototypes, QC, machines, costing, testing, trials, regulatory, transfer) | Need Jayon's real documents and answers; designing from guesses creates rework | [data-model.md](./data-model.md#not-modelled-yet-on-purpose) |
 | Regulatory gates beyond hand-recorded milestones | Need the full picture, Jayon's agreement and legal advice | [regulatory-notes.md](./regulatory-notes.md) |
 | Sealed PDFs, Aadhaar eSign or DSC, identity checks and e-signature agreements | Only matter for official records, which need real sign-in first | [documents-and-signing.md](./documents-and-signing.md#later) |

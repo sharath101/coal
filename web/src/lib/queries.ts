@@ -5,6 +5,7 @@ import {
   getChat,
   getDocument,
   getMe,
+  getOrgChart,
   getProcess,
   getProject,
   getProjectRoute,
@@ -46,6 +47,7 @@ import { api } from './api';
 export const queryKeys = {
   me: ['me'] as const,
   roles: ['roles'] as const,
+  orgChart: ['org-chart'] as const,
   productLines: ['product-lines'] as const,
   projects: ['projects'] as const,
   project: (id: string) => ['project', id] as const,
@@ -80,8 +82,16 @@ export const queryKeys = {
 
 export const useMe = () => useQuery({ queryKey: queryKeys.me, queryFn: () => api(getMe) });
 
+/** Departments, roles and positions with their open seats: seats change as people sign up, so it is read afresh. */
 export const useRoles = () =>
-  useQuery({ queryKey: queryKeys.roles, queryFn: () => api(listRoles), staleTime: Infinity });
+  useQuery({ queryKey: queryKeys.roles, queryFn: () => api(listRoles), refetchOnMount: 'always' });
+
+/** The org chart: every position and who holds it. */
+export const useOrgChart = () =>
+  useQuery({
+    queryKey: queryKeys.orgChart,
+    queryFn: async () => (await api(getOrgChart)).positions,
+  });
 
 export const useProductLines = () =>
   useQuery({

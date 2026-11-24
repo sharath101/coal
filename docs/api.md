@@ -43,13 +43,15 @@ This is the first-release endpoint list. The generated OpenAPI spec is the exact
 
 | Endpoint | Purpose | Tier |
 |---|---|---|
-| `POST /auth/sign-up` | Create an account: name, role, and product line for a Lead. Returns a session. **Placeholder** ([roles-and-access.md](./roles-and-access.md#accounts-for-now)) | — |
+| `POST /auth/sign-up` | Create an account: name and a position (a product line for a position counted by line). A position with no seat left is refused with `409 POSITION_FULL`. Returns a session. **Placeholder** ([roles-and-access.md](./roles-and-access.md#accounts-for-now)) | — |
 | `POST /auth/sign-in` | Sign in by name, in any case. **Placeholder** | — |
+| `POST /auth/switch` | **Demo only, temporary** ([P113](./decisions.md)): the admin takes another person's place, or goes back to the admin. Ends the session and starts one for that person. Only from a session an admin started, and only while `ADMIN_SWITCHING` is on; audited as `session.switched`. Never the AI's | — |
 | `POST /auth/sign-out` | End the session | — |
-| `GET /me` | My profile, role and product line, and `features` (what is switched on: `templateFilling`, which is parked and off by default: [P109](./decisions.md)) | read |
-| `PATCH /me` | Change my name, role or product line (only until there is an admin) | — |
-| `GET /users`, `GET /users/{id}` | The people directory | read |
-| `GET /roles` | Departments and their roles, for the sign-up form. Public | read |
+| `GET /me` | My profile, position, role and product line, who I report to (`reportsTo`), `features` (what is switched on: `templateFilling`, which is parked and off by default: [P109](./decisions.md)) and `switcher` (the admin behind the session, when there is one) | read |
+| `PATCH /me` | Change my name, position or product line (a full position is refused with `409 POSITION_FULL`; only until there is real sign-in) | — |
+| `GET /users`, `GET /users/{id}` | The people directory. It leaves out the demo admin | read |
+| `GET /org-chart` | Every position on Jayon's chart, who reports to whom, and who holds each ([roles-and-access.md](./roles-and-access.md#the-org-chart)) | read |
+| `GET /roles` | Departments, roles and the positions people may choose, with whether each still has a seat (no names), for the sign-up form. Public | read |
 | `GET /product-lines` | R&D's product lines, for the sign-up form. Public | read |
 
 ### Signing
@@ -114,7 +116,7 @@ Every action returns `{ saved, preview }`: what changed (steps, tasks made with 
 | `PATCH /tasks/{id}` | Set my own task, assignment, request or corrective action to open, in progress or done. Starting or finishing a request accepts it. A task of a step follows its step and is refused with `409 USE_THE_STEP`: start the step and submit it instead. A task has `followsStep` to say which it is | auto (my own) |
 | `POST /tasks/{id}/claim` | Claim a task from my role's queue. I join the project team if I'm not on it. A Lead may claim only for their own product line's projects | confirm |
 | `POST /tasks/{id}/reassign` | Give a task to someone who holds its role (the VP or the Head; the Lead only within the project team) | confirm |
-| `POST /tasks` | Make a task: for myself (`own`), assigned to someone I may direct (`work`), or a `request` to anyone else, decided by [the ladder](./roles-and-access.md#assigning-work-and-making-requests). Optionally on a project and step I work on, with a due date. `?preview=true` says which it would be | auto (my own); the AI proposes the rest |
+| `POST /tasks` | Make a task: for myself (`own`), assigned to someone I may direct (`work`), or a `request` to anyone else, decided by [the org chart](./roles-and-access.md#assigning-work-and-making-requests). Optionally on a project and step I work on, with a due date. `?preview=true` says which it would be | auto (my own); the AI proposes the rest |
 | `POST /tasks/{id}/accept` | Accept a request made of me: it becomes my task, and the person who asked is told | confirm |
 | `POST /tasks/{id}/decline` | Decline a request made of me, with a reason the person who asked sees on the task | confirm |
 

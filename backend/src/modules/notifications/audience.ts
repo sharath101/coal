@@ -1,10 +1,17 @@
 import type { RouteDefinition } from '@coal/shared';
 import type { Executor } from '../../core/db/client';
+import { positionSeed } from '../org/catalogue';
+import { positionAbove } from '../org/chart';
 import { loadRun } from '../process/service';
-import { roleAbove } from '../permissions/rules';
+import { isTeamStaff } from '../permissions/rules';
 import { activeMembers, findProject, type ProjectRow } from '../rnd/projects';
 import { getProductLine } from '../rnd/service';
-import { findActiveUsersByRole, type UserRow } from '../users/service';
+import {
+  findActiveUsersByPosition,
+  findActiveUsersByRole,
+  positionOf,
+  type UserRow,
+} from '../users/service';
 
 /** What a notification about a project needs to know: its route, its line and its team. */
 export interface ProjectContext {
@@ -50,16 +57,44 @@ export async function holdersOf(
   });
 }
 
-/** The next role up the ladder that has someone to tell, and those people (docs/roles-and-access.md#assigning-work-and-making-requests). */
-export async function nextRoleUp(
+/** The people at one box of the chart who would look after this project: the team's, else anyone's. */
+async function holdersAtPosition(
   ex: Executor,
   orgId: string,
   ctx: ProjectContext,
-  roleKey: string,
+  positionKey: string,
+  productLineId: string | null,
 ): Promise<UserRow[]> {
-  for (let up = roleAbove(roleKey); up; up = roleAbove(up)) {
-    const people = await holdersOf(ex, orgId, ctx, up);
-    if (people.length > 0) return people;
+  const seed = positionSeed(positionKey);
+  if (seed?.role === 'board') return findActiveUsersByRole(ex, orgId, 'board');
+  const line = seed?.perProductLine ? productLineId : null;
+  const onTeam = ctx.team.filter(
+    (u) => positionOf(u) === positionKey && (!line || u.productLineId === line),
+  );
+  if (onTeam.length > 0) return onTeam;
+  return findActiveUsersByPosition(ex, orgId, positionKey, { productLineId: line });
+}
+
+/**
+ * The people to tell when someone is late or has recorded a deviation: the nearest position above
+ * theirs on the org chart that has anyone (docs/roles-and-access.md#assigning-work-and-making-requests),
+ * and, for R&D staff, also the Lead of the project's line, who runs it. The Board is both the MD
+ * and the CEO.
+ */
+export async function nextUp(
+  ex: Executor,
+  orgId: string,
+  ctx: ProjectContext,
+  person: UserRow,
+): Promise<UserRow[]> {
+  const found: UserRow[] = [];
+  for (let up = positionAbove(positionOf(person)); up; up = positionAbove(up)) {
+    const holders = await holdersAtPosition(ex, orgId, ctx, up, person.productLineId);
+    if (holders.length > 0) {
+      found.push(...holders);
+      break;
+    }
   }
-  return [];
+  if (isTeamStaff(person.roleKey)) found.push(...(await holdersOf(ex, orgId, ctx, 'rd_lead')));
+  return [...new Map(found.map((u) => [u.id, u])).values()].filter((u) => u.id !== person.id);
 }

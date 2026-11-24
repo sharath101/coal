@@ -12,8 +12,7 @@ import type { OutboxEvent, Subscription } from '../events/dispatcher';
 import { loadCalendar, loadSettings } from '../schedule/calendar';
 import { SIGNERS_REMINDED, findTask, activeTasksOfStep, signOffWaits } from '../tasks/service';
 import { findUser, findActiveUsersByRole, findUsersByIds, type UserRow } from '../users/service';
-import { roleAbove } from '../permissions/rules';
-import { holdersOf, projectContext, nextRoleUp, type ProjectContext } from './audience';
+import { holdersOf, projectContext, nextUp, type ProjectContext } from './audience';
 import {
   notify,
   renderMessage,
@@ -244,9 +243,7 @@ async function onDeviationRecorded(event: OutboxEvent, tx: Tx) {
     person: recorder.name,
     due: shortDate(str((event.payload as Payload).newDate)),
   };
-  const reviewers = roleAbove(recorder.roleKey)
-    ? await nextRoleUp(tx, event.orgId, ctx, recorder.roleKey)
-    : [];
+  const reviewers = await nextUp(tx, event.orgId, ctx, recorder);
   const items = messageTo(reviewers, event, ctx, {
     key: 'deviation_to_review',
     kind: 'work_message',

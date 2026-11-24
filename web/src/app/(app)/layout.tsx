@@ -22,7 +22,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   if (me.data) {
     return (
       <div className="flex min-h-[calc(100vh-2rem)] flex-col">
-        <LiveUpdates />
+        <LiveUpdates key={me.data.id} />
         <TopBar me={me.data} />
         <main className="flex flex-1 flex-col">{children}</main>
       </div>

@@ -9,6 +9,7 @@ import {
 import type { AppDeps } from '../../core/deps';
 import type { Actor, RequestContext } from '../../core/http/context';
 import { ROLES } from '../org/catalogue';
+import { isManager } from '../org/chart';
 import { toError } from '../permissions';
 import { loadCalendar, loadSettings } from '../schedule/calendar';
 import { dateOfInstant } from '@coal/shared';
@@ -32,11 +33,24 @@ const HANDLERS: Record<WidgetKey, WidgetHandler> = {
   messages,
 };
 
+/**
+ * Team workload is for anyone with people reporting to them on the org chart (the DARD Lead, the
+ * Asst. Managers), besides the roles the widget lists. The Board sees department totals only.
+ */
+const mayUse = (actor: Actor, key: WidgetKey): boolean =>
+  mayUseWidget(actor.roleKey, key) ||
+  (key === 'team-workload' && actor.roleKey !== 'board' && isManager(actor.positionKey));
+
 /** The widgets this person may use, and their layout. */
 export function listWidgets(actor: Actor) {
-  const allowed = WIDGET_INFOS.filter((w) => mayUseWidget(actor.roleKey, w.key));
+  const allowed = WIDGET_INFOS.filter((w) => mayUse(actor, w.key));
   const keys = new Set(allowed.map((w) => w.key));
-  return { layout: layoutFor(actor.roleKey).filter((k) => keys.has(k)), widgets: allowed };
+  const layout = layoutFor(actor.roleKey);
+  if (keys.has('team-workload') && !layout.includes('team-workload')) {
+    const before = layout.indexOf('messages');
+    layout.splice(before < 0 ? layout.length : before, 0, 'team-workload');
+  }
+  return { layout: layout.filter((k) => keys.has(k)), widgets: allowed };
 }
 
 export async function getWidget(
@@ -57,7 +71,7 @@ export async function getWidget(
   },
 ): Promise<WidgetData> {
   const definition = widgetByKey(key);
-  if (!definition || !mayUseWidget(actor.roleKey, key)) {
+  if (!definition || !mayUse(actor, key)) {
     const names = new Map(ROLES.map((r) => [r.key, r.name]));
     throw toError({
       allowed: false,

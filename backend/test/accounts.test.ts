@@ -19,13 +19,15 @@ describe('sign-up', () => {
     const res = await inject({
       method: 'POST',
       url: '/api/v1/auth/sign-up',
-      payload: { name: '  Meera   Example ', roleKey: 'rd_ops' },
+      payload: { name: '  Meera   Example ', positionKey: 'ops_manager' },
     });
     expect(res.statusCode).toBe(201);
     expect(res.json().user).toMatchObject({
       name: 'Meera Example',
       role: { key: 'rd_ops', name: 'R&D Ops', departmentCode: 'RND' },
+      position: { key: 'ops_manager', title: 'Asst. Manager, R&D Ops' },
       productLine: null,
+      reportsTo: null,
     });
 
     const cookie = res.cookies.find((c) => c.name === 'coal_session');
@@ -44,7 +46,7 @@ describe('sign-up', () => {
     const res = await inject({
       method: 'POST',
       url: '/api/v1/auth/sign-up',
-      payload: { name: 'RAVI example', roleKey: 'dard' },
+      payload: { name: 'RAVI example', positionKey: 'dard_lead' },
     });
     expect(res.statusCode).toBe(409);
     expect(res.headers['content-type']).toContain('application/problem+json');
@@ -55,37 +57,40 @@ describe('sign-up', () => {
     const missing = await inject({
       method: 'POST',
       url: '/api/v1/auth/sign-up',
-      payload: { name: 'Lead Without Line', roleKey: 'rd_lead' },
+      payload: { name: 'Lead Without Line', positionKey: 'rd_lead' },
     });
     expect(missing.json().code).toBe('PRODUCT_LINE_REQUIRED');
 
     const spine = await productLineId(t.app, 'SPN');
     const { user } = await signUp(t.app, {
       name: 'Spine Lead',
-      roleKey: 'rd_lead',
+      positionKey: 'rd_lead',
       productLineId: spine,
     });
     expect(user).toMatchObject({ productLine: { code: 'SPN', name: 'Spine' } });
   });
 
-  it('ignores a product line for roles that have none', async () => {
+  it('ignores a product line for positions that are not counted by line', async () => {
     const spine = await productLineId(t.app, 'SPN');
     const { user } = await signUp(t.app, {
       name: 'Design Person',
-      roleKey: 'design_engineer',
+      positionKey: 'fea_expert',
       productLineId: spine,
     });
     expect(user).toMatchObject({ productLine: null });
   });
 
-  it('refuses unknown roles', async () => {
+  it('refuses unknown positions', async () => {
     const res = await inject({
       method: 'POST',
       url: '/api/v1/auth/sign-up',
-      payload: { name: 'Nobody Example', roleKey: 'astronaut' },
+      payload: { name: 'Nobody Example', positionKey: 'astronaut' },
     });
     expect(res.statusCode).toBe(400);
-    expect(res.json()).toMatchObject({ code: 'VALIDATION_FAILED', errors: [{ path: 'roleKey' }] });
+    expect(res.json()).toMatchObject({
+      code: 'VALIDATION_FAILED',
+      errors: [{ path: 'positionKey' }],
+    });
   });
 });
 
@@ -110,7 +115,7 @@ describe('sign-in and sign-out', () => {
   });
 
   it('accepts the session as a bearer token, for the app later', async () => {
-    const { cookie } = await signUp(t.app, { name: 'Bearer Example', roleKey: 'pme' });
+    const { cookie } = await signUp(t.app, { name: 'Bearer Example', positionKey: 'pme_staff' });
     const token = cookie.split('=')[1];
     const me = await inject({
       method: 'GET',
@@ -147,11 +152,11 @@ describe('my profile', () => {
     }
   });
 
-  it('changes my role, and drops the product line when the new role has none', async () => {
+  it('changes my position, and drops the product line when the new position has none', async () => {
     const trauma = await productLineId(t.app, 'TRM');
     const { cookie, user } = await signUp(t.app, {
       name: 'Changing Lead',
-      roleKey: 'rd_lead',
+      positionKey: 'rd_lead',
       productLineId: trauma,
     });
 
@@ -159,10 +164,14 @@ describe('my profile', () => {
       method: 'PATCH',
       url: '/api/v1/me',
       headers: { cookie, 'if-match': user.updatedAt },
-      payload: { roleKey: 'rd_head' },
+      payload: { positionKey: 'pme_staff' },
     });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toMatchObject({ role: { key: 'rd_head' }, productLine: null });
+    expect(res.json()).toMatchObject({
+      role: { key: 'pme' },
+      position: { key: 'pme_staff' },
+      productLine: null,
+    });
   });
 
   it('refuses an edit made from an old version', async () => {

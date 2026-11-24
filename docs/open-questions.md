@@ -42,7 +42,7 @@
 | W21 | Can the same person submit a step and sign it off? The route lets it happen where a role both does and signs a step (for example the Lead at step 14) | Yes, as the route lists it. The step's sign-off record then carries both signatures. Separation of duties applies to a document's own rows, not to step sign-offs | VP, R&D Head |
 | W22 | Which days are holidays, and which Saturdays are worked? | Monday to Friday are working days, and a few made-up holidays are loaded for local work (`SAMPLE_HOLIDAYS`). Jayon's calendar replaces them as rows of `work_calendar` | R&D Head |
 | W23 | Are the timings right? A step is at risk 2 working days before it is due and not started, or when a signature has waited more than 3; a project is red when the forecast launch is more than 30 days late or a step is more than 10 working days overdue; a signature is due 3 working days after it is asked for; reminders go 2 working days before and on the due date; a late task is escalated at 2 and 5 working days | These are the starting values in `settings` and can be changed without a release | VP, R&D Head |
-| W24 | Who confirms a deviation, and does the weekly exception list need to be a document? | The next role up the ladder, or anyone above, in the project's scope; the "list" is a notification to the Head and the VP at 5 working days late, plus the Delays widget (P63) | R&D Head |
+| W24 | Who confirms a deviation, and does the weekly exception list need to be a document? | Someone above the person who recorded it on the org chart (or the Lead of the line, for people in R&D on the project), in the project's scope; the "list" is a notification to the Head and the VP at 5 working days late, plus the Delays widget (P63) | R&D Head |
 | W25 | Must work given by hand (an assignment or a request, not the route's own work) also say why when it is late? Should it get reminders? | No: it isn't on the plan, so a late one can be closed without a deviation, and it gets no reminders. It still shows how late it is | R&D Head |
 
 ## People and access
@@ -52,14 +52,15 @@
 | A1 | Should Leads see the content of all three product lines, or only their own? | Only their own line (status of all is open to everyone) | VP, R&D Head |
 | A2 | Who may see budgets and costs? May PME see prototype cost totals? | Board, VP, Head; the Lead for their line; R&D Ops on the project | VP |
 | A3 | Who may see the named cause of a delay? May the Board see named individuals' measures? | The person named, the roles above them, VP and Head; the Board sees department totals only | VP |
-| A4 | The org chart: who holds each role, who reports to whom, can one person hold several roles, can a line have more than one Lead? | The role ladder; one role per account | R&D Head |
+| A4 | The org chart: who holds each real position, can one person hold several roles, are the roles outside R&D on the chart? *The chart as drawn is in COAL ([P111](./decisions.md)); what is open is who really sits in each box* | The chart from the catalogue; one position, so one role, per account | R&D Head |
 | A5 | Who can create a project: only the VP, or the R&D Head too? | Only the VP | VP |
 | A6 | Will outside parties (labs, vendors, surgeons) get accounts or single-use links? | No access for now; R&D Ops or DARD upload what they send | R&D Head |
 | A7 | Must a person accept a task assigned to them, or only a request? | Only requests need accepting | Founders |
-| A8 | Which authentication method (company Microsoft or Google sign-in, email codes) and how admin works | Name-only placeholder; no admin | Founders |
+| A8 | Which authentication method (company Microsoft or Google sign-in, email codes) and how admin works | Name-only placeholder; no admin, except the temporary demo admin that is removed before the hand-off ([P113](./decisions.md)) | Founders |
 | A9 | When other departments join, does everyone in Jayon see the status of every R&D project (D6), or only R&D and the people involved? | Everyone in COAL, which is R&D and the people it works with for now | VP |
 | A10 | How will employees without a company email (for example on the shop floor) sign in, once real sign-in comes? | Not needed until real sign-in | Founders, Jayon IT |
 | A11 | Who keeps the source library, and who may research? | The VP, the R&D Head and the R&D Leads keep it; those three and R&D Ops (the people of steps C, 1 and 2) research. Design engineers may want literature at steps 7 and 8 later | R&D Head |
+| A12 | On the org chart ([P111](./decisions.md)): is the CEO a Board position alongside the MD? How many operations analysts are there? What route work, if any, do graphics designers and the FEA expert do? May a design engineer claim a queued task of another product line, as now? Does AM join R&D's chart? | The CEO is a second Board seat; one analyst; graphics designers get only the work they are given; the FEA expert shares the AEMS role with the metallurgy expert; yes; AM is left out | R&D Head, VP |
 
 ## Documents and signing
 

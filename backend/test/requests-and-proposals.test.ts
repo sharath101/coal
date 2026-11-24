@@ -359,30 +359,28 @@ describe('proposals (action cards)', () => {
     const project = await w.go(fresh('Changed'));
     const title = fresh('Draw rev C');
     const card = await ok(
-      propose('lead', 'Drawing', [
-        newTask({ title, assigneeId: id('designer'), projectId: project }),
-      ]),
+      propose('lead', 'Drawing', [newTask({ title, assigneeId: id('pme'), projectId: project })]),
     );
-    expect(card.preview.actions[0].summary).toMatch(/^Assign to Dev Example/);
-    // The designer leaves the team, so the Lead can only ask now.
+    expect(card.preview.actions[0].summary).toMatch(/^Assign to Pia Example/);
+    // Pia leaves the team, so the Lead, who runs only the people on their line's teams, can only ask now.
     const team = (await ok(call('GET', `/projects/${project}/team`, 'lead'))).items.map(
       (m: any) => m.user.id,
     );
     await ok(
       call('PUT', `/projects/${project}/team`, 'lead', {
-        userIds: team.filter((u: string) => u !== id('designer')),
+        userIds: team.filter((u: string) => u !== id('pme')),
       }),
     );
     const changed = await confirm(card.id, 'lead', 1);
     expect(changed.status).toBe(409);
     expect(changed.body.code).toBe('PREVIEW_CHANGED');
-    expect((await tasksOf('designer')).map((x) => x.title)).not.toContain(title);
+    expect((await tasksOf('pme')).map((x) => x.title)).not.toContain(title);
 
     const now = await ok(call('GET', `/proposals/${card.id}`, 'lead'));
     expect(now.version).toBe(2);
-    expect(now.preview.actions[0].summary).toMatch(/^Ask Dev Example/);
+    expect(now.preview.actions[0].summary).toMatch(/^Ask Pia Example/);
     expect((await confirm(card.id, 'lead', 2)).status).toBe(200);
-    expect((await tasksOf('designer')).find((x) => x.title === title)?.kind).toBe('request');
+    expect((await tasksOf('pme')).find((x) => x.title === title)?.kind).toBe('request');
   });
 
   it('carries out every action or none', async () => {

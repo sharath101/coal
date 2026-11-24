@@ -434,7 +434,14 @@ describe('making a template from a sample, over the API', () => {
         guard(endpoint, {
           orgId: 'x',
           requestId: 'r',
-          actor: { userId: 'u', name: 'N', roleKey: 'vp', productLineId: null },
+          actor: {
+            userId: 'u',
+            name: 'N',
+            roleKey: 'vp',
+            positionKey: 'vp',
+            productLineId: null,
+            switcherId: null,
+          },
           sessionId: 's',
           viaAi: true,
         }),

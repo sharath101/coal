@@ -2,7 +2,7 @@
 
 import { CAUSE_TYPES, DEVIATION_REASONS } from '@coal/shared';
 import { useTranslations } from 'next-intl';
-import { selectClass } from '@/components/role-fields';
+import { selectClass } from '@/components/ui/select-class';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';

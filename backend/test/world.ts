@@ -1,7 +1,10 @@
-import { productLineId, signUp, type SignedIn, type TestApp } from './helpers';
+import { openSeats, productLineId, signUp, type SignedIn, type TestApp } from './helpers';
 
-/** The made-up people of the tests: one for each role the route uses. */
-export const PEOPLE = {
+/**
+ * The made-up people of the tests: one for each role the route uses. Each is `[name, role]`, with
+ * the position where the role has several and the person isn't its first (docs/roles-and-access.md#the-org-chart).
+ */
+export const PEOPLE: Record<string, readonly [string, string, string?]> = {
   vp: ['Vera Example', 'vp'],
   head: ['Hari Example', 'rd_head'],
   head2: ['Hana Example', 'rd_head'],
@@ -13,11 +16,11 @@ export const PEOPLE = {
   ops: ['Om Example', 'rd_ops'],
   dard: ['Dina Example', 'dard'],
   qc: ['Quin Example', 'qc_inspector'],
-  md: ['Mira Example', 'board'],
-  ceo: ['Chet Example', 'board'],
+  md: ['Mira Example', 'board', 'managing_director'],
+  ceo: ['Chet Example', 'board', 'ceo'],
   qa: ['Quinn Example', 'company_qa'],
   outsider: ['Olga Example', 'marketing'],
-} as const;
+};
 
 export interface Res {
   status: number;
@@ -128,11 +131,16 @@ export async function createWorld(t: TestApp) {
   const spine = await productLineId(t.app, 'SPN');
   const trauma = await productLineId(t.app, 'TRM');
   const who: Record<string, SignedIn> = {};
-  for (const [key, [name, roleKey]] of Object.entries(PEOPLE)) {
+  // The engine must cope with several people in a role, so the tests that need two Heads open the seat.
+  await openSeats(t, 'rd_head');
+  for (const [key, [name, roleKey, positionKey]] of Object.entries(PEOPLE)) {
     who[key] = await signUp(t.app, {
       name,
       roleKey,
-      ...(roleKey === 'rd_lead' && { productLineId: key === 'leadOther' ? trauma : spine }),
+      ...(positionKey && { positionKey }),
+      ...(['rd_lead', 'design_engineer'].includes(roleKey) && {
+        productLineId: key === 'leadOther' ? trauma : spine,
+      }),
     });
   }
 

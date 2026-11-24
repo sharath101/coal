@@ -5,7 +5,7 @@ import { getRuns } from '../process/service';
 import { loadCalendar, loadSettings } from '../schedule/calendar';
 import { activeTasksOf, activeTasksOfStep, type TaskRow } from '../tasks/service';
 import { findActiveUsersByRole, findUsersByIds, type UserRow } from '../users/service';
-import { holdersOf, nextRoleUp, projectContext, type ProjectContext } from './audience';
+import { holdersOf, nextUp, projectContext, type ProjectContext } from './audience';
 import { notify, renderMessage, shortDate, stepVars, type NewNotification } from './service';
 
 /**
@@ -107,7 +107,7 @@ export async function runReminders(
       }
       if (late >= settings.escalateToLadderWorkingDays) {
         build(
-          await nextRoleUp(tx, orgId, ctx, assignee.roleKey),
+          await nextUp(tx, orgId, ctx, assignee),
           'escalation_late',
           'escalation',
           `${assignee.name} is late on step ${step.key}`,
@@ -197,7 +197,7 @@ async function signatureReminders(
     }
   } else if (o.assignee && o.late >= o.ladderAfter) {
     build(
-      await nextRoleUp(tx, orgId, ctx, o.assignee.roleKey),
+      await nextUp(tx, orgId, ctx, o.assignee),
       'escalation_late',
       'escalation',
       `${o.assignee.name} has not signed step ${task.stepKey}`,
