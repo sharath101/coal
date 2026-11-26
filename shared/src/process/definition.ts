@@ -10,6 +10,14 @@ import { z } from 'zod';
 export const StepKey = z.string().regex(/^[A-Z0-9]{1,3}[a-z]?$/);
 export type StepKey = z.infer<typeof StepKey>;
 
+/**
+ * The first step, "The idea", is done at Go and keyed `C` in the route file, the API and the
+ * database. People see it as step 0, so it reads like the others ("Step 0 done") and sorts first
+ * (P118). Anything that shows a step number to a person goes through `stepLabel`.
+ */
+export const START_STEP_KEY = 'C';
+export const stepLabel = (key: string): string => (key === START_STEP_KEY ? '0' : key);
+
 const Key = z.string().regex(/^[a-z][a-z0-9_]*$/);
 /** A role key, as in the roles catalogue. */
 const RoleKey = Key;

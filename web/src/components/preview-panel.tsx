@@ -1,6 +1,6 @@
 'use client';
 
-import type { Preview } from '@coal/shared';
+import { stepLabel, type Preview } from '@coal/shared';
 import { useTranslations } from 'next-intl';
 
 /** What an action would do or did: the steps that move, the tasks and who gets them, and warnings. */
@@ -32,7 +32,9 @@ export function PreviewPanel({
         <ul className="grid gap-0.5">
           {preview.steps.map((s, i) => (
             <li key={`${s.key}-${s.change}-${i}`}>
-              <span className="font-medium">{t('stepLine', { key: s.key, name: s.name })}</span>{' '}
+              <span className="font-medium">
+                {t('stepLine', { key: stepLabel(s.key), name: s.name })}
+              </span>{' '}
               <span className="text-muted-foreground">
                 {t(`change.${s.change}`, { iteration: s.iteration })}
               </span>

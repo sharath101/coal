@@ -7,6 +7,7 @@ import {
   returnStep,
   sendBackStep,
   startStep,
+  stepLabel,
   submitStep,
   type ActionResult,
   type DocumentSummary,
@@ -218,7 +219,7 @@ export function StepCard({ projectId, step, route, documents, focused = false, o
       <details open={isOpen || focused || canRecordAtStep(route, step.key)} className="group">
         <summary className="flex cursor-pointer list-none flex-wrap items-center gap-2 p-3">
           <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-md bg-muted font-mono text-xs font-semibold">
-            {step.key}
+            {stepLabel(step.key)}
           </span>
           <span className="font-medium">{step.name}</span>
           {step.checkpoint && (

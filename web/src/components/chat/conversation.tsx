@@ -6,6 +6,7 @@ import {
   MAX_CHAT_FILES,
   createChat,
   sendFeedback,
+  stepLabel,
   stopReply,
   type ChatDetail,
   type ChatMessage,
@@ -73,7 +74,7 @@ function PinChips({ pin, onClear }: { pin: Pin; onClear?: () => void }) {
     <div className="flex flex-wrap items-center gap-2 border-b px-4 py-2 text-xs text-muted-foreground">
       <span>{t('about')}</span>
       {pin.projectId && <ProjectLabel id={pin.projectId} />}
-      {pin.stepKey && <span>{t('step', { key: pin.stepKey })}</span>}
+      {pin.stepKey && <span>{t('step', { key: stepLabel(pin.stepKey) })}</span>}
       {pin.documentId && <span>{t('document')}</span>}
       {pin.taskId && <span>{t('task')}</span>}
       {pin.widgetKey && <span>{t('widget', { key: pin.widgetKey })}</span>}

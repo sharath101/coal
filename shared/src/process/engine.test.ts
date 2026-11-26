@@ -1,6 +1,13 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { parseRoute, dependentsOf, validateRoute, type RouteDefinition } from './definition';
+import {
+  parseRoute,
+  dependentsOf,
+  validateRoute,
+  START_STEP_KEY,
+  stepLabel,
+  type RouteDefinition,
+} from './definition';
 import {
   apply,
   currentStage,
@@ -211,6 +218,15 @@ describe('Go', () => {
       '2',
       '2a',
     ]);
+  });
+
+  it('shows the idea, the step done at Go, as step 0, and every other step as its own key', () => {
+    const start = route.steps.find((s) => s.done_at_go);
+    expect(start?.key).toBe(START_STEP_KEY);
+    expect(stepLabel(START_STEP_KEY)).toBe('0');
+    for (const step of route.steps.filter((s) => !s.done_at_go)) {
+      expect(stepLabel(step.key)).toBe(step.key);
+    }
   });
 });
 

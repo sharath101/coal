@@ -1,5 +1,6 @@
 'use client';
 
+import { stepLabel } from '@coal/shared';
 import { BookMarked, MessagesSquare } from 'lucide-react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
@@ -67,7 +68,7 @@ export default function ResearchPage() {
               <span className="text-xs text-muted-foreground">
                 {run.terms.join(' · ')}
                 {run.project
-                  ? ` · ${run.project.code}${run.stepKey ? `, ${run.stepKey}` : ''}`
+                  ? ` · ${run.project.code}${run.stepKey ? `, ${stepLabel(run.stepKey)}` : ''}`
                   : ''}
               </span>
             </Link>

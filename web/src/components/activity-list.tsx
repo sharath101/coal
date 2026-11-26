@@ -1,5 +1,6 @@
 'use client';
 
+import { stepLabel } from '@coal/shared';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { formatTime } from '@/lib/format';
@@ -11,7 +12,9 @@ type Values = Record<string, string | number>;
 function valuesOf(payload: Record<string, unknown>): Values {
   const out: Values = {};
   for (const [key, value] of Object.entries(payload)) {
-    if (typeof value === 'string' || typeof value === 'number') out[key] = value;
+    if (typeof value === 'string' || typeof value === 'number') {
+      out[key] = key === 'step' ? stepLabel(String(value)) : value;
+    }
   }
   return out;
 }

@@ -10,11 +10,11 @@
 
 ## The route in brief
 
-A product goes from the VP's idea (step **C**) to launch (step **25**) through **28 steps** in **6 stages**:
+A product goes from the VP's idea (step **0**) to launch (step **25**) through **28 steps** in **6 stages**:
 
-- **Numbering.** Steps 1 to 25 keep Jayon's own numbers. The COAL meeting added 2a and split step 24 into 24a and 24b, so there is no step 24.
+- **Numbering.** Steps 1 to 25 keep Jayon's own numbers. The COAL meeting added 2a and split step 24 into 24a and 24b, so there is no step 24. **Step 0**, the idea, is the start: it comes before Jayon's numbered steps and is done at Go. Its key is `C` in the route file, the API and the database, and people see it as 0 ([P118](./decisions.md)).
 - **Checkpoints.** Four steps (4, 12, 18 and 23) are go or no-go points. Nothing after a checkpoint starts until it is signed.
-- **Sign-offs.** 25 steps have a sign-off: the R&D Head signs 10, the R&D Lead 7, the VP 6 and the Board 2. C, 2a and 24a have none.
+- **Sign-offs.** 25 steps have a sign-off: the R&D Head signs 10, the R&D Lead 7, the VP 6 and the Board 2. Steps 0, 2a and 24a have none.
 - **Parallel steps.** Some steps start together (1, 2 and 2a; 6 to 9; 10 and 11; 14 and 15).
 
 **The route is data, not code.** It is stored as a versioned definition, `shared/src/process/rnd-route.v2.yaml` (see [architecture.md](./architecture.md#the-process-engine)). Each project stays on the version it started with. A version is never edited once it is loaded: to change the route, add a new version file, and update its tests and this doc together. (Version 2 was extended in place with each step's default length, the step that writes the plan, and the work-message templates, because it had not been deployed anywhere: [P55](./decisions.md).)
@@ -33,7 +33,7 @@ A product goes from the VP's idea (step **C**) to launch (step **25**) through *
 
 | Step | Name | Stage | Does the work | Signs | Starts when | Produces |
 |---|---|---|---|---|---|---|
-| **C** | The idea | 1 | VP | — (Go is the VP's signed decision) | — | Product concept |
+| **0** | The idea | 1 | VP | — (Go is the VP's signed decision) | — | Product concept |
 | **1** | Project inception | 1 | Head, Lead | VP | Go | Project Initiation Document (PID), naming the team |
 | **2** | Market study | 1 | Ops | VP | Go | Market Research Survey, with sources |
 | **2a** | Regulatory planning (new) | 1 | Lead, DARD ⚠ | none ⚠ | Go ⚠ | Regulatory plan: the bodies that must approve and the documents each needs |
@@ -68,7 +68,7 @@ A product goes from the VP's idea (step **C**) to launch (step **25**) through *
 
 ```mermaid
 flowchart LR
-  C(["C Idea"]) --> S1["1 Inception"] & S2["2 Market study"] & S2a["2a Regulatory plan"]
+  C(["0 Idea"]) --> S1["1 Inception"] & S2["2 Market study"] & S2a["2a Regulatory plan"]
   S1 & S2 --> S3["3 Proposal"]
   S3 --> G4{{"4 Board"}} --> S5["5 Action plan"]
   S5 --> S6["6 Raw material"] & S7["7 Implant design"] & S8["8 Instrument design"] & S9["9 Outsourcing"]
@@ -101,7 +101,7 @@ flowchart LR
   Documents then can't change until the signer approves or returns the step.
 - **The Board.** The MD and the CEO sign only as the Board, at steps 4 and 23. We assume both must sign ⚠. When the step is submitted, every person holding the Board role gets a sign-off task, and the step is approved when all of them have approved. If any one returns it, it goes back to its authors and the approvals so far are cleared. Anyone who joins the Board later doesn't join a sign-off already under way.
 - **Who may submit and sign.** Any doer of a step may start and submit it; only the step's signer may approve or return it. For checkpoints, approving records a `checkpoint` decision. Step 12 can't be approved until the Head has answered both of its questions, and "Are the prototypes OK?" must be *yes*.
-- **Steps without a sign-off.** C, 2a and 24a are complete when a doer marks them done. C is completed by the VP's signed Go.
+- **Steps without a sign-off.** 0, 2a and 24a are complete when a doer marks them done. Step 0 is completed by the VP's signed Go.
 
 ### Starting steps
 
@@ -125,7 +125,7 @@ flowchart LR
 
 | Step | Decision | By | Effect |
 |---|---|---|---|
-| C | Go | VP (signed) | Creates the project and opens 1, 2 and 2a |
+| 0 | Go | VP (signed) | Creates the project and opens 1, 2 and 2a |
 | 4, 23 | Approve, send back, or drop | Board | Approve opens the next step. Where the work goes back to is an open question ⚠ |
 | 12 | Are the prototypes OK? | Head | Yes opens 13. No sends the work back to 7 or 8 |
 | 12 | Is a pre-clinical study needed? | Head | Sets the path of step 15 |
@@ -178,7 +178,7 @@ Who else may do this is an open question.
 
 These are details from the workflow page that matter for tasks and documents. Step modules for them come later ([roadmap.md](./roadmap.md)).
 
-- **Steps C, 1 and 2.** What already exists (products on the market, studies, trials, safety problems) can be researched in the source library, and the results kept as sources of the project; the Market Research Survey can then cite them ([workstation-and-ai.md](./workstation-and-ai.md#researching-what-already-exists)).
+- **Steps 0, 1 and 2.** What already exists (products on the market, studies, trials, safety problems) can be researched in the source library, and the results kept as sources of the project; the Market Research Survey can then cite them ([workstation-and-ai.md](./workstation-and-ai.md#researching-what-already-exists)).
 - **Steps 7 and 8.** The FEA runs at the start of the design. The metallurgy expert in AEMS covers the material work through to the FEA, and is part of every project team. Drawings mark the critical dimensions for QC inspection.
 - **Steps 10 and 11.**
   - *The test licence.* The company QA team (not NPD QA) applies to CDSCO for the manufacturing test licence before prototypes are made.

@@ -1,6 +1,6 @@
 'use client';
 
-import type { WidgetKey, WidgetRow } from '@coal/shared';
+import { stepLabel, type WidgetKey, type WidgetRow } from '@coal/shared';
 import { useTranslations } from 'next-intl';
 import { HealthBadge, type Health } from '@/components/health-badge';
 import { StageStrip } from '@/components/widgets/widget-parts';
@@ -51,7 +51,7 @@ export function useCellText(widget: WidgetKey) {
     if (DAY_COLUMNS.has(column)) {
       return t('days', { count: Math.round(Number(value) * 10) / 10 });
     }
-    if (column === 'step') return t('step', { key: text });
+    if (column === 'step') return t('step', { key: stepLabel(text) });
     if (column === 'kind') {
       if (widget === 'messages') {
         return t.has(`notificationKind.${text}` as never)

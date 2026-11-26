@@ -1,6 +1,12 @@
 'use client';
 
-import { keepResearch, stopResearch, type ResearchResult, type ResearchRun } from '@coal/shared';
+import {
+  keepResearch,
+  stepLabel,
+  stopResearch,
+  type ResearchResult,
+  type ResearchRun,
+} from '@coal/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
@@ -100,7 +106,7 @@ export default function ResearchRunPage() {
               {r.stepKey
                 ? t('forStep', {
                     project: `${r.project.code} · ${r.project.name}`,
-                    step: r.stepKey,
+                    step: stepLabel(r.stepKey),
                   })
                 : t('for', { project: `${r.project.code} · ${r.project.name}` })}
             </span>
@@ -413,7 +419,7 @@ function KeepForm({
             <option value="">{t('wholeProject')}</option>
             {(projectId ? (route.data?.steps ?? []) : []).map((s) => (
               <option key={s.key} value={s.key}>
-                {s.key} · {s.name}
+                {stepLabel(s.key)} · {s.name}
               </option>
             ))}
           </select>
@@ -423,7 +429,7 @@ function KeepForm({
       {done && (
         <p className="text-sm text-emerald-800">
           {done.step
-            ? t('keptNoteStep', { count: done.count, step: done.step })
+            ? t('keptNoteStep', { count: done.count, step: stepLabel(done.step) })
             : t('keptNote', { count: done.count })}
         </p>
       )}

@@ -1,6 +1,6 @@
 'use client';
 
-import type { ProjectMilestone, RouteView } from '@coal/shared';
+import { stepLabel, type ProjectMilestone, type RouteView } from '@coal/shared';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { ChangeDatesDialog } from '@/components/change-dates-dialog';
@@ -205,7 +205,9 @@ export function TimelinePanel({
                   {steps.map((s) => (
                     <tr key={s.key} className="border-t align-top">
                       <td className="px-3 py-2">
-                        <span className="font-mono text-xs text-muted-foreground">{s.key}</span>{' '}
+                        <span className="font-mono text-xs text-muted-foreground">
+                          {stepLabel(s.key)}
+                        </span>{' '}
                         {s.name}
                       </td>
                       <td className="px-3 py-2">

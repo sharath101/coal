@@ -33,7 +33,7 @@ Types are data (`backend/src/modules/templates/catalogue.ts`), loaded on deploy.
 | Other document | `DOC` | any | upload | `…-DOC-nn` | Approved: the step's signer |
 | Step sign-off record | `STEP_SIGNOFF` | any with a sign-off | record | `…-SO-nn` | Approved: the step's signer, by approving the step |
 
-The product concept at step C isn't a document yet: Go records the idea's name and description ⚠ (S10). A template for each of the other steps' documents is a new type, prepared when Jayon's sample documents arrive.
+The product concept at step 0 isn't a document yet: Go records the idea's name and description ⚠ (S10). A template for each of the other steps' documents is a new type, prepared when Jayon's sample documents arrive.
 
 ## The template library
 
@@ -217,7 +217,7 @@ A document is signed in up to three rows, in order: **Prepared**, then **Reviewe
 - **Until passkeys,** a signature is a confirmed click by the right person ([below](#signing-with-face-id-or-fingerprint)). It is recorded insert-only, with the person's name, role, the meaning, the time and both hashes.
 - **Handover checklist.** At step 24b, the production head signs it with the meaning **Received and accepted**. Not built yet: it arrives with the step's own modules ⚠.
 
-**Decisions are signed too.** Every decision is signed by the person who made it, with a hash of exactly what was decided: Go at step C, the checkpoint decisions, the two answers at step 12 ([workflow.md](./workflow.md#decisions-recorded-at-steps)), and hold, resume and drop. A send-back is recorded and audited, with its reason, but isn't signed.
+**Decisions are signed too.** Every decision is signed by the person who made it, with a hash of exactly what was decided: Go at step 0, the checkpoint decisions, the two answers at step 12 ([workflow.md](./workflow.md#decisions-recorded-at-steps)), and hold, resume and drop. A send-back is recorded and audited, with its reason, but isn't signed.
 
 ## Step sign-off records
 
