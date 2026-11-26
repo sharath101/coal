@@ -2,7 +2,7 @@ import { addWorkingDays, dateOfInstant, makeCalendar, WIDGETS } from '@coal/shar
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { OutboxDispatcher } from '../src/modules/events/dispatcher';
 import { SUBSCRIPTIONS } from '../src/modules/events/subscriptions';
-import { createTestApp, type TestApp } from './helpers';
+import { createTestApp, productLineId, type TestApp } from './helpers';
 import { createWorld, type World } from './world';
 
 let t: TestApp;
@@ -458,6 +458,70 @@ describe('how we are doing', () => {
     const unread = await expanded('messages', 'ops', '&tab=unread');
     expect(rowsOf(unread).some((r) => r.id === top.id)).toBe(false);
     expect(unread.tab).toBe('unread');
+  });
+});
+
+describe('grouping by product line', () => {
+  /** The group names in the order the rows come, each repeated name collapsed. */
+  const runsOf = (rows: any[]) =>
+    rows.map((r) => r.group?.name ?? null).filter((name, i, all) => i === 0 || name !== all[i - 1]);
+
+  it('puts the rows of one product line together, the lines by name, and work on no project last', async () => {
+    daysAhead = 0;
+    const spineId = await w.go(fresh('Group spine'));
+    const traumaId = (
+      await ok(
+        call('POST', '/projects', 'vp', {
+          name: fresh('Group trauma'),
+          productLineId: await productLineId(t.app, 'TRM'),
+          teamUserIds: w.team(),
+        }),
+      )
+    ).project.id;
+    const own = fresh('Group own task');
+    await ok(call('POST', '/tasks', 'ops', { title: own }));
+
+    const tasks = rowsOf(await expanded('my-tasks', 'ops'));
+    const groupOf = (projectId: string) =>
+      tasks.find((r) => r.ref.projectId === projectId)?.group?.name;
+    expect(groupOf(spineId)).toBe('Spine');
+    expect(groupOf(traumaId)).toBe('Trauma');
+    expect(tasks.find((r) => r.title === own).group).toBeNull();
+    // Each line is one run, in name order, and the work on no project comes after them.
+    expect(runsOf(tasks)).toEqual(['Spine', 'Trauma', null]);
+
+    const pipeline = rowsOf(await expanded('pipeline', 'vp'));
+    expect(pipeline.find((r) => r.ref.projectId === traumaId).group.name).toBe('Trauma');
+    expect(runsOf(pipeline)).toEqual(['Spine', 'Trauma']);
+
+    // The other lists of projects and steps come in line order too.
+    for (const key of ['my-projects', 'upcoming-checkpoints', 'delays-risks', 'coming-up']) {
+      const runs = runsOf(rowsOf(await expanded(key, 'vp')));
+      expect(runs).toEqual([...new Set(runs)].sort());
+    }
+  });
+
+  it('gives each task the product line of its project, and none to work on no project', async () => {
+    const traumaId = (
+      await ok(
+        call('POST', '/projects', 'vp', {
+          name: fresh('Task line'),
+          productLineId: await productLineId(t.app, 'TRM'),
+          teamUserIds: w.team(),
+        }),
+      )
+    ).project.id;
+    const own = fresh('Task line own');
+    await ok(call('POST', '/tasks', 'ops', { title: own }));
+    const { items } = await ok(call('GET', '/tasks?scope=mine&limit=100', 'ops'));
+    expect(items.find((x: any) => x.subject?.id === traumaId).productLine.name).toBe('Trauma');
+    expect(items.find((x: any) => x.title === own).productLine).toBeNull();
+  });
+
+  it('gives a widget about people or messages no groups', async () => {
+    for (const key of ['team-workload', 'how-its-going', 'messages']) {
+      expect(rowsOf(await expanded(key, 'vp')).every((r) => r.group === null)).toBe(true);
+    }
   });
 });
 

@@ -31,4 +31,5 @@ export * from './rules/research';
 export * from './rules/calendar';
 export * from './rules/schedule';
 export * from './rules/measures';
+export * from './rules/lines';
 export * from './process';

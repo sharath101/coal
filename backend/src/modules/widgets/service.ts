@@ -13,7 +13,7 @@ import { isManager } from '../org/chart';
 import { toError } from '../permissions';
 import { loadCalendar, loadSettings } from '../schedule/calendar';
 import { dateOfInstant } from '@coal/shared';
-import type { WidgetContext, WidgetHandler } from './context';
+import { groupedByLine, type WidgetContext, type WidgetHandler } from './context';
 import { delaysAndRisks } from './delays';
 import { messages } from './messages';
 import { howItsGoing, teamWorkload } from './people';
@@ -101,5 +101,11 @@ export async function getWidget(
     },
   };
   const body = await HANDLERS[key](w);
-  return { key, view: query.view, asOf: now.toISOString(), ...body };
+  return {
+    key,
+    view: query.view,
+    asOf: now.toISOString(),
+    ...body,
+    rows: groupedByLine(body.rows),
+  };
 }

@@ -7,6 +7,7 @@ import {
   type SignOffWait,
 } from '@coal/shared';
 import { listWaiting } from '../documents/service';
+import { linesOfProjectIds } from '../rnd/service';
 import { roleName } from '../rnd/routing';
 import {
   activeTasksOf,
@@ -19,6 +20,7 @@ import {
   codeOf,
   count,
   dueTone,
+  lineGroup,
   projectLink,
   row,
   rowLimit,
@@ -35,6 +37,22 @@ export const waitingOnText = (wait: SignOffWait) =>
   [...wait.pending.map((p) => p.name), ...(wait.queued ? [`${wait.signer.name} queue`] : [])].join(
     ', ',
   );
+
+type Lines = Map<string, { id: string; name: string }>;
+
+/** The product lines of the projects these tasks belong to. */
+const linesOfTasks = (w: WidgetContext, tasks: TaskRow[]): Promise<Lines> =>
+  linesOfProjectIds(
+    w.deps.db,
+    w.ctx.orgId,
+    tasks.flatMap((t) => (t.subjectType === 'project' && t.subjectId ? [t.subjectId] : [])),
+  );
+
+/** A task under the product line of its project; work that is on no project has no line. */
+const lineGroupOfTask = (lines: Lines, t: TaskRow) => {
+  const line = t.subjectType === 'project' && t.subjectId ? lines.get(t.subjectId) : undefined;
+  return line ? lineGroup(line) : null;
+};
 
 function matchesFilters(w: WidgetContext, t: TaskRow): boolean {
   const f = w.filters;
@@ -92,6 +110,7 @@ export async function myTasks(w: WidgetContext): Promise<WidgetBody> {
         : [...running, ...mine.filter((t) => t.status === 'waiting')];
   const filtered = source.filter((t) => matchesFilters(w, t));
   const shown = filtered.slice(0, rowLimit(w));
+  const lines = await linesOfTasks(w, shown);
   // A doer's task that waits shows who it waits on and how late they are, not the doer's own date.
   const waits = await signOffWaits(
     w.deps.db,
@@ -123,6 +142,7 @@ export async function myTasks(w: WidgetContext): Promise<WidgetBody> {
         title: t.title,
         subtitle: t.subjectLabel,
         link: t.subjectId ? projectLink(t.subjectId, t.stepKey) : null,
+        group: lineGroupOfTask(lines, t),
         tone,
         badges: wait
           ? [
@@ -176,6 +196,7 @@ export async function waitingSignature(w: WidgetContext): Promise<WidgetBody> {
     activeTasksOf(w.deps.db, orgId, [w.actor.userId]),
   ]);
   const signOffs = active.filter((t) => t.kind === 'sign');
+  const lines = await linesOfTasks(w, signOffs);
   const rows = [
     ...documents.map((d) => ({
       at: dateOfInstant(new Date(d.requestedAt)),
@@ -186,6 +207,7 @@ export async function waitingSignature(w: WidgetContext): Promise<WidgetBody> {
         title: `${d.number} · ${d.title}`,
         subtitle: `${d.project.code} · step ${d.stepKey}`,
         link: `/projects/${d.project.id}/documents/${d.documentId}`,
+        group: lineGroup(d.productLine),
         tone: 'neutral',
         badges: [{ label: d.meaning, tone: 'neutral' }],
         cells: {
@@ -208,6 +230,7 @@ export async function waitingSignature(w: WidgetContext): Promise<WidgetBody> {
         title: t.title,
         subtitle: t.subjectLabel,
         link: t.subjectId ? projectLink(t.subjectId, t.stepKey) : null,
+        group: lineGroupOfTask(lines, t),
         tone: dueTone(w, t.dueOn),
         badges: [{ label: 'Step sign-off', tone: 'neutral' }],
         cells: {
@@ -283,6 +306,7 @@ export async function comingUp(w: WidgetContext): Promise<WidgetBody> {
           title: `Step ${step.key}: ${step.name}`,
           subtitle: `${p.project.code} · ${p.project.name}`,
           link: projectLink(p.project.id, step.key),
+          group: lineGroup(p.line),
           cells: { project: p.project.code, step: step.key, starts, waitsFor },
           actions: ['open'],
           ref: { projectId: p.project.id, stepKey: step.key },

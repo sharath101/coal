@@ -37,6 +37,8 @@ export const Task = z.object({
   daysLate: z.number().int(),
   /** What the task belongs to, such as a project, for linking. */
   subject: z.object({ type: z.string(), id: Id, label: z.string() }).nullable(),
+  /** The product line of the project it belongs to, to divide lists by line; null on no project. */
+  productLine: z.object({ id: Id, name: z.string() }).nullable(),
   /** Made by the route for a step: its dates are on the plan, and a late one needs a deviation. */
   onPlan: z.boolean(),
   /**

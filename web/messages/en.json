@@ -1053,6 +1053,9 @@
     "unread": "Unread:",
     "seeAll": "See all messages"
   },
+  "lineGroup": {
+    "none": "Not on a project"
+  },
   "widgets": {
     "ask": "Ask AI",
     "open": "Open",

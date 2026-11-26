@@ -6,6 +6,7 @@ import { findUsersByIds } from '../users/service';
 import {
   count,
   healthTone,
+  lineGroup,
   projectLink,
   row,
   rowLimit,
@@ -89,6 +90,7 @@ export async function delaysAndRisks(w: WidgetContext): Promise<WidgetBody> {
           title: `Step ${step.key}: ${step.name}`,
           subtitle: `${p.project.code} · ${p.project.name}`,
           link: projectLink(p.project.id, step.key),
+          group: lineGroup(p.line),
           tone: healthTone(overdue ? 'overdue' : 'at_risk'),
           badges: overdue
             ? [{ label: `${late}d late`, tone: 'danger' }]
@@ -120,6 +122,7 @@ export async function delaysAndRisks(w: WidgetContext): Promise<WidgetBody> {
     state: 'all',
   });
   const devs = await presentDeviations(w.deps.db, orgId, w.actor, devRows);
+  const groupOfProject = new Map(portfolio.map((p) => [p.project.id, lineGroup(p.line)]));
   const toReview = devs.filter((d) => d.can.review).length;
   const overdueCount = delays.filter((d) => d.late > 0).length;
   const atRiskCount = delays.length - overdueCount;
@@ -133,6 +136,7 @@ export async function delaysAndRisks(w: WidgetContext): Promise<WidgetBody> {
             title: `${d.project.code} · step ${d.stepKey ?? ''}`,
             subtitle: d.reasonText,
             link: projectLink(d.project.id, d.stepKey),
+            group: groupOfProject.get(d.project.id) ?? null,
             tone: d.can.review ? 'warning' : 'neutral',
             badges: d.review
               ? [{ label: d.review.outcome, tone: 'good' }]

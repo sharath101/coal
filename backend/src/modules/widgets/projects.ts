@@ -10,6 +10,7 @@ import { roleName } from '../rnd/routing';
 import {
   count,
   healthTone,
+  lineGroup,
   projectLink,
   row,
   rowLimit,
@@ -49,6 +50,7 @@ export async function upcomingCheckpoints(w: WidgetContext): Promise<WidgetBody>
         title: `Step ${step.key}: ${step.name}`,
         subtitle: `${p.project.code} · ${p.project.name}`,
         link: projectLink(p.project.id, step.key),
+        group: lineGroup(p.line),
         tone: late ? 'danger' : waiting.length > 0 && soon ? 'warning' : 'neutral',
         cells: {
           project: p.project.code,
@@ -93,6 +95,7 @@ const projectRow = (p: PortfolioProject, w: WidgetContext) => {
     title: `${p.project.code} · ${p.project.name}`,
     subtitle: p.line.name,
     link: projectLink(p.project.id),
+    group: lineGroup(p.line),
     tone: healthTone(p.run.health),
     badges:
       p.run.status === 'active' ? [] : [{ label: p.run.status.replace('_', ' '), tone: 'neutral' }],

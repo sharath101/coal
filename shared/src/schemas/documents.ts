@@ -395,6 +395,7 @@ export const WaitingSignature = z.object({
   versionNo: z.number().int(),
   stepKey: StepKey,
   project: z.object({ id: Id, code: z.string(), name: z.string() }),
+  productLine: z.object({ id: Id, name: z.string() }),
   requestedAt: Timestamp,
 });
 export type WaitingSignature = z.infer<typeof WaitingSignature>;

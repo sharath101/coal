@@ -49,6 +49,7 @@ import { fillParts, formOutline } from '../templates/sample-docx';
 import { actorOf, findActiveUsersByRole } from '../users/service';
 import { assertMay, loadEnv, viewerOf } from '../rnd/env';
 import { activeMembers, findProjectByRun } from '../rnd/projects';
+import { listProductLines } from '../rnd/service';
 import type { Env } from '../rnd/actions';
 import { accessOf, documentResource, visibleVersions, type Access } from './access';
 import {
@@ -1268,6 +1269,7 @@ export async function listWaiting(
     ctx.orgId,
     [...versions.values()].map((v) => v.documentId),
   );
+  const lineById = new Map((await listProductLines(deps.db, ctx.orgId)).map((l) => [l.id, l]));
   const out: WaitingSignature[] = [];
   const projects = new Map<string, Awaited<ReturnType<typeof findProjectByRun>>>();
   const teams = new Map<string, string[]>();
@@ -1285,6 +1287,8 @@ export async function listWaiting(
     }
     const project = projects.get(doc.runId);
     if (!project) continue;
+    const line = lineById.get(project.productLineId);
+    if (!line) continue;
     const preparer = (await signaturesOf(deps.db, 'document_version', [version.id]))
       .get(version.id)
       ?.find((s) => s.meaning === 'prepared')?.userId;
@@ -1306,6 +1310,7 @@ export async function listWaiting(
       versionNo: version.versionNo,
       stepKey: doc.stepKey,
       project: { id: project.id, code: project.code, name: project.name },
+      productLine: { id: line.id, name: line.name },
       requestedAt: request.requestedAt.toISOString(),
     });
     if (out.length >= 100) break;

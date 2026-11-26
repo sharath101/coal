@@ -1,10 +1,11 @@
 'use client';
 
-import { RUN_STATUSES } from '@coal/shared';
+import { RUN_STATUSES, groupByLine } from '@coal/shared';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { HealthBadge } from '@/components/health-badge';
+import { LineHeading } from '@/components/line-heading';
 import { ProblemMessage } from '@/components/problem-message';
 import { selectClass } from '@/components/ui/select-class';
 import { ProjectStatusBadge } from '@/components/status-badge';
@@ -69,34 +70,44 @@ export default function ProjectsPage() {
           {isVp ? t('noneForVp') : t('none')}
         </p>
       )}
-      <ul className="grid gap-2">
-        {items.map((p) => (
-          <li key={p.id}>
-            <Link
-              href={`/projects/${p.id}`}
-              className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-4 hover:bg-accent"
-            >
-              <div className="grid gap-0.5">
-                <span className="font-medium">
-                  <span className="font-mono text-sm text-muted-foreground">{p.code}</span> ·{' '}
-                  {p.name}
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  {p.productLine.name} · {t('stage', { stage: p.stage })} ·{' '}
-                  {t('by', { name: p.createdBy })}
-                  {p.forecastLaunch && (
-                    <> · {t('launch', { date: formatDate(p.forecastLaunch) })}</>
-                  )}
-                </span>
-              </div>
-              <span className="flex items-center gap-2">
-                <HealthBadge health={p.health} />
-                <ProjectStatusBadge status={p.status} />
-              </span>
-            </Link>
-          </li>
+      <div className="grid gap-5">
+        {groupByLine(items, (p) => p.productLine).map((group) => (
+          <section key={group.key} className="grid gap-2">
+            <LineHeading
+              as="h2"
+              name={group.name}
+              count={projects.hasNextPage ? undefined : group.items.length}
+            />
+            <ul className="grid gap-2">
+              {group.items.map((p) => (
+                <li key={p.id}>
+                  <Link
+                    href={`/projects/${p.id}`}
+                    className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-4 hover:bg-accent"
+                  >
+                    <div className="grid gap-0.5">
+                      <span className="font-medium">
+                        <span className="font-mono text-sm text-muted-foreground">{p.code}</span> ·{' '}
+                        {p.name}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {t('stage', { stage: p.stage })} · {t('by', { name: p.createdBy })}
+                        {p.forecastLaunch && (
+                          <> · {t('launch', { date: formatDate(p.forecastLaunch) })}</>
+                        )}
+                      </span>
+                    </div>
+                    <span className="flex items-center gap-2">
+                      <HealthBadge health={p.health} />
+                      <ProjectStatusBadge status={p.status} />
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </section>
         ))}
-      </ul>
+      </div>
       {projects.hasNextPage && (
         <Button
           variant="outline"

@@ -5,6 +5,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, X } from 'lucide-react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
+import { LineHeading } from '@/components/line-heading';
 import { ProblemMessage } from '@/components/problem-message';
 import { Button } from '@/components/ui/button';
 import {
@@ -21,6 +22,7 @@ import { queryKeys, useWidget, type WidgetInfo } from '@/lib/queries';
 import { AskAiButton } from '@/components/widgets/widget-card';
 import { Cell } from '@/components/widgets/cells';
 import { CountStats, useWidgetText } from '@/components/widgets/count-stats';
+import { groupRows, subtitleOf } from '@/components/widgets/group-rows';
 import { RowActions, rowHasActions } from '@/components/widgets/row-actions';
 import { WidgetFilters } from '@/components/widgets/widget-filters';
 import { RowBadges, toneBar } from '@/components/widgets/widget-parts';
@@ -45,7 +47,7 @@ function RowTitle({ row }: { row: WidgetRow }) {
       ) : (
         <span className="font-medium">{row.title}</span>
       )}
-      {row.subtitle && <span className="text-xs text-muted-foreground">{row.subtitle}</span>}
+      {subtitleOf(row) && <span className="text-xs text-muted-foreground">{subtitleOf(row)}</span>}
       <RowBadges badges={row.badges} />
     </div>
   );
@@ -60,6 +62,7 @@ export function WidgetPanel({ info, state, onChange, onClose }: Props) {
   const queryClient = useQueryClient();
   const widget = useWidget(info.key, { view: 'expanded', tab: state.tab, filters: state.filters });
   const data = widget.data;
+  const { grouped, groups } = groupRows(data?.rows ?? []);
   const activeTab = state.tab ?? data?.tab ?? info.tabs[0] ?? null;
   const showActions = (data?.rows ?? []).some(rowHasActions);
   const markAll = useMutation({
@@ -101,49 +104,71 @@ export function WidgetPanel({ info, state, onChange, onClose }: Props) {
                   )}
                 </tr>
               </thead>
-              <tbody>
-                {data.rows.map((row) => (
-                  <tr key={row.id} className="border-t align-top">
-                    <td className={cn('px-3 py-2', toneBar(row.tone))}>
-                      <RowTitle row={row} />
-                    </td>
-                    {info.columns.map((column) => (
-                      <td key={column} className="px-3 py-2">
-                        <Cell widget={info.key} column={column} value={row.cells[column]} />
+              {groups.map((group) => (
+                <tbody key={group.key}>
+                  {grouped && (
+                    <tr className="border-t bg-muted/30">
+                      <th
+                        scope="colgroup"
+                        colSpan={info.columns.length + 1 + (showActions ? 1 : 0)}
+                        className="px-3 py-1.5 text-left"
+                      >
+                        <LineHeading name={group.name} count={group.items.length} />
+                      </th>
+                    </tr>
+                  )}
+                  {group.items.map((row) => (
+                    <tr key={row.id} className="border-t align-top">
+                      <td className={cn('px-3 py-2', toneBar(row.tone))}>
+                        <RowTitle row={row} />
                       </td>
-                    ))}
-                    {showActions && (
-                      <td className="px-3 py-2">
-                        <RowActions row={row} />
-                      </td>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
+                      {info.columns.map((column) => (
+                        <td key={column} className="px-3 py-2">
+                          <Cell widget={info.key} column={column} value={row.cells[column]} />
+                        </td>
+                      ))}
+                      {showActions && (
+                        <td className="px-3 py-2">
+                          <RowActions row={row} />
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              ))}
             </table>
           </div>
 
-          <ul className="grid gap-2 md:hidden">
-            {data.rows.map((row) => (
-              <li
-                key={row.id}
-                className={cn('grid gap-2 rounded-lg border p-3', toneBar(row.tone))}
-              >
-                <RowTitle row={row} />
-                <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
-                  {info.columns.map((column) => (
-                    <div key={column} className="contents">
-                      <dt className="text-muted-foreground">{t(`columns.${column}` as never)}</dt>
-                      <dd>
-                        <Cell widget={info.key} column={column} value={row.cells[column]} />
-                      </dd>
-                    </div>
+          <div className="grid gap-4 md:hidden">
+            {groups.map((group) => (
+              <section key={group.key} className="grid gap-2">
+                {grouped && <LineHeading name={group.name} count={group.items.length} />}
+                <ul className="grid gap-2">
+                  {group.items.map((row) => (
+                    <li
+                      key={row.id}
+                      className={cn('grid gap-2 rounded-lg border p-3', toneBar(row.tone))}
+                    >
+                      <RowTitle row={row} />
+                      <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
+                        {info.columns.map((column) => (
+                          <div key={column} className="contents">
+                            <dt className="text-muted-foreground">
+                              {t(`columns.${column}` as never)}
+                            </dt>
+                            <dd>
+                              <Cell widget={info.key} column={column} value={row.cells[column]} />
+                            </dd>
+                          </div>
+                        ))}
+                      </dl>
+                      {showActions && <RowActions row={row} />}
+                    </li>
                   ))}
-                </dl>
-                {showActions && <RowActions row={row} />}
-              </li>
+                </ul>
+              </section>
             ))}
-          </ul>
+          </div>
           <p className="text-xs text-muted-foreground">
             {data.total > data.rows.length
               ? t('showing', { shown: data.rows.length, total: data.total })

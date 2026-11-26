@@ -1,5 +1,6 @@
 import {
   addCalendarDays,
+  groupByLine,
   type DateKey,
   type ScheduleSettings,
   type Tone,
@@ -47,12 +48,25 @@ export function row(r: Partial<WidgetRow> & { id: string; title: string }): Widg
     link: null,
     tone: 'neutral',
     badges: [],
+    group: null,
     cells: {},
     actions: [],
     ref: {},
     ...r,
   };
 }
+
+/** The group a row sits under when it belongs to a project of this product line. */
+export const lineGroup = (line: { id: string; name: string }): WidgetRow['group'] => ({
+  key: line.id,
+  name: line.name,
+});
+
+/** Puts the rows of one product line next to each other (`groupByLine`); each line's rows keep the widget's order, the most urgent first. */
+export const groupedByLine = (rows: WidgetRow[]): WidgetRow[] =>
+  groupByLine(rows, (r) => r.group && { id: r.group.key, name: r.group.name }).flatMap(
+    (g) => g.items,
+  );
 
 export const count = (key: string, value: number | null, tone: Tone = 'neutral') => ({
   key,

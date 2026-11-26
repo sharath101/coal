@@ -340,7 +340,13 @@ describe('signing a document', () => {
     // What waits for whom.
     const waiting = async (as: string) => (await ok(call('GET', '/signature-requests', as))).items;
     expect(await waiting('dard')).toMatchObject([
-      { meaning: 'reviewed', number: sent.number, versionNo: 2, stepKey: '1' },
+      {
+        meaning: 'reviewed',
+        number: sent.number,
+        versionNo: 2,
+        stepKey: '1',
+        productLine: { name: 'Spine' },
+      },
     ]);
     expect(await waiting('vp')).toEqual([]);
     expect(await waiting('designer')).toEqual([]);

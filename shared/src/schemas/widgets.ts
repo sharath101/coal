@@ -17,6 +17,11 @@ export const WidgetRow = z.object({
   link: z.string().nullable(),
   tone: Tone,
   badges: z.array(z.object({ label: z.string(), tone: Tone })),
+  /**
+   * The heading the row sits under: the product line of its project. Rows of one group come next
+   * to each other, the groups in order; null where the row belongs to no project.
+   */
+  group: z.object({ key: z.string(), name: z.string() }).nullable(),
   /** The values of the expanded table's columns, by column key. */
   cells: z.record(z.string(), Cell),
   /** What the viewer may do with the row now (action keys of the widget). */

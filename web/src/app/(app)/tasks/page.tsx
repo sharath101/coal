@@ -1,8 +1,10 @@
 'use client';
 
+import { groupByLine } from '@coal/shared';
 import { useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { Suspense, useState } from 'react';
+import { LineHeading } from '@/components/line-heading';
 import { NewTaskDialog } from '@/components/new-task-dialog';
 import { ProblemMessage } from '@/components/problem-message';
 import { TaskRow } from '@/components/task-row';
@@ -79,11 +81,24 @@ function Tasks() {
           {t('none')}
         </p>
       )}
-      <ul className="grid gap-2">
-        {items.map((task) => (
-          <TaskRow key={task.id} task={task} sent={scope === 'sent'} />
+      <div className="grid gap-5">
+        {groupByLine(items, (task) => task.productLine).map((group) => (
+          <section key={group.key} className="grid gap-2">
+            {items.some((task) => task.productLine) && (
+              <LineHeading
+                as="h2"
+                name={group.name}
+                count={tasks.hasNextPage ? undefined : group.items.length}
+              />
+            )}
+            <ul className="grid gap-2">
+              {group.items.map((task) => (
+                <TaskRow key={task.id} task={task} sent={scope === 'sent'} />
+              ))}
+            </ul>
+          </section>
         ))}
-      </ul>
+      </div>
       {tasks.hasNextPage && (
         <Button
           variant="outline"

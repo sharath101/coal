@@ -6,6 +6,7 @@ import { containing, wordsQuery } from '../../core/db/search';
 import { notFound, validationFailed } from '../../core/http/errors';
 import { latestEventsOfRunSteps } from '../events/service';
 import { listRoles } from '../org/service';
+import { linesOfProjectIds } from '../rnd/service';
 import { loadCalendar } from '../schedule/calendar';
 import { findUsersByIds } from '../users/service';
 import { tasks } from './tables';
@@ -546,6 +547,11 @@ export async function presentTasks(
   const nameOf = new Map(people.map((p) => [p.id, p.name]));
   const roleName = new Map(roleList.map((r) => [r.key, r.name]));
   const today = dateOfInstant(now);
+  const lines = await linesOfProjectIds(
+    ex,
+    orgId,
+    rows.flatMap((r) => (r.subjectType === 'project' && r.subjectId ? [r.subjectId] : [])),
+  );
   const waits = await signOffWaits(
     ex,
     orgId,
@@ -575,6 +581,8 @@ export async function presentTasks(
       row.subjectType && row.subjectId
         ? { type: row.subjectType, id: row.subjectId, label: row.subjectLabel ?? '' }
         : null,
+    productLine:
+      (row.subjectType === 'project' && row.subjectId && lines.get(row.subjectId)) || null,
     onPlan: row.runStepId !== null,
     followsStep: followsStep(row),
     waitingOn: (row.status === 'waiting' && row.runStepId && waits.get(row.runStepId)) || null,

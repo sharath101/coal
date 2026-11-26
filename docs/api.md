@@ -60,7 +60,7 @@ Signing is a confirmed click until passkeys arrive in the last block ([D16](./de
 
 | Endpoint | Purpose | Tier |
 |---|---|---|
-| `GET /signature-requests` | What waits for my signature: the rows I may sign now, on documents (a step sign-off record is signed by approving its step) | read |
+| `GET /signature-requests` | What waits for my signature: the rows I may sign now, on documents (a step sign-off record is signed by approving its step), each with the `productLine` of its project | read |
 | `POST /signature-requests/{id}/sign` | Sign a row. A confirmed click: the signature is tied to the version's content and PDF hashes. `?preview=true` supported | never |
 | `POST /signature-requests/{id}/return` | Return the document to its authors with a comment, instead of signing | never |
 | `POST /documents/{id}/versions/{n}/submit` | Submit a draft: the author signs Prepared and the next row opens. `?preview=true` supported | confirm |
@@ -111,7 +111,7 @@ Every action returns `{ saved, preview }`: what changed (steps, tasks made with 
 
 | Endpoint | Purpose | Tier |
 |---|---|---|
-| `GET /tasks` | My tasks (`scope=mine`), the tasks waiting in my role's queue (`scope=queue`), or the work and requests I gave others (`scope=sent`), open or closed. A doer's task that is `waiting` carries `waitingOn`, the same as the step's `withSigners` | read |
+| `GET /tasks` | My tasks (`scope=mine`), the tasks waiting in my role's queue (`scope=queue`), or the work and requests I gave others (`scope=sent`), open or closed. A doer's task that is `waiting` carries `waitingOn`, the same as the step's `withSigners`. A task on a project carries its `productLine`, for dividing the list by line | read |
 | `GET /tasks/{id}` | One task: mine, one waiting in my role's queue, or one I gave | read |
 | `PATCH /tasks/{id}` | Set my own task, assignment, request or corrective action to open, in progress or done. Starting or finishing a request accepts it. A task of a step follows its step and is refused with `409 USE_THE_STEP`: start the step and submit it instead. A task has `followsStep` to say which it is | auto (my own) |
 | `POST /tasks/{id}/claim` | Claim a task from my role's queue. I join the project team if I'm not on it. A Lead may claim only for their own product line's projects | confirm |
@@ -173,7 +173,7 @@ Work given by hand (`POST /tasks`) isn't on the route's plan: no step closes or 
 | Endpoint | Purpose | Tier |
 |---|---|---|
 | `GET /widgets` | The widgets I can use, with their tabs, filters and columns, and my layout (the keys in order) | read |
-| `GET /widgets/{key}?view=compact\|expanded&tab=&filter[...]=` | One widget's data: counts, and rows with a title, a subtitle, badges, the table's cells, actions and references. Counts only what I may see | read |
+| `GET /widgets/{key}?view=compact\|expanded&tab=&filter[...]=` | One widget's data: counts, and rows with a title, a subtitle, badges, the product line they are grouped under (`group`), the table's cells, actions and references. Counts only what I may see | read |
 | `GET /notifications`, `POST /notifications/{id}/read`, `POST /notifications/read-all` | My notifications and work messages, and the unread count | read / auto |
 | `GET /stream` | Server-Sent Events. Hints only, never content: `{"type":"widgets","keys":[…]}` (fetch these widgets again) and `{"type":"notification"}`. Needs a session. *Not in the endpoint list or the OpenAPI file, because it isn't a request and response* | — |
 | `GET /search?q=&types=` | Projects, documents, tasks and people matching some words (PostgreSQL full-text search with English stemming, plus parts of codes and names). Each kind is filtered by its own rule: every project (status is open), documents the person may open in full (drafts only for the people who work on the project), their own tasks, queue and given work, and the people directory | read |

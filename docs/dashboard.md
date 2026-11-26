@@ -50,7 +50,11 @@ interface WidgetDefinition {
 }
 ```
 
-**One shape for every widget.** `GET /widgets/{key}` returns `counts` (the headline numbers, each with a tone), `rows` and `tabs`. A row has a title, a subtitle, a link, a tone, badges, `cells` (the values of the columns) and the `actions` this person may take, plus references (task, request, project, step) for those actions. The top few rows fill the compact card; the whole tab fills the expanded view. A client needs no widget-specific code to show a new widget, only labels for its columns.
+**One shape for every widget.** `GET /widgets/{key}` returns `counts` (the headline numbers, each with a tone), `rows` and `tabs`. A row has a title, a subtitle, a link, a tone, badges, a `group`, `cells` (the values of the columns) and the `actions` this person may take, plus references (task, request, project, step) for those actions. The top few rows fill the compact card; the whole tab fills the expanded view. A client needs no widget-specific code to show a new widget, only labels for its columns.
+
+**Grouped by product line** ([P114](./decisions.md)). Every widget whose rows belong to a project (W1 to W7) puts them under a heading for the product line of that project: Arthroscopy, then its projects or tasks; Spine, then its own; and so on. A row's `group` is that line (its id and name), and the server sorts the rows so each line's rows sit together, the lines by name, and work that is on no project (a person's own task) last under "Not on a project". Within a line the widget's own order stays (the most urgent first), so the compact card, which shows the top few rows, shows them under their lines. The expanded view adds each line's row count. A widget about people or messages (W8 to W10) has no groups, and a widget with no row in any group shows no headings.
+
+The **Projects** page and the **My tasks** page (with its "Waiting for my signature" list) are divided the same way, by the `productLine` that their projects, tasks and signature requests carry. They are paged, so the website groups what it has loaded and adds the count of a line only once everything is. The ordering is one pure rule, `groupByLine` in `shared/` (`rules/lines.ts`), used by the server for widgets and by the website for the pages.
 
 ## First-release widgets
 
