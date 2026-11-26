@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { defineEndpoint } from '../api/contract';
 import { Condition, StepKey } from '../process/definition';
 import { RUN_STATUSES, STEP_STATUSES } from '../process/engine';
+import { MILESTONE_STATUSES } from '../rules/schedule';
 import {
   DateOnly,
   HealthEnum,
@@ -24,6 +25,55 @@ export const StepStatusEnum = z.enum(STEP_STATUSES);
 export const Person = z.object({ id: Id, name: z.string() });
 export const RoleRef = z.object({ key: z.string(), name: z.string() });
 
+// Milestones: the targets the VP sets for a project (docs/dashboard.md#milestones)
+
+export const MilestoneStatusEnum = z.enum(MILESTONE_STATUSES);
+
+export const ProjectMilestone = z.object({
+  id: Id,
+  /** A route step, reached when the step is signed off, or a title in the VP's own words, ticked off by hand. */
+  kind: z.enum(['step', 'own']),
+  stepKey: StepKey.nullable(),
+  /** The step's name, or the VP's words. */
+  title: z.string(),
+  targetDate: DateOnly.nullable(),
+  status: MilestoneStatusEnum,
+  /** Working days past the target: until today, or until it was reached. */
+  daysLate: z.number().int(),
+  /** A step milestone's forecast: the step's forecast end. */
+  forecastDate: DateOnly.nullable(),
+  reachedOn: DateOnly.nullable(),
+  /** Who ticked it off (own words only). */
+  reachedBy: Person.nullable(),
+  /** The note given when it was ticked off. Content: only for people in the project's scope. */
+  note: z.string().nullable(),
+});
+export type ProjectMilestone = z.infer<typeof ProjectMilestone>;
+
+/** The next milestone not reached yet, for project cards. */
+export const NextMilestone = ProjectMilestone.pick({
+  id: true,
+  title: true,
+  targetDate: true,
+  status: true,
+  daysLate: true,
+});
+
+const MilestoneTitle = z.string().trim().min(2).max(120);
+
+/** A milestone to add: a route step, or a title in your own words. */
+export const MilestoneInput = z
+  .object({
+    stepKey: StepKey.optional(),
+    title: MilestoneTitle.optional(),
+    targetDate: DateOnly.optional(),
+  })
+  .refine((m) => (m.stepKey === undefined) !== (m.title === undefined), {
+    message: 'Give a step or a title, not both.',
+    path: ['title'],
+  });
+export type MilestoneInput = z.infer<typeof MilestoneInput>;
+
 export const ProjectSummary = z.object({
   id: Id,
   code: z.string(),
@@ -37,6 +87,8 @@ export const ProjectSummary = z.object({
   healthReasons: z.array(HealthReason),
   plannedLaunch: DateOnly.nullable(),
   forecastLaunch: DateOnly.nullable(),
+  /** The first milestone not reached yet, while the project is running. */
+  nextMilestone: NextMilestone.nullable(),
   createdAt: Timestamp,
   createdBy: z.string(),
 });
@@ -50,12 +102,18 @@ export const ProjectCan = z.object({
   resume: z.boolean(),
   drop: z.boolean(),
   editTeam: z.boolean(),
+  /** Add, change and remove milestones (the VP and the R&D Head, while the project runs). */
+  editMilestones: z.boolean(),
+  /** Tick off a milestone in your own words, or undo it. */
+  reachMilestones: z.boolean(),
 });
 
 export const ProjectDetail = ProjectSummary.extend({
   holdReason: z.string().nullable(),
   dropReason: z.string().nullable(),
   team: z.array(TeamMember),
+  /** By target date, those without one last, then in route order. */
+  milestones: z.array(ProjectMilestone),
   can: ProjectCan,
 });
 export type ProjectDetail = z.infer<typeof ProjectDetail>;
@@ -108,6 +166,8 @@ export const GoBody = z.object({
   productLineId: Id,
   /** People to add to the starting team, besides the Lead, the Head and the AEMS expert. */
   teamUserIds: z.array(Id).max(30).default([]),
+  /** The project's milestones, if the VP sets any now. They can be added or changed later. */
+  milestones: z.array(MilestoneInput).max(20).default([]),
 });
 
 export const ProjectsQuery = PageQuery.extend({
@@ -261,14 +321,22 @@ export const StepView = z.object({
 });
 export type StepView = z.infer<typeof StepView>;
 
-export const MilestoneView = z.object({
+/**
+ * A fact a person records that a step waits for, such as "material received" (docs/workflow.md#starting-steps).
+ * The route file calls these milestones (`milestone_reached`); they are not the project's milestones.
+ */
+export const PrerequisiteView = z.object({
   key: z.string(),
   name: z.string(),
+  /** The step it is recorded at, or null if it can be recorded any time. */
   recordedAt: StepKey.nullable(),
   recordedBy: z.array(RoleRef),
+  /** The steps that wait for it, to start, submit or be approved. */
+  holdsUp: z.array(StepKey),
   reached: z.boolean(),
   canRecord: z.boolean(),
 });
+export type PrerequisiteView = z.infer<typeof PrerequisiteView>;
 
 export const StageView = z.object({ no: z.number().int(), name: z.string() });
 
@@ -279,7 +347,7 @@ export const RouteView = z.object({
   stage: z.number().int(),
   stages: z.array(StageView),
   steps: z.array(StepView),
-  milestones: z.array(MilestoneView),
+  prerequisites: z.array(PrerequisiteView),
   openCorrectiveActions: z.number().int(),
 });
 export type RouteView = z.infer<typeof RouteView>;
@@ -553,18 +621,19 @@ export const remindSigners = defineEndpoint({
   response: RemindResult,
 });
 
-export const recordMilestone = defineEndpoint({
-  id: 'milestones.record',
+export const recordPrerequisite = defineEndpoint({
+  id: 'prerequisites.record',
   method: 'POST',
-  path: '/projects/{id}/milestones',
-  summary: 'Record a milestone, with a note or a file as evidence',
+  path: '/projects/{id}/prerequisites',
+  summary:
+    'Record a prerequisite a step waits for, such as material received, with a note or a file as evidence',
   auth: 'session',
-  permission: 'milestones.record',
+  permission: 'prerequisites.record',
   aiTier: 'confirm',
   params: IdParams,
   query: PreviewQuery,
   body: z.object({
-    milestone: z.string().min(1).max(60),
+    prerequisite: z.string().min(1).max(60),
     note: z.string().trim().max(1000).optional(),
     evidenceFileId: Id.optional(),
   }),
@@ -588,4 +657,69 @@ export const createCorrectiveAction = defineEndpoint({
   }),
   response: ActionResult,
   status: 201,
+});
+
+// Milestones (docs/dashboard.md#milestones). The VP and the R&D Head set them; the assistant only reads them.
+
+export const MilestoneParams = z.object({ id: Id, milestoneId: Id });
+export const MilestoneList = z.object({ items: z.array(ProjectMilestone) });
+
+export const addMilestone = defineEndpoint({
+  id: 'milestones.add',
+  method: 'POST',
+  path: '/projects/{id}/milestones',
+  summary:
+    'Add a milestone to a project: a route step, or a title in your own words, with a target date',
+  auth: 'session',
+  permission: 'milestones.write',
+  aiTier: 'never',
+  params: IdParams,
+  body: MilestoneInput,
+  response: MilestoneList,
+  status: 201,
+});
+
+export const updateMilestone = defineEndpoint({
+  id: 'milestones.update',
+  method: 'PATCH',
+  path: '/projects/{id}/milestones/{milestoneId}',
+  summary:
+    "Change a milestone's target date (null clears it), or the title of one in your own words",
+  auth: 'session',
+  permission: 'milestones.write',
+  aiTier: 'never',
+  params: MilestoneParams,
+  body: z
+    .object({ title: MilestoneTitle.optional(), targetDate: DateOnly.nullable().optional() })
+    .refine((b) => b.title !== undefined || b.targetDate !== undefined, {
+      message: 'Give a new title or target date.',
+      path: ['targetDate'],
+    }),
+  response: MilestoneList,
+});
+
+export const removeMilestone = defineEndpoint({
+  id: 'milestones.remove',
+  method: 'DELETE',
+  path: '/projects/{id}/milestones/{milestoneId}',
+  summary: 'Remove a milestone. Its record is kept',
+  auth: 'session',
+  permission: 'milestones.write',
+  aiTier: 'never',
+  params: MilestoneParams,
+  response: MilestoneList,
+});
+
+export const reachMilestone = defineEndpoint({
+  id: 'milestones.reach',
+  method: 'PUT',
+  path: '/projects/{id}/milestones/{milestoneId}/reached',
+  summary:
+    'Tick off a milestone in your own words, with a note, or undo it. A step milestone is reached when its step is signed off',
+  auth: 'session',
+  permission: 'milestones.reach',
+  aiTier: 'never',
+  params: MilestoneParams,
+  body: z.object({ reached: z.boolean(), note: z.string().trim().max(1000).optional() }),
+  response: MilestoneList,
 });

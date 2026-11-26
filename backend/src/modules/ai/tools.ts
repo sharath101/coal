@@ -255,7 +255,8 @@ const TOOLS: AiToolDef[] = [
   aiTool({
     name: 'get_project',
     endpoint: getProject,
-    description: 'One project: its stage, health, launch dates, hold or drop reason and team.',
+    description:
+      "One project: its stage, health, launch dates, hold or drop reason, team, and the milestones the VP set for it (each one's target date, state and how late it is). Milestones are read-only for you: the VP and the R&D Head set them on the project page.",
     input: z.object({ projectId: id('project') }),
     call: ({ projectId }) => ({ params: { id: projectId } }),
     label: () => 'Opened a project',
@@ -275,6 +276,16 @@ const TOOLS: AiToolDef[] = [
         holdReason: p.holdReason,
         dropReason: p.dropReason,
         team: p.team.map((m) => `${m.user.name} (${m.user.role.name})`),
+        milestones: p.milestones.map((m) => ({
+          title: m.title,
+          step: m.stepKey,
+          target: m.targetDate,
+          status: m.status,
+          workingDaysLate: m.daysLate,
+          forecast: m.forecastDate,
+          reachedOn: m.reachedOn,
+          note: m.note,
+        })),
       },
       sources: [project(p)],
     }),
@@ -284,7 +295,7 @@ const TOOLS: AiToolDef[] = [
     name: 'get_route',
     endpoint: getProjectRoute,
     description:
-      "A project's steps: each one's state, who does it, who signs it, what it waits for and its dates. Use it to say where a project is and what comes next.",
+      "A project's steps: each one's state, who does it, who signs it, what it waits for and its dates, and the prerequisites some steps wait for (facts a person records, such as material received). Use it to say where a project is and what comes next.",
     input: z.object({ projectId: id('project') }),
     call: ({ projectId }) => ({ params: { id: projectId } }),
     label: () => 'Looked at a project’s route',
@@ -307,7 +318,11 @@ const TOOLS: AiToolDef[] = [
           daysLate: s.daysLate,
           withSigners: s.withSigners && signOffWaitData(s.withSigners),
         })),
-        milestones: r.milestones.map((m) => ({ name: m.name, reached: m.reached })),
+        prerequisites: r.prerequisites.map((m) => ({
+          name: m.name,
+          reached: m.reached,
+          holdsUp: m.holdsUp,
+        })),
       },
       sources: [
         {

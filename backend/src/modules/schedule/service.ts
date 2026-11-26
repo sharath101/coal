@@ -23,6 +23,7 @@ import { ROLES } from '../org/catalogue';
 import { currentSteps, findRunStep, loadRun, saveSchedule, type RunRow } from '../process/service';
 import { moveDueDates, movedDueDates } from '../tasks/service';
 import { loadCalendar, loadSettings } from './calendar';
+import { evaluateMilestones, milestoneHealth, milestonesOfRuns } from './milestones';
 import { timelineItems } from './tables';
 
 export type TimelineRow = typeof timelineItems.$inferSelect;
@@ -126,12 +127,13 @@ export async function recompute(
   options: { baselineNo?: number } = {},
 ): Promise<Recomputed> {
   const { run, route } = await loadRun(tx, orgId, runId, { forUpdate: true });
-  const [rows, cal, settings, itemRows, expected] = await Promise.all([
+  const [rows, cal, settings, itemRows, expected, milestoneRows] = await Promise.all([
     currentSteps(tx, runId),
     loadCalendar(tx, orgId),
     loadSettings(tx, orgId),
     timelineRows(tx, runId),
     movedDueDates(tx, runId),
+    milestonesOfRuns(tx, [runId]),
   ]);
   const { current } = splitItems(itemRows);
   const plan = planOfRows(current);
@@ -159,8 +161,28 @@ export async function recompute(
     run.plannedLaunch ||
     defaultLaunch(route, startedOn, cal, settings);
   const tracked = ['active', 'on_hold'].includes(run.status);
+  const milestones = evaluateMilestones(
+    route,
+    milestoneRows,
+    (key) => {
+      const f = facts[key];
+      return f
+        ? {
+            status: f.status,
+            completedOn: f.completedOn,
+            forecastEnd: schedule.steps[key]?.forecastEnd ?? null,
+          }
+        : undefined;
+    },
+    today,
+    cal,
+  );
   const outcome = tracked
-    ? projectHealth(route, schedule, { plannedLaunch, settings })
+    ? projectHealth(route, schedule, {
+        plannedLaunch,
+        settings,
+        milestones: milestoneHealth(milestones),
+      })
     : { health: null, reasons: [] };
 
   await saveSchedule(

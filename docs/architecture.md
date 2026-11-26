@@ -109,11 +109,11 @@ coal/
                       (session, AI tier and permission checks, problem responses, Idempotency-Key)
       modules/        Platform modules: auth, users, org (departments and roles), permissions,
                       audit, events (the outbox), files (storage, virus scanning), process
-                      (route versions, runs and their steps, decisions, milestones, send-backs),
+                      (route versions, runs and their steps, decisions, prerequisites, send-backs),
                       tasks, templates (document types, the template library, Word files),
                       documents (documents, versions, PDFs, signature rows, step sign-off
                       records), attachments (attachments and sources), schedule (the working
-                      calendar, settings, the plan and baseline, forecast and health),
+                      calendar, settings, the plan and baseline, a project's milestones, forecast and health),
                       deviations (late work, its reviews and comments), notifications (work
                       messages, reminders, the live stream), widgets (the Dashboard's data),
                       proposals (action cards), search, ai (the gateway, tools, instructions,
@@ -157,10 +157,10 @@ Each backend module owns its tables, its services and its routes. Modules call e
 
 ## The process engine
 
-COAL runs its processes, starting with the R&D route, on its own small engine, not a workflow product. The route is paced by people over months, its rules are specific (milestones, conditional steps, rework that resets only dependent steps), and the engine's state and the audit trail must be written together.
+COAL runs its processes, starting with the R&D route, on its own small engine, not a workflow product. The route is paced by people over months, its rules are specific (prerequisites recorded by hand, conditional steps, rework that resets only dependent steps), and the engine's state and the audit trail must be written together.
 
-- **Routes are files.** Each process's route lives in `shared/src/process/` as a YAML file per version (`rnd-route.v2.yaml`), checked against a strict schema (`definition.ts`) and by `validateRoute`: every step, milestone, decision and role it names exists, there are no cycles, and every send-back goes to a step the sender depends on. On deploy (`db:migrate`) the files are loaded into `process_versions`, with a hash. A loaded version never changes: a changed file is refused until it is a new version. Each run (for R&D, each project) stays on the version it started with. Besides who does what and when a step opens, a step carries its default length in working days (`default_days`) and may mark itself as the step that writes the plan (`baseline`), and the file holds the work-message templates (`messages`) with the words COAL fills in.
-- **A pure engine.** `apply(route, state, action)` takes a run's state and an action (start, submit, approve, return, decide, record a milestone, send back, hold, resume, drop) and returns the new state and a list of **effects**: steps becoming ready, started, submitted, approved, done, returned, reset or cancelled; decisions and milestones recorded; the run held, resumed, dropped, completed or closed. `startRun` does the same for Go. It touches nothing else, and refuses with an `EngineError` that carries the API's problem code. It also answers questions the screens need: what a step waits for, what it can do now (`stepActions`), and who may hold or drop (`runActionRoles`).
+- **Routes are files.** Each process's route lives in `shared/src/process/` as a YAML file per version (`rnd-route.v2.yaml`), checked against a strict schema (`definition.ts`) and by `validateRoute`: every step, milestone (a prerequisite: the file's word for the facts a step waits for, [P116](./decisions.md)), decision and role it names exists, there are no cycles, and every send-back goes to a step the sender depends on. On deploy (`db:migrate`) the files are loaded into `process_versions`, with a hash. A loaded version never changes: a changed file is refused until it is a new version. Each run (for R&D, each project) stays on the version it started with. Besides who does what and when a step opens, a step carries its default length in working days (`default_days`) and may mark itself as the step that writes the plan (`baseline`), and the file holds the work-message templates (`messages`) with the words COAL fills in.
+- **A pure engine.** `apply(route, state, action)` takes a run's state and an action (start, submit, approve, return, decide, record a prerequisite (`record_milestone`), send back, hold, resume, drop) and returns the new state and a list of **effects**: steps becoming ready, started, submitted, approved, done, returned, reset or cancelled; decisions and prerequisites recorded; the run held, resumed, dropped, completed or closed. `startRun` does the same for Go. It touches nothing else, and refuses with an `EngineError` that carries the API's problem code. It also answers questions the screens need: what a step waits for, what it can do now (`stepActions`), and who may hold or drop (`runActionRoles`).
 - **Opening steps.** After every action the engine opens each step whose conditions hold, until nothing changes. A send-back closes the iterations of the step and of everything that depends on it, and reopens the target at once.
 - **One transaction per action.** Each action runs in one database transaction, in `backend/src/modules/rnd/actions.ts`:
   1. lock the run, so actions on one project happen one after the other;
@@ -170,7 +170,7 @@ COAL runs its processes, starting with the R&D route, on its own small engine, n
   5. turn the effects into tasks, audit entries and events (see below).
 - **Previews.** The same code runs inside the transaction and rolls back at the end (`previewable()` in `core/db/change.ts`). A preview can't drift from the real action, because it is the real action.
 - **Conditions are named rules** written in code and used by name in the route file: `step_approved`, `step_done`, `milestone_reached`, `decision_equals`, `decision_recorded`, `no_open_corrective_actions`.
-- **Tests.** Table-driven tests walk whole projects through the route in seconds (`shared/src/process/engine.test.ts`), including every rework path, both paths of step 15, the Board's two signatures, hold and drop, and the milestones. API tests (`backend/test/route.test.ts`) walk it through the real endpoints, with the permissions, tasks and audit trail.
+- **Tests.** Table-driven tests walk whole projects through the route in seconds (`shared/src/process/engine.test.ts`), including every rework path, both paths of step 15, the Board's two signatures, hold and drop, and the prerequisites. API tests (`backend/test/route.test.ts`) walk it through the real endpoints, with the permissions, tasks and audit trail.
 
 ```yaml
 process: rnd-route

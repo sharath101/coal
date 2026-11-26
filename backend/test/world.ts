@@ -145,7 +145,7 @@ export async function createWorld(t: TestApp) {
   }
 
   async function call(
-    method: 'GET' | 'POST' | 'PUT' | 'PATCH',
+    method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
     url: string,
     as: string | null,
     payload?: unknown,
@@ -196,8 +196,8 @@ export async function createWorld(t: TestApp) {
     }
   }
 
-  const milestone = (id: string, key: string, as: string) =>
-    ok(call('POST', `/projects/${id}/milestones`, as, { milestone: key }));
+  const prerequisite = (id: string, key: string, as: string) =>
+    ok(call('POST', `/projects/${id}/prerequisites`, as, { prerequisite: key }));
   const decide = (id: string, step: string, decision: string, value: string) =>
     ok(call('POST', `/projects/${id}/steps/${step}/decisions`, 'head', { decision, value }));
 
@@ -210,9 +210,9 @@ export async function createWorld(t: TestApp) {
     const start = options.from ? ORDER.indexOf(options.from) : 0;
     for (const key of ORDER.slice(start)) {
       if (key === '10') {
-        await milestone(id, 'material_received_implant', 'ops');
-        await milestone(id, 'material_received_instrument', 'ops');
-        await milestone(id, 'test_licence_recorded', 'dard');
+        await prerequisite(id, 'material_received_implant', 'ops');
+        await prerequisite(id, 'material_received_instrument', 'ops');
+        await prerequisite(id, 'test_licence_recorded', 'dard');
       }
       if (key === '12') {
         await decide(id, '12', 'prototypes_ok', 'yes');
@@ -234,7 +234,7 @@ export async function createWorld(t: TestApp) {
     route,
     stepOf,
     finish,
-    milestone,
+    prerequisite,
     decide,
     advance,
     upload,

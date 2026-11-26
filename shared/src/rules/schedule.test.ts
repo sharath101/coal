@@ -5,9 +5,12 @@ import { makeCalendar } from './calendar';
 import {
   SCHEDULE_DEFAULTS,
   defaultLaunch,
+  milestoneStatus,
   planOfSteps,
   projectHealth,
   scheduleRun,
+  type MilestoneFacts,
+  type MilestoneHealth,
   type StepFacts,
 } from './schedule';
 
@@ -210,5 +213,84 @@ describe('project health', () => {
     const result = healthOf(f, '2026-11-04', planned);
     expect(result.health).toBe('red');
     expect(result.reasons.some((r) => r.code === 'launch_slipped')).toBe(true);
+  });
+
+  describe('with milestones', () => {
+    const onTime = facts({ '1': { status: 'in_progress', openedOn: '2026-11-02' } });
+    const withMilestone = (m: MilestoneHealth) => {
+      const schedule = scheduleRun(route, onTime, options('2026-11-03'));
+      return projectHealth(route, schedule, { plannedLaunch: null, settings, milestones: [m] });
+    };
+
+    it('stays green while a milestone is reached, on track or has no date', () => {
+      for (const status of ['reached', 'on_track', 'no_date'] as const) {
+        expect(withMilestone({ name: 'Board approval', status, daysLate: 0 }).health).toBe('green');
+      }
+    });
+
+    it('is amber when a milestone is late or at risk', () => {
+      const late = withMilestone({ name: 'Board approval', status: 'late', daysLate: 3 });
+      expect(late).toEqual({
+        health: 'amber',
+        reasons: [{ code: 'milestone_late', milestone: 'Board approval', days: 3 }],
+      });
+      const atRisk = withMilestone({ name: 'Launch', status: 'at_risk', daysLate: 0 });
+      expect(atRisk).toEqual({
+        health: 'amber',
+        reasons: [{ code: 'milestone_at_risk', milestone: 'Launch' }],
+      });
+    });
+
+    it('is red when a milestone is more than 10 working days late', () => {
+      expect(withMilestone({ name: 'Trade show', status: 'late', daysLate: 10 }).health).toBe(
+        'amber',
+      );
+      expect(withMilestone({ name: 'Trade show', status: 'late', daysLate: 11 })).toEqual({
+        health: 'red',
+        reasons: [{ code: 'milestone_far_late', milestone: 'Trade show', days: 11 }],
+      });
+    });
+  });
+});
+
+describe('milestone status', () => {
+  // 2 November 2026 is a Monday.
+  const status = (m: Partial<MilestoneFacts>, today: string) =>
+    milestoneStatus({ targetDate: null, reachedOn: null, forecastEnd: null, ...m }, today, cal);
+
+  it('is reached once reached, with the working days it was late', () => {
+    expect(status({ targetDate: '2026-11-06', reachedOn: '2026-11-05' }, '2026-11-20')).toEqual({
+      status: 'reached',
+      daysLate: 0,
+    });
+    expect(status({ targetDate: '2026-11-06', reachedOn: '2026-11-10' }, '2026-11-20')).toEqual({
+      status: 'reached',
+      daysLate: 2,
+    });
+  });
+
+  it('has no date until a target is set', () => {
+    expect(status({ forecastEnd: '2027-01-01' }, '2026-11-20')).toEqual({
+      status: 'no_date',
+      daysLate: 0,
+    });
+  });
+
+  it('is on track up to and on its target day, and late the working day after', () => {
+    expect(status({ targetDate: '2026-11-06' }, '2026-11-06').status).toBe('on_track');
+    expect(status({ targetDate: '2026-11-06' }, '2026-11-09')).toEqual({
+      status: 'late',
+      daysLate: 1,
+    });
+  });
+
+  it("is at risk while its step's forecast is after the target", () => {
+    expect(status({ targetDate: '2026-11-20', forecastEnd: '2026-11-25' }, '2026-11-03')).toEqual({
+      status: 'at_risk',
+      daysLate: 0,
+    });
+    expect(
+      status({ targetDate: '2026-11-20', forecastEnd: '2026-11-19' }, '2026-11-03').status,
+    ).toBe('on_track');
   });
 });

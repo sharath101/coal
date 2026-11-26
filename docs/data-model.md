@@ -16,12 +16,12 @@ This is the **first-release core** only: about 40 tables. Step-specific and regu
   - *Platform tables* serve every department: people, processes, tasks, documents, templates, signatures, AI, notifications and audit.
   - *Department tables* hold one department's own records. R&D's are `product_lines`, `projects` and `project_members`.
   - Department tables may point at platform tables, never the other way round. The one exception is `users.product_line_id`, the product line of a Lead or a design engineer, until the org chart replaces it ([A4](./open-questions.md#people-and-access)).
-- **Processes in general.** A **process run** is one run of a process's route. For R&D, each project has exactly one run. Steps, tasks, decisions, milestones and documents point at the run, so other departments' processes reuse them unchanged.
+- **Processes in general.** A **process run** is one run of a process's route. For R&D, each project has exactly one run. Steps, tasks, decisions, prerequisites, milestones and documents point at the run, so other departments' processes reuse them unchanged.
 - **Times.** Stored in UTC, shown in Indian time.
 - **Nothing important is overwritten.** Documents, signatures, decisions and deviations are versioned or insert-only. A correction is a new row pointing at the old one. Tables marked *insert-only* can't be changed or deleted: a trigger (`coal_refuse_change`) refuses every `UPDATE`, `DELETE` and `TRUNCATE`, and in production the backend's database account will also lack those privileges.
 - **Audit and events in the same transaction.** Every change writes its audit entry and its events in the same transaction as the change itself ([architecture.md](./architecture.md#events-and-live-updates)).
 - **JSON for variable content.** Document content (fields and written sections), route definitions, template specifications, and proposal actions and previews are JSON columns, checked against zod schemas in `shared/`.
-- **A run's state is its rows.** There is no separate state blob. The engine's state is loaded from `run_steps` (the current iteration of each step), `decisions` and `milestones`, and each action locks the run's row (`FOR UPDATE`), so two actions on one project happen one after the other. Tasks link to what they belong to with `subject_type` and `subject_id` (for R&D, a project), not a foreign key, so the platform's task table doesn't depend on any department's tables.
+- **A run's state is its rows.** There is no separate state blob. The engine's state is loaded from `run_steps` (the current iteration of each step), `decisions` and `milestones` (the prerequisites recorded), and each action locks the run's row (`FOR UPDATE`), so two actions on one project happen one after the other. Tasks link to what they belong to with `subject_type` and `subject_id` (for R&D, a project), not a foreign key, so the platform's task table doesn't depend on any department's tables.
 - **Two kinds of step reference.** `step_key` (for example `"13"` or `"24a"`) points at a step in the route definition. `run_step_id` points at one iteration of that step in one run.
 
 ## The core
@@ -48,7 +48,8 @@ erDiagram
   process_runs ||--o{ attachments : holds
   process_runs ||--o{ sources : cites
   run_steps ||--o{ decisions : records
-  process_runs ||--o{ milestones : records
+  process_runs ||--o{ milestones : "prerequisites recorded"
+  process_runs ||--o{ run_milestones : "targets set"
   tasks ||--o{ deviations : explains
   users ||--o{ proposals : "confirms"
 ```
@@ -99,11 +100,12 @@ Departments, roles, positions and product lines are reference data. Their rows a
 
 | Table | Holds | Key columns |
 |---|---|---|
-| `milestones` *(insert-only)* | Milestones recorded, such as material received | run_id, milestone, step_key and iteration (where it counts), note, evidence_file_id, recorded_by, recorded_at |
+| `milestones` *(insert-only)* | Prerequisites recorded, such as material received: the facts a step waits for ([P116](./decisions.md); the route file calls them milestones) | run_id, milestone, step_key and iteration (where it counts), note, evidence_file_id, recorded_by, recorded_at |
 | `decisions` *(insert-only)* | Go, checkpoint and step decisions, and hold, resume and drop | run_id, run_step_id, step_key, iteration, decision (go, checkpoint, prototypes_ok, preclinical_needed, hold, resume, drop), value, reason, decided_by. *Each decision is signed: the signature points at the decision* |
 | `send_backs` *(insert-only)* | Each time work is sent back to an earlier step | run_id, from_run_step_id, from_step_key, to_step_key, reason, evidence_file_id, decided_by, reset_run_step_ids. *A send-back isn't signed; its reason is kept in the record and the audit trail* |
 | `tasks` | Every task and request | run_id, run_step_id and step_key (empty for work outside a process), task_key (names a task a step makes beyond one per doer role), kind (work, review, sign, decision, corrective action, request, own), title, body, role_key, assignee_id, queue_role (set while the task waits in a queue), assigned_by, via_ai, status (open, in progress, waiting, done, declined, cancelled), keep_on_reset (a send-back never cancels it: the step-20 follow-up), subject_type, subject_id and subject_label (the project, for links), done_at, handed_in_at (when the doers handed the step in: the task waits for its signer from then, and the measures stop the clock here), due_on (when it is due now: a person's new date from a deviation moves it) and first_due_on (the first due date, which never moves: the on-time rate counts it), accepted_at and decline_reason (a request's answer). Work given by hand (`POST /tasks`: own tasks, assignments and requests) has no run step, so no step closes or resets it |
 | `timeline_items` | Planned dates per step and role. A `draft` is the plan being written at step 5 (replaced on each save); the VP's sign-off turns it into the `baseline` rows. Later changes are `change` rows. Baseline and change rows can't be changed or deleted (a trigger refuses it); the newest row for a step and role is the plan. The plan of a step is the earliest start and latest end across its roles | run_id, kind (draft, baseline, change), baseline_no, step_key, role_key, planned_start, planned_end, reason, recorded_by, created_at |
+| `run_milestones` | A project's milestones: the targets the VP sets at Go or later ([P117](./decisions.md)). Either a route step (reached when its current iteration is signed off or done) or a title in the VP's own words (ticked off by hand); a check refuses both or neither, and a step is a milestone of a run only once. A removed one keeps its row, with `removed_at` set | run_id, step_key or title, target_date, reached_at, reached_by and note (own words only), created_by, removed_at |
 | `deviations` *(insert-only)* | Late work, with the reason and the cause. A correction is a new row pointing at the old one | run_id, run_step_id, step_key, task_id, kind (late, forecast slip, rework), planned_date, new_date, reason_code, reason_text, cause_type (person, role, outside party), cause_user_id, cause_role, cause_party, recorded_by, corrects_id |
 | `deviation_reviews` *(insert-only)* | The next role up confirms or corrects a deviation, once | deviation_id, reviewer_id, outcome (confirmed, corrected), corrected_by_id (the new deviation), note |
 | `deviation_comments` *(insert-only)* | Comments from the person or role named as the cause | deviation_id, user_id, body |
@@ -160,7 +162,7 @@ Research in public sources ([workstation-and-ai.md](./workstation-and-ai.md#rese
 
 ## Not modelled yet, on purpose
 
-These need real Jayon documents and answers before they can be designed well. Guessing now would create tables we'd have to undo. Until each one is designed, its step works with tasks, uploads, milestones and step sign-off records.
+These need real Jayon documents and answers before they can be designed well. Guessing now would create tables we'd have to undo. Until each one is designed, its step works with tasks, uploads, prerequisites and step sign-off records.
 
 | Area | Steps | Examples of what will be needed |
 |---|---|---|

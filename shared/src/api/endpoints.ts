@@ -66,6 +66,7 @@ import { completeUpload, createUpload, getFileLink } from '../schemas/files';
 import { listRoles } from '../schemas/org';
 import { getProcess, getProcessStep, listProcesses } from '../schemas/process';
 import {
+  addMilestone,
   approveStep,
   createCorrectiveAction,
   createProject,
@@ -80,13 +81,16 @@ import {
   listProjects,
   previewGo,
   putTeam,
-  recordMilestone,
+  reachMilestone,
+  recordPrerequisite,
   remindSigners,
+  removeMilestone,
   resumeProject,
   returnStep,
   sendBackStep,
   startStep,
   submitStep,
+  updateMilestone,
 } from '../schemas/projects';
 import {
   acceptTask,
@@ -162,7 +166,11 @@ export const ENDPOINTS = [
   decideStep,
   sendBackStep,
   remindSigners,
-  recordMilestone,
+  recordPrerequisite,
+  addMilestone,
+  updateMilestone,
+  removeMilestone,
+  reachMilestone,
   createCorrectiveAction,
   listTasks,
   getTask,

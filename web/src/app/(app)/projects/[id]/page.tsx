@@ -7,8 +7,8 @@ import { Suspense } from 'react';
 import { ActivityList } from '@/components/activity-list';
 import { ProjectSources } from '@/components/attachments-sources';
 import { HealthBadge } from '@/components/health-badge';
-import { Milestones } from '@/components/milestones';
 import { HealthReasons, LaunchDates, useHealthReasonText } from '@/components/project-health';
+import { ProjectMilestones } from '@/components/project-milestones';
 import { ProjectActions } from '@/components/project-actions';
 import { AskAiLink } from '@/components/ask-ai';
 import { ProblemMessage } from '@/components/problem-message';
@@ -107,7 +107,7 @@ function ProjectView() {
         </TabsList>
 
         <TabsContent value="timeline" className="mt-6">
-          <TimelinePanel projectId={id} route={r} />
+          <TimelinePanel projectId={id} route={r} milestones={p.milestones} />
         </TabsContent>
 
         <TabsContent value="route" className="mt-6 grid gap-8 lg:grid-cols-[1fr_20rem]">
@@ -149,7 +149,14 @@ function ProjectView() {
 
           <aside className="grid content-start gap-8">
             <TeamPanel project={p} onChanged={changed} />
-            <Milestones projectId={id} route={r} onChanged={changed} />
+            <ProjectMilestones
+              project={p}
+              stages={r.stages}
+              steps={r.steps
+                .filter((s) => !['approved', 'done', 'cancelled'].includes(s.status))
+                .map((s) => ({ key: s.key, name: s.name, stage: s.stage }))}
+              onChanged={changed}
+            />
             <ProjectSources projectId={id} />
             <ActivityList projectId={id} />
           </aside>

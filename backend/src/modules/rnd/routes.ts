@@ -16,7 +16,7 @@ import {
   previewGo,
   putTeam,
   reassignTask,
-  recordMilestone,
+  recordPrerequisite,
   remindSigners,
   resumeProject,
   returnStep,
@@ -174,7 +174,7 @@ export const rndRoutes = [
       );
       if (query.preview) return { saved: false, preview, project: null };
       const env = await loadEnv(tx, ctx.orgId, actor, project.id);
-      return { saved: true, preview, project: await presentProject(tx, env) };
+      return { saved: true, preview, project: await presentProject(tx, env, deps.now()) };
     }),
   ),
 
@@ -200,11 +200,11 @@ export const rndRoutes = [
       status: query['filter[status]'],
       productLineId: query['filter[productLine]'],
     });
-    return { items: await presentProjects(deps.db, ctx.orgId, rows), nextCursor };
+    return { items: await presentProjects(deps.db, ctx.orgId, rows, deps.now()), nextCursor };
   }),
 
   implement(getProject, async ({ deps, ctx, actor, params }) =>
-    presentProject(deps.db, await loadEnv(deps.db, ctx.orgId, actor, params.id)),
+    presentProject(deps.db, await loadEnv(deps.db, ctx.orgId, actor, params.id), deps.now()),
   ),
 
   implement(getProjectRoute, async ({ deps, ctx, actor, params }) =>
@@ -436,11 +436,12 @@ export const rndRoutes = [
     }),
   ),
 
-  implement(recordMilestone, ({ deps, ctx, actor, params, query, body }) =>
+  implement(recordPrerequisite, ({ deps, ctx, actor, params, query, body }) =>
     previewable(deps.db, ctx, query.preview, async (tx, log) => {
       const env = await loadEnv(tx, ctx.orgId, actor, params.id, { forUpdate: true });
-      const def = env.loaded.route.milestones.find((m) => m.key === body.milestone);
-      assertMay(env, 'milestones.record', def?.recorded_by ?? []);
+      // The route file calls prerequisites milestones; the engine records them as such.
+      const def = env.loaded.route.milestones.find((m) => m.key === body.prerequisite);
+      assertMay(env, 'prerequisites.record', def?.recorded_by ?? []);
       if (body.evidenceFileId) {
         await assertUsableEvidence(tx, ctx.orgId, actor, body.evidenceFileId, 'evidenceFileId');
       }
@@ -448,7 +449,7 @@ export const rndRoutes = [
         tx,
         log,
         env,
-        { type: 'record_milestone', milestone: body.milestone },
+        { type: 'record_milestone', milestone: body.prerequisite },
         {
           userId: actor.userId,
           ...(body.note && { note: body.note }),

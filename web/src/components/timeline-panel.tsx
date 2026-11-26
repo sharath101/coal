@@ -1,12 +1,13 @@
 'use client';
 
-import type { RouteView } from '@coal/shared';
+import type { ProjectMilestone, RouteView } from '@coal/shared';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { ChangeDatesDialog } from '@/components/change-dates-dialog';
 import { DeviationsPanel } from '@/components/deviations-panel';
 import { HealthBadge, StepHealthBadge } from '@/components/health-badge';
 import { HealthReasons, LaunchDates } from '@/components/project-health';
+import { MilestoneStatusBadge } from '@/components/project-milestones';
 import { PlanEditor } from '@/components/plan-editor';
 import { ProblemMessage } from '@/components/problem-message';
 import { StepStatusBadge } from '@/components/status-badge';
@@ -14,9 +15,18 @@ import { Button } from '@/components/ui/button';
 import { formatDate, formatDateTime } from '@/lib/format';
 import { useRoles, useTimeline } from '@/lib/queries';
 
-/** The Timeline tab: planned against forecast, the baseline, the changes, and the deviations. */
-export function TimelinePanel({ projectId, route }: { projectId: string; route: RouteView }) {
+/** The Timeline tab: planned against forecast, the milestones, the baseline, the changes, and the deviations. */
+export function TimelinePanel({
+  projectId,
+  route,
+  milestones,
+}: {
+  projectId: string;
+  route: RouteView;
+  milestones: ProjectMilestone[];
+}) {
   const t = useTranslations('timeline');
+  const tM = useTranslations('milestones');
   const timeline = useTimeline(projectId);
   const roles = useRoles();
   const [changing, setChanging] = useState(false);
@@ -91,6 +101,57 @@ export function TimelinePanel({ projectId, route }: { projectId: string; route: 
             </div>
           </section>
         )
+      )}
+
+      {milestones.length > 0 && (
+        <section className="grid gap-2" aria-labelledby="milestones-table-heading">
+          <h3 id="milestones-table-heading" className="font-medium">
+            {tM('title')}
+          </h3>
+          <div className="overflow-x-auto rounded-lg border">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-muted/50 text-xs text-muted-foreground uppercase">
+                <tr>
+                  <th scope="col" className="px-3 py-2 font-medium">
+                    {tM('table.milestone')}
+                  </th>
+                  <th scope="col" className="px-3 py-2 font-medium">
+                    {tM('table.target')}
+                  </th>
+                  <th scope="col" className="px-3 py-2 font-medium">
+                    {tM('table.forecast')}
+                  </th>
+                  <th scope="col" className="px-3 py-2 font-medium">
+                    {tM('table.status')}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {milestones.map((m) => (
+                  <tr key={m.id} className="border-t align-top">
+                    <td className="px-3 py-2">
+                      {m.stepKey && (
+                        <span className="font-mono text-xs text-muted-foreground">
+                          {m.stepKey}{' '}
+                        </span>
+                      )}
+                      {m.title}
+                    </td>
+                    <td className="px-3 py-2 whitespace-nowrap">
+                      {m.targetDate ? formatDate(m.targetDate) : t('noDate')}
+                    </td>
+                    <td className="px-3 py-2 whitespace-nowrap">
+                      {m.forecastDate ? formatDate(m.forecastDate) : t('noDate')}
+                    </td>
+                    <td className="px-3 py-2">
+                      <MilestoneStatusBadge status={m.status} daysLate={m.daysLate} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
       )}
 
       <section className="grid gap-2" aria-labelledby="steps-heading">

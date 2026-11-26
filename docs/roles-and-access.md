@@ -149,7 +149,8 @@ Everyone with an account can see the **status** of every project. For now, that 
 | Sign a document row (Prepared, Reviewed, Approved) | The person the row names, or anyone holding its role within the project's scope; never Approved by the person who prepared the version ([documents-and-signing.md](./documents-and-signing.md#signature-rows)) |
 | Sign off a step | The step's signer ([workflow.md](./workflow.md#the-steps)) |
 | Decide at a checkpoint, choose the step-15 path, send work back | As in [workflow.md](./workflow.md#decisions-recorded-at-steps) |
-| Record a milestone | As in [workflow.md](./workflow.md#starting-steps) |
+| Record a prerequisite (material received, trial surgeries complete…) | As in [workflow.md](./workflow.md#starting-steps) |
+| Set a project's milestones (add, change, remove), and tick off those in the VP's own words | VP and R&D Head, while the project runs or is on hold ⚠ ([P117](./decisions.md), [W26](./open-questions.md#workflow)). Everyone sees them; the assistant only reads them |
 | Put on hold, resume, drop | VP; the Board can drop only while step 4 or 23 is open ⚠ |
 | Change the team | Lead (of the product line) or Head |
 | Raise a corrective action | The Lead, while the case study is open ⚠ |

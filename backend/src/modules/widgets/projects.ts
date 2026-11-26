@@ -7,6 +7,7 @@ import {
   OPEN_STATUSES,
 } from '@coal/shared';
 import { roleName } from '../rnd/routing';
+import { nextMilestones, type EvaluatedMilestone } from '../schedule/milestones';
 import {
   count,
   healthTone,
@@ -83,13 +84,14 @@ export async function upcomingCheckpoints(w: WidgetContext): Promise<WidgetBody>
   };
 }
 
-const projectRow = (p: PortfolioProject, w: WidgetContext) => {
+const projectRow = (p: PortfolioProject, w: WidgetContext, milestone?: EvaluatedMilestone) => {
   const open = [...p.steps.entries()].filter(([, s]) => OPEN_STATUSES.includes(s.status));
   const next =
     open
       .map(([, s]) => s.plannedEnd)
       .filter((d): d is string => !!d)
       .sort()[0] ?? null;
+  const status = p.run.status === 'active' ? [] : [{ label: p.run.status.replace('_', ' ') }];
   return row({
     id: p.project.id,
     title: `${p.project.code} · ${p.project.name}`,
@@ -97,13 +99,20 @@ const projectRow = (p: PortfolioProject, w: WidgetContext) => {
     link: projectLink(p.project.id),
     group: lineGroup(p.line),
     tone: healthTone(p.run.health),
-    badges:
-      p.run.status === 'active' ? [] : [{ label: p.run.status.replace('_', ' '), tone: 'neutral' }],
+    badges: [
+      ...status.map((b) => ({ ...b, tone: 'neutral' as const })),
+      ...(milestone?.status === 'late'
+        ? [{ label: 'Milestone late', tone: 'danger' as const }]
+        : milestone?.status === 'at_risk'
+          ? [{ label: 'Milestone at risk', tone: 'warning' as const }]
+          : []),
+    ],
     cells: {
       line: p.line.code,
       stage: p.run.stage,
       health: p.run.health,
       next,
+      ...(milestone && { milestone: milestone.title, milestoneDue: milestone.row.targetDate }),
       steps: open.map(([k]) => k).join(', '),
       lead: p.lead,
       daysInStage: daysInStage(p, w),
@@ -142,6 +151,17 @@ export async function myProjects(w: WidgetContext): Promise<WidgetBody> {
   );
   const red = mine.filter((p) => p.run.health === 'red').length;
   const amber = mine.filter((p) => p.run.health === 'amber').length;
+  const shown = mine.slice(0, rowLimit(w));
+  const next = await nextMilestones(
+    w.deps.db,
+    w.ctx.orgId,
+    shown.map((p) => ({
+      runId: p.run.id,
+      route: p.route,
+      running: ['active', 'on_hold'].includes(p.run.status),
+    })),
+    w.now,
+  );
   return {
     counts: [
       count('projects', mine.length),
@@ -151,7 +171,7 @@ export async function myProjects(w: WidgetContext): Promise<WidgetBody> {
     tabs: [],
     tab: null,
     total: mine.length,
-    rows: mine.slice(0, rowLimit(w)).map((p) => projectRow(p, w)),
+    rows: shown.map((p) => projectRow(p, w, next.get(p.run.id))),
   };
 }
 

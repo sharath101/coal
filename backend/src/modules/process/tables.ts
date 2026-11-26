@@ -127,7 +127,7 @@ export const decisions = pgTable(
   (t) => [index('decisions_run').on(t.runId)],
 );
 
-/** Milestones recorded, such as material received. Insert-only. */
+/** Prerequisites recorded, such as material received (the route file calls them milestones). Insert-only. */
 export const milestones = pgTable(
   'milestones',
   {

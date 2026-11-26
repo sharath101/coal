@@ -22,7 +22,9 @@ const QuestionId = z.string().regex(/^[A-Z]{1,2}\d+$/);
  * Conditions are named rules, used by name in the route file:
  * - `step_approved`: the step's sign-off is done (steps with a signer);
  * - `step_done`: a doer marked the step done (steps without a signer);
- * - `milestone_reached`: the milestone is recorded (for its step's current iteration, if it is per iteration);
+ * - `milestone_reached`: the milestone is recorded (for its step's current iteration, if it is per iteration).
+ *   The file's milestones are the prerequisites people record (docs/workflow.md#starting-steps), not a
+ *   project's own milestones;
  * - `decision_equals` / `decision_recorded`: a decision at a step's current iteration;
  * - `no_open_corrective_actions`: every corrective action on the run is closed.
  */
@@ -205,6 +207,14 @@ export function directInputs(route: RouteDefinition, step: StepDefinition): Step
   const keys = step.starts_when.flatMap((c) => conditionSteps(route, c));
   if (step.path) keys.push(step.path.decided_at.step);
   return [...new Set(keys)];
+}
+
+/** The steps that wait for a prerequisite (the route file's milestone): to open, submit or be approved. */
+export function stepsWaitingFor(route: RouteDefinition, milestoneKey: string): StepKey[] {
+  const names = (c: Condition) => 'milestone_reached' in c && c.milestone_reached === milestoneKey;
+  return route.steps
+    .filter((s) => [...s.starts_when, ...s.submit_requires, ...s.approve_requires].some(names))
+    .map((s) => s.key);
 }
 
 /** Every step that depends on `key`, directly or indirectly (not including `key`). */

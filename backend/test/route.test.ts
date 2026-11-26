@@ -114,8 +114,8 @@ async function finish(id: string, key: string) {
   }
 }
 
-const milestone = (id: string, key: string, as: string) =>
-  ok(call('POST', `/projects/${id}/milestones`, as, { milestone: key }));
+const prerequisite = (id: string, key: string, as: string) =>
+  ok(call('POST', `/projects/${id}/prerequisites`, as, { prerequisite: key }));
 
 const decide = (id: string, step: string, decision: string, value: string) =>
   ok(call('POST', `/projects/${id}/steps/${step}/decisions`, 'head', { decision, value }));
@@ -146,9 +146,9 @@ async function advance(id: string, through: string, options: { preclinical?: 'ye
   ];
   for (const key of order) {
     if (key === '10') {
-      await milestone(id, 'material_received_implant', 'ops');
-      await milestone(id, 'material_received_instrument', 'ops');
-      await milestone(id, 'test_licence_recorded', 'dard');
+      await prerequisite(id, 'material_received_implant', 'ops');
+      await prerequisite(id, 'material_received_instrument', 'ops');
+      await prerequisite(id, 'test_licence_recorded', 'dard');
     }
     if (key === '12') {
       await decide(id, '12', 'prototypes_ok', 'yes');
@@ -316,14 +316,14 @@ describe('a whole project, from Go to launch', () => {
     expect(view.steps.find((s: any) => s.key === '20').status).toBe('ready');
 
     await ok(call('POST', `/projects/${id}/steps/20/start`, 'lead'));
-    await milestone(id, 'trial_surgeries_complete', 'lead');
+    await prerequisite(id, 'trial_surgeries_complete', 'lead');
     expect((await stepOf(id, '21')).status).toBe('ready');
     await finish(id, '21');
     await finish(id, '22');
     // 22 waited for the regulatory plan (2a), which was done long ago.
     await finish(id, '23');
     expect((await stepOf(id, '24a')).status).toBe('locked');
-    await milestone(id, 'positive_feedback_threshold', 'lead');
+    await prerequisite(id, 'positive_feedback_threshold', 'lead');
     await finish(id, '24a');
     await finish(id, '24b');
     await finish(id, '25');
@@ -333,7 +333,7 @@ describe('a whole project, from Go to launch', () => {
     const early = await call('POST', `/projects/${id}/steps/20/submit`, 'lead');
     expect(early.status).toBe(409);
     expect(early.body.code).toBe('STEP_NOT_READY');
-    await milestone(id, 'follow_up_complete', 'ops');
+    await prerequisite(id, 'follow_up_complete', 'ops');
     await finish(id, '20');
     expect((await ok(call('GET', `/projects/${id}`, 'vp'))).status).toBe('closed');
 
@@ -656,29 +656,29 @@ describe('corrective actions', () => {
   });
 });
 
-describe('milestones', () => {
+describe('prerequisites', () => {
   it('are recorded once, by the right role, when their step has opened', async () => {
-    const id = await go('Milestones');
-    const early = await call('POST', `/projects/${id}/milestones`, 'ops', {
-      milestone: 'material_received_implant',
+    const id = await go('Prerequisites');
+    const early = await call('POST', `/projects/${id}/prerequisites`, 'ops', {
+      prerequisite: 'material_received_implant',
     });
     expect(early.body.code).toBe('STEP_NOT_READY');
-    const wrongRole = await call('POST', `/projects/${id}/milestones`, 'lead', {
-      milestone: 'test_licence_recorded',
+    const wrongRole = await call('POST', `/projects/${id}/prerequisites`, 'lead', {
+      prerequisite: 'test_licence_recorded',
     });
     expect(wrongRole.body).toMatchObject({ code: 'NOT_ALLOWED', whoCan: ['DARD'] });
     await ok(
-      call('POST', `/projects/${id}/milestones`, 'dard', {
-        milestone: 'test_licence_recorded',
+      call('POST', `/projects/${id}/prerequisites`, 'dard', {
+        prerequisite: 'test_licence_recorded',
         note: 'Applied on 3 March',
       }),
     );
-    const again = await call('POST', `/projects/${id}/milestones`, 'dard', {
-      milestone: 'test_licence_recorded',
+    const again = await call('POST', `/projects/${id}/prerequisites`, 'dard', {
+      prerequisite: 'test_licence_recorded',
     });
     expect(again.body.code).toBe('ALREADY_DONE');
-    const unknown = await call('POST', `/projects/${id}/milestones`, 'dard', {
-      milestone: 'nothing',
+    const unknown = await call('POST', `/projects/${id}/prerequisites`, 'dard', {
+      prerequisite: 'nothing',
     });
     expect(unknown.status).toBe(404);
     const [row] = await t.deps.db
@@ -686,9 +686,16 @@ describe('milestones', () => {
       .from(milestones)
       .where(sql`${milestones.note} = 'Applied on 3 March'`);
     expect(row).toMatchObject({ milestone: 'test_licence_recorded', stepKey: null });
-    expect(
-      (await route(id)).milestones.find((m: any) => m.key === 'test_licence_recorded'),
-    ).toMatchObject({ reached: true, canRecord: false });
+    const view = await route(id);
+    expect(view.prerequisites.find((m: any) => m.key === 'test_licence_recorded')).toMatchObject({
+      reached: true,
+      canRecord: false,
+      recordedAt: null,
+      holdsUp: ['10', '11'],
+    });
+    expect(view.prerequisites.find((m: any) => m.key === 'trial_surgeries_complete')).toMatchObject(
+      { recordedAt: '20', holdsUp: ['21'] },
+    );
   });
 });
 
@@ -991,11 +998,11 @@ describe('closing at launch', () => {
     const id = await go('Close at launch');
     await advance(id, '19');
     await ok(call('POST', `/projects/${id}/steps/20/start`, 'lead'));
-    await milestone(id, 'trial_surgeries_complete', 'lead');
-    await milestone(id, 'follow_up_complete', 'ops');
+    await prerequisite(id, 'trial_surgeries_complete', 'lead');
+    await prerequisite(id, 'follow_up_complete', 'ops');
     await finish(id, '20');
     for (const key of ['21', '22', '23']) await finish(id, key);
-    await milestone(id, 'positive_feedback_threshold', 'lead');
+    await prerequisite(id, 'positive_feedback_threshold', 'lead');
     for (const key of ['24a', '24b', '25']) await finish(id, key);
 
     expect((await ok(call('GET', `/projects/${id}`, 'vp'))).status).toBe('closed');

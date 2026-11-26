@@ -7,6 +7,7 @@ import { useState } from 'react';
 import { HealthBadge } from '@/components/health-badge';
 import { LineHeading } from '@/components/line-heading';
 import { ProblemMessage } from '@/components/problem-message';
+import { MilestoneStatusBadge } from '@/components/project-milestones';
 import { selectClass } from '@/components/ui/select-class';
 import { ProjectStatusBadge } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
@@ -18,6 +19,7 @@ import { canManageTemplates } from '@/lib/roles';
 /** Every project's status is open to everyone signed in (docs/roles-and-access.md#what-people-can-see). */
 export default function ProjectsPage() {
   const t = useTranslations('projects');
+  const tM = useTranslations('milestones');
   const tStatus = useTranslations('status');
   const { data: me } = useMe();
   const [status, setStatus] = useState<(typeof RUN_STATUSES)[number] | ''>('');
@@ -96,6 +98,25 @@ export default function ProjectsPage() {
                           <> · {t('launch', { date: formatDate(p.forecastLaunch) })}</>
                         )}
                       </span>
+                      {p.nextMilestone && (
+                        <span className="flex flex-wrap items-center gap-1.5 text-xs">
+                          <span className="text-muted-foreground">{tM('next')}</span>
+                          <span>
+                            {p.nextMilestone.targetDate
+                              ? t('milestoneBy', {
+                                  title: p.nextMilestone.title,
+                                  date: formatDate(p.nextMilestone.targetDate),
+                                })
+                              : p.nextMilestone.title}
+                          </span>
+                          {['late', 'at_risk'].includes(p.nextMilestone.status) && (
+                            <MilestoneStatusBadge
+                              status={p.nextMilestone.status}
+                              daysLate={p.nextMilestone.daysLate}
+                            />
+                          )}
+                        </span>
+                      )}
                     </div>
                     <span className="flex items-center gap-2">
                       <HealthBadge health={p.health} />

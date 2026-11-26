@@ -21,8 +21,13 @@ export const HealthReason = z.object({
     'step_far_overdue',
     'step_overdue',
     'step_at_risk',
+    'milestone_far_late',
+    'milestone_late',
+    'milestone_at_risk',
   ]),
   step: z.string().optional(),
+  /** The milestone's name, for the milestone reasons. */
+  milestone: z.string().optional(),
   days: z.number().int().optional(),
 });
 export type HealthReason = z.infer<typeof HealthReason>;

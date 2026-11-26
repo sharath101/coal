@@ -81,7 +81,7 @@ railway variables set ADMIN_SWITCHING=true --service backend   # once, for the d
 railway ssh --service backend -- pnpm seed:demo
 ```
 
-It makes 29 made-up people, one for each seat the chart's headcount fills, and three projects, some of them late. All of them have a single first name: *Vera* (the VP), *Hari* (the R&D Head), *Leela* (the Spine Lead) and so on; the People page lists them. With `ADMIN_SWITCHING` on it also makes *Admin*: sign in as Admin, and move between everyone without signing out ([roles-and-access.md](./roles-and-access.md#switching-people-for-the-demo)). People can also sign up with their own name and a position.
+It makes 29 made-up people, one for each seat the chart's headcount fills, and three projects, some of them late; the two Spine projects have milestones, one of them already late, and the Trauma project has none yet. All of them have a single first name: *Vera* (the VP), *Hari* (the R&D Head), *Leela* (the Spine Lead) and so on; the People page lists them. With `ADMIN_SWITCHING` on it also makes *Admin*: sign in as Admin, and move between everyone without signing out ([roles-and-access.md](./roles-and-access.md#switching-people-for-the-demo)). People can also sign up with their own name and a position.
 
 ## Before the hand-off
 

@@ -1,13 +1,35 @@
 import {
+  addMilestone as addMilestoneEndpoint,
   changeDates as changeDatesEndpoint,
+  dateOfInstant,
   getTimeline as getTimelineEndpoint,
   launchStepKey,
   putPlan as putPlanEndpoint,
+  reachMilestone as reachMilestoneEndpoint,
+  removeMilestone as removeMilestoneEndpoint,
+  updateMilestone as updateMilestoneEndpoint,
+  type RouteDefinition,
 } from '@coal/shared';
-import { change } from '../../core/db/change';
+import { change, type ChangeLog } from '../../core/db/change';
+import type { Tx } from '../../core/db/client';
+import type { Actor, RequestContext } from '../../core/http/context';
 import { implement } from '../../core/http/endpoint';
 import { AppError, validationFailed } from '../../core/http/errors';
-import { assertMay, loadEnv } from '../rnd/env';
+import type { Env } from '../rnd/actions';
+import { assertMay, canSeeProjectContent, loadEnv } from '../rnd/env';
+import {
+  MILESTONE_ROLES,
+  checkMilestoneInput,
+  checkTargetDate,
+  insertMilestones,
+  lockMilestone,
+  milestoneTitle,
+  milestonesOfRuns,
+  presentMilestones,
+  refuseStepMilestone,
+  updateMilestoneRow,
+  type MilestoneRow,
+} from './milestones';
 import {
   insertChange,
   recompute,
@@ -113,4 +135,165 @@ export const scheduleRoutes = [
       return presentTimeline(tx, env, deps.now());
     }),
   ),
+
+  implement(addMilestoneEndpoint, ({ deps, ctx, actor, params, body }) =>
+    change(deps.db, ctx, async (tx, log) => {
+      const env = await milestoneEnv(tx, ctx, actor, params.id, 'milestones.write');
+      const { route, run } = env.loaded;
+      const existing = await milestonesOfRuns(tx, [run.id]);
+      checkMilestoneInput(route, body, {
+        today: dateOfInstant(deps.now()),
+        takenSteps: new Set(existing.flatMap((m) => (m.stepKey ? [m.stepKey] : []))),
+        path: '',
+      });
+      const [row] = await insertMilestones(tx, ctx.orgId, run.id, actor.userId, [body]);
+      const added = row as MilestoneRow;
+      log.audit({
+        action: 'project_milestone.added',
+        recordType: 'project_milestone',
+        recordId: added.id,
+        after: { projectId: env.project.id, ...milestoneRecord(added) },
+      });
+      milestoneEvent(log, env, route, added, 'added');
+      return afterMilestoneChange(tx, log, deps.now(), env);
+    }),
+  ),
+
+  implement(updateMilestoneEndpoint, ({ deps, ctx, actor, params, body }) =>
+    change(deps.db, ctx, async (tx, log) => {
+      const env = await milestoneEnv(tx, ctx, actor, params.id, 'milestones.write');
+      const { route, run } = env.loaded;
+      const row = await lockMilestone(tx, run.id, params.milestoneId);
+      if (body.title !== undefined && row.stepKey) {
+        throw validationFailed("A step milestone takes the step's name.", 'title');
+      }
+      if (body.targetDate) {
+        checkTargetDate(body.targetDate, { today: dateOfInstant(deps.now()), path: '' });
+      }
+      const set = {
+        ...(body.title !== undefined && { title: body.title }),
+        ...(body.targetDate !== undefined && { targetDate: body.targetDate }),
+      };
+      const after = { ...row, ...set };
+      if (after.title === row.title && after.targetDate === row.targetDate) {
+        throw validationFailed('The milestone already has that title and date.', 'targetDate');
+      }
+      await updateMilestoneRow(tx, row.id, set);
+      log.audit({
+        action: 'project_milestone.changed',
+        recordType: 'project_milestone',
+        recordId: row.id,
+        before: milestoneRecord(row),
+        after: milestoneRecord(after),
+      });
+      milestoneEvent(log, env, route, after, 'changed');
+      return afterMilestoneChange(tx, log, deps.now(), env);
+    }),
+  ),
+
+  implement(removeMilestoneEndpoint, ({ deps, ctx, actor, params }) =>
+    change(deps.db, ctx, async (tx, log) => {
+      const env = await milestoneEnv(tx, ctx, actor, params.id, 'milestones.write');
+      const { route, run } = env.loaded;
+      const row = await lockMilestone(tx, run.id, params.milestoneId);
+      await updateMilestoneRow(tx, row.id, { removedAt: deps.now() });
+      log.audit({
+        action: 'project_milestone.removed',
+        recordType: 'project_milestone',
+        recordId: row.id,
+        before: milestoneRecord(row),
+      });
+      milestoneEvent(log, env, route, row, 'removed');
+      return afterMilestoneChange(tx, log, deps.now(), env);
+    }),
+  ),
+
+  implement(reachMilestoneEndpoint, ({ deps, ctx, actor, params, body }) =>
+    change(deps.db, ctx, async (tx, log) => {
+      const env = await milestoneEnv(tx, ctx, actor, params.id, 'milestones.reach');
+      const { route, run } = env.loaded;
+      const row = await lockMilestone(tx, run.id, params.milestoneId);
+      refuseStepMilestone(route, row);
+      const title = milestoneTitle(route, row);
+      if (body.reached === !!row.reachedAt) {
+        throw new AppError(
+          409,
+          'ALREADY_DONE',
+          body.reached ? `"${title}" is already reached.` : `"${title}" isn't marked reached.`,
+        );
+      }
+      const set = body.reached
+        ? { reachedAt: deps.now(), reachedBy: actor.userId, note: body.note || null }
+        : { reachedAt: null, reachedBy: null, note: null };
+      await updateMilestoneRow(tx, row.id, set);
+      log.audit({
+        action: body.reached ? 'project_milestone.reached' : 'project_milestone.unreached',
+        recordType: 'project_milestone',
+        recordId: row.id,
+        before: { reachedAt: row.reachedAt, note: row.note },
+        after: { reachedAt: set.reachedAt, note: set.note },
+      });
+      milestoneEvent(log, env, route, row, body.reached ? 'reached' : 'unreached');
+      return afterMilestoneChange(tx, log, deps.now(), env);
+    }),
+  ),
 ];
+
+/** Loads a project for a change to its milestones: locked, the person allowed, and still running. */
+async function milestoneEnv(
+  tx: Tx,
+  ctx: RequestContext,
+  actor: Actor,
+  projectId: string,
+  permission: 'milestones.write' | 'milestones.reach',
+): Promise<Env> {
+  const env = await loadEnv(tx, ctx.orgId, actor, projectId, { forUpdate: true });
+  assertMay(env, permission, MILESTONE_ROLES);
+  if (!['active', 'on_hold'].includes(env.loaded.state.status)) {
+    throw new AppError(
+      409,
+      'PROJECT_NOT_ACTIVE',
+      "The project isn't running, so its milestones can't change.",
+    );
+  }
+  return env;
+}
+
+const milestoneRecord = (m: MilestoneRow) => ({
+  runId: m.runId,
+  stepKey: m.stepKey,
+  title: m.title,
+  targetDate: m.targetDate,
+});
+
+function milestoneEvent(
+  log: ChangeLog,
+  env: Env,
+  route: RouteDefinition,
+  m: MilestoneRow,
+  what: 'added' | 'changed' | 'removed' | 'reached' | 'unreached',
+) {
+  log.event({
+    type: `project_milestone.${what}`,
+    projectId: env.project.id,
+    ...(m.stepKey && { stepKey: m.stepKey }),
+    payload: {
+      milestone: milestoneTitle(route, m),
+      ...(m.stepKey && { step: m.stepKey }),
+      targetDate: m.targetDate,
+    },
+  });
+}
+
+/** Health counts milestones, so it is worked out again; the answer is the project's milestones. */
+async function afterMilestoneChange(tx: Tx, log: ChangeLog, now: Date, env: Env) {
+  const { route, run } = env.loaded;
+  await recompute(tx, log, now, env.orgId, env.project.id, run.id);
+  return {
+    items: await presentMilestones(
+      tx,
+      { orgId: env.orgId, runId: run.id, route, seesContent: canSeeProjectContent(env) },
+      now,
+    ),
+  };
+}

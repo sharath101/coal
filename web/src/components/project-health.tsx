@@ -8,7 +8,11 @@ import { formatDate } from '@/lib/format';
 export function useHealthReasonText() {
   const t = useTranslations('healthReasons');
   return (reason: HealthReason) =>
-    t(reason.code, { step: reason.step ?? '', days: reason.days ?? 0 });
+    t(reason.code, {
+      step: reason.step ?? '',
+      milestone: reason.milestone ?? '',
+      days: reason.days ?? 0,
+    });
 }
 
 export function HealthReasons({ reasons }: { reasons: HealthReason[] }) {
@@ -17,7 +21,9 @@ export function HealthReasons({ reasons }: { reasons: HealthReason[] }) {
   return (
     <ul className="list-disc pl-5 text-sm">
       {reasons.map((reason) => (
-        <li key={`${reason.code}-${reason.step ?? ''}`}>{text(reason)}</li>
+        <li key={`${reason.code}-${reason.step ?? ''}-${reason.milestone ?? ''}`}>
+          {text(reason)}
+        </li>
       ))}
     </ul>
   );

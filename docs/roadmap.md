@@ -16,12 +16,12 @@ This roadmap gives an **order, not dates**. Madhav's effort estimates and costs 
 | Area | In the first release | Doc |
 |---|---|---|
 | Accounts | Sign up by name and position on Jayon's R&D chart, with seats; sign in by name (placeholder); a temporary admin for the demo only | [roles-and-access.md](./roles-and-access.md#accounts-for-now) |
-| The route | All 28 steps, checkpoints, milestones (recorded by hand), step 15's two paths, sending work back, hold and drop | [workflow.md](./workflow.md) |
+| The route | All 28 steps, checkpoints, prerequisites (recorded by hand), step 15's two paths, sending work back, hold and drop | [workflow.md](./workflow.md) |
 | Tasks | Tasks from the route; assigning work, requests, role queues, comments | [roles-and-access.md](./roles-and-access.md#assigning-work-and-making-requests) |
 | Access | Status visible to everyone; content need-to-know; one permission module with tests | [roles-and-access.md](./roles-and-access.md#how-access-is-enforced) |
 | Documents | The template library, with each step's templates as they're provided (stages 1 and 2 first); uploads where there's no template yet; versions; PDFs; pictures and sources; virus scanning | [documents-and-signing.md](./documents-and-signing.md#the-template-library) |
 | Signing | Signature rows; step sign-off records; signed decisions; audit trail. Signing is a confirmed click until the last block adds Face ID or fingerprint passkeys on the website (D16) | [documents-and-signing.md](./documents-and-signing.md#signature-rows) |
-| Dashboard | The widget framework; widgets W1 to W10; the project page; dates, forecast, reminders, deviations; in-app notifications | [dashboard.md](./dashboard.md) |
+| Dashboard | The widget framework; widgets W1 to W10; the project page; dates, forecast, reminders, deviations; each project's milestones; in-app notifications | [dashboard.md](./dashboard.md) |
 | Workstation and AI | Chat by project on the website, built channel-neutral for WhatsApp later; the five AI features, only when asked; action cards; Claude behind one gateway | [workstation-and-ai.md](./workstation-and-ai.md) |
 | Platform | Backend, website and shared code, built to grow to all of Jayon; local setup; simple demo hosting when needed | [architecture.md](./architecture.md) |
 
@@ -42,10 +42,10 @@ Each block depends on the ones before it. Within a block, the work can run side 
    - File storage.
    - The website skeleton with the Dashboard and Workstation toggle, with its text ready for translation.
 2. **The route** ✅
-   - The route definition (version 2) in YAML, and the pure engine, with tests for every step, rework path, branch and milestone.
+   - The route definition (version 2) in YAML, and the pure engine, with tests for every step, rework path, branch and prerequisite.
    - Process runs and their steps, R&D projects, tasks and their routing; Go as a plain form.
-   - Decisions, sending work back, milestones, hold and drop.
-   - On the website: Go with its preview, the projects list, the project page (the route by stage, with each step's actions, team, milestones and activity), and My tasks.
+   - Decisions, sending work back, prerequisites, hold and drop.
+   - On the website: Go with its preview, the projects list, the project page (the route by stage, with each step's actions, team, prerequisites and activity), and My tasks.
    - Left for later blocks, as planned: documents on steps (block 3), due dates and deviations (route durations, `default_days`, arrive with the Dashboard), notifications, and signing with passkeys (sign-offs are a confirmed click until the last block).
 3. **Documents and signing** ✅
    - Document types and the template library: adding, checking and activating templates (VP and R&D Head, on the Templates page); the import command for `private/templates/`; made-up sample templates for each document type until Jayon's forms arrive.
@@ -138,7 +138,7 @@ Everything deliberately left out of the first release, and why:
 |---|---|---|
 | Real authentication, a real admin role, an org chart kept by Jayon, several roles per person | Not decided yet; name-only accounts and the chart as drawn let us build everything else | [roles-and-access.md](./roles-and-access.md#later) |
 | Step modules (materials, design, prototypes, QC, machines, costing, testing, trials, regulatory, transfer) | Need Jayon's real documents and answers; designing from guesses creates rework | [data-model.md](./data-model.md#not-modelled-yet-on-purpose) |
-| Regulatory gates beyond hand-recorded milestones | Need the full picture, Jayon's agreement and legal advice | [regulatory-notes.md](./regulatory-notes.md) |
+| Regulatory gates beyond hand-recorded prerequisites | Need the full picture, Jayon's agreement and legal advice | [regulatory-notes.md](./regulatory-notes.md) |
 | Sealed PDFs, Aadhaar eSign or DSC, identity checks and e-signature agreements | Only matter for official records, which need real sign-in first | [documents-and-signing.md](./documents-and-signing.md#later) |
 | Signing on someone's behalf during leave | Needs real identity and admin | [roles-and-access.md](./roles-and-access.md#later) |
 | Sensitivity labels, compartments, row-level security | The simple content rules are enough for made-up data | [roles-and-access.md](./roles-and-access.md#later) |

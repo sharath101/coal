@@ -67,6 +67,13 @@ const SCHEDULE_EVENTS = [
   'deviation.recorded',
   'deviation.reviewed',
 ] as const;
+const MILESTONE_EVENTS = [
+  'project_milestone.added',
+  'project_milestone.changed',
+  'project_milestone.removed',
+  'project_milestone.reached',
+  'project_milestone.unreached',
+] as const;
 
 export const WIDGETS: readonly WidgetDefinition[] = [
   {
@@ -134,9 +141,9 @@ export const WIDGETS: readonly WidgetDefinition[] = [
     question: 'how',
     tabs: [],
     filters: [],
-    columns: ['line', 'stage', 'health', 'next'],
+    columns: ['line', 'stage', 'health', 'next', 'milestone', 'milestoneDue'],
     actions: ['open'],
-    refreshOn: [...STEP_EVENTS, ...SCHEDULE_EVENTS, 'project.created'],
+    refreshOn: [...STEP_EVENTS, ...SCHEDULE_EVENTS, ...MILESTONE_EVENTS, 'project.created'],
   },
   {
     key: 'pipeline',
@@ -158,7 +165,7 @@ export const WIDGETS: readonly WidgetDefinition[] = [
     filters: ['project', 'line'],
     columns: ['project', 'step', 'owner', 'planned', 'forecast', 'daysLate', 'reason', 'cause'],
     actions: ['open'],
-    refreshOn: [...SCHEDULE_EVENTS, ...STEP_EVENTS],
+    refreshOn: [...SCHEDULE_EVENTS, ...STEP_EVENTS, ...MILESTONE_EVENTS],
   },
   {
     key: 'team-workload',

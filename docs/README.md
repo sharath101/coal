@@ -78,9 +78,9 @@ The full log, with reasons, is in [decisions.md](./decisions.md).
 
 | Doc | What it covers |
 |---|---|
-| [workflow.md](./workflow.md) | Jayon's R&D route: the 28 steps, who does and signs each one, when each starts, checkpoints, decisions, milestones, rework |
+| [workflow.md](./workflow.md) | Jayon's R&D route: the 28 steps, who does and signs each one, when each starts, checkpoints, decisions, prerequisites, rework |
 | [roles-and-access.md](./roles-and-access.md) | Roles, accounts, project teams, who sees what, who can do what, assigning work, task routing, enforcement |
-| [dashboard.md](./dashboard.md) | Widgets, layouts, the project page, measures, health, deadlines and deviations, notifications |
+| [dashboard.md](./dashboard.md) | Widgets, layouts, the project page, measures, health, deadlines and deviations, a project's milestones, notifications |
 | [workstation-and-ai.md](./workstation-and-ai.md) | The Workstation, the AI's features, tiers and action cards, the main flows, channels (website, WhatsApp, app), AI providers, safety basics, AI tests |
 | [ai-safety.md](./ai-safety.md) | How the AI is kept safe, for the company and for reuse: the threats, every measure and where it lives, the exam that tests it, what isn't covered, and a checklist for the next AI project |
 | [documents-and-signing.md](./documents-and-signing.md) | Documents, the template library, versions, signature rows, step sign-off records, passkey signing, audit trail, files |
@@ -104,7 +104,7 @@ The full log, with reasons, is in [decisions.md](./decisions.md).
 | Accounts, sign-in, permissions or task assignment | [roles-and-access.md](./roles-and-access.md) |
 | An API endpoint | [api.md](./api.md), plus the doc for its area |
 | A database table or migration | [data-model.md](./data-model.md), plus the doc for its area |
-| A Dashboard widget, dates, alerts or notifications | [dashboard.md](./dashboard.md) |
+| A Dashboard widget, dates, a project's milestones, alerts or notifications | [dashboard.md](./dashboard.md) |
 | The Workstation, the AI, a tool, a prompt or a chat channel | [workstation-and-ai.md](./workstation-and-ai.md) |
 | How a request is processed, step by step, and where it can stop | [workstation-and-ai.md § How a reply is made](./workstation-and-ai.md#how-a-reply-is-made) |
 | AI safety: presenting it, a new AI feature, a change to instructions, tools, tiers or the model, or running the exam | [ai-safety.md](./ai-safety.md) |

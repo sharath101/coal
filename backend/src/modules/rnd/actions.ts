@@ -2,10 +2,12 @@ import {
   EngineError,
   OPEN_STATUSES,
   apply,
+  dateOfInstant,
   startRun,
   stepOf,
   type Action,
   type Effect,
+  type MilestoneInput,
   type Preview,
   type StepDefinition,
   type StepKey,
@@ -65,6 +67,7 @@ import {
   timelineRows,
   type DueResolver,
 } from '../schedule/service';
+import { checkMilestoneInput, insertMilestones } from '../schedule/milestones';
 
 export const RND_ROUTE = 'rnd-route';
 
@@ -711,6 +714,7 @@ export interface GoInput {
   description: string;
   productLineId: string;
   teamUserIds: string[];
+  milestones: MilestoneInput[];
 }
 
 /** Go: creates the project, its run and its team, and opens the first steps. */
@@ -726,13 +730,22 @@ export async function goProject(
   if (!line) throw validationFailed('There is no such product line.', 'productLineId');
   const version = await latestVersion(tx, ctx.orgId, RND_ROUTE);
   if (!version) throw notFound('route');
+  const now = services.deps.now();
+  const taken = new Set<string>();
+  input.milestones.forEach((m, i) => {
+    checkMilestoneInput(version.route, m, {
+      today: dateOfInstant(now),
+      takenSteps: taken,
+      path: `milestones.${i}.`,
+    });
+    if (m.stepKey) taken.add(m.stepKey);
+  });
 
   const extra = await requireActiveUsers(tx, ctx.orgId, input.teamUserIds, 'teamUserIds');
   const starting = await startingTeam(tx, ctx.orgId, line.id);
   const team = [...new Map([...starting, ...extra].map((u) => [u.id, u])).values()];
 
   const start = startRun(version.route);
-  const now = services.deps.now();
   const { run, stepIds } = await createRun(tx, ctx.orgId, version, start.state, now);
   const code = await nextProjectCode(tx, ctx.orgId, line);
   const [project] = await tx
@@ -749,6 +762,13 @@ export async function goProject(
     .returning();
   const row = project as ProjectRow;
   await addMembers(tx, ctx.orgId, row.id, team, actor.userId);
+  const milestoneRows = await insertMilestones(
+    tx,
+    ctx.orgId,
+    run.id,
+    actor.userId,
+    input.milestones,
+  );
 
   const loaded: LoadedRun = { run, version, route: version.route, state: start.state, stepIds };
   const env: Env = { orgId: ctx.orgId, actor, project: row, loaded, team, now };
@@ -772,7 +792,18 @@ export async function goProject(
     action: 'project.created',
     recordType: 'project',
     recordId: row.id,
-    after: { code, name: row.name, productLineId: line.id, team: team.map((u) => u.id) },
+    after: {
+      code,
+      name: row.name,
+      productLineId: line.id,
+      team: team.map((u) => u.id),
+      milestones: milestoneRows.map((m) => ({
+        id: m.id,
+        stepKey: m.stepKey,
+        title: m.title,
+        targetDate: m.targetDate,
+      })),
+    },
   });
   log.event({ type: 'project.created', projectId: row.id, payload: { code, name: row.name } });
 

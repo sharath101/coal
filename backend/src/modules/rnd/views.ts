@@ -5,6 +5,7 @@ import {
   milestoneReached,
   runActionRoles,
   stepActions,
+  stepsWaitingFor,
   waitsFor,
   workingDaysBetween,
   type ActivityItem,
@@ -17,8 +18,9 @@ import {
 import type { Executor } from '../../core/db/client';
 import { explainedSteps } from '../deviations/store';
 import { listProjectEvents } from '../events/service';
-import { currentSteps, getRuns, stepHistory } from '../process/service';
+import { currentSteps, getRuns, stepHistory, versionsByIds } from '../process/service';
 import { loadCalendar } from '../schedule/calendar';
+import { MILESTONE_ROLES, nextMilestones, presentMilestones } from '../schedule/milestones';
 import { activeTasksOfRun, presentTasks, signOffWaits } from '../tasks/service';
 import { findUsersByIds, present } from '../users/service';
 import type { Env } from './actions';
@@ -35,6 +37,7 @@ export async function presentProjects(
   ex: Executor,
   orgId: string,
   rows: ProjectRow[],
+  now: Date = new Date(),
 ): Promise<ProjectSummary[]> {
   if (rows.length === 0) return [];
   const [runs, lines, creators] = await Promise.all([
@@ -50,10 +53,32 @@ export async function presentProjects(
       rows.map((r) => r.createdBy),
     ),
   ]);
+  const versions = await versionsByIds(
+    ex,
+    [...runs.values()].map((r) => r.processVersionId),
+  );
+  const next = await nextMilestones(
+    ex,
+    orgId,
+    [...runs.values()].flatMap((run) => {
+      const version = versions.get(run.processVersionId);
+      return version
+        ? [
+            {
+              runId: run.id,
+              route: version.route,
+              running: ['active', 'on_hold'].includes(run.status),
+            },
+          ]
+        : [];
+    }),
+    now,
+  );
   const lineById = new Map(lines.map((l) => [l.id, l]));
   const creatorName = new Map(creators.map((u) => [u.id, u.name]));
   return rows.map((row) => {
     const run = runs.get(row.processRunId);
+    const milestone = next.get(row.processRunId);
     return {
       id: row.id,
       code: row.code,
@@ -66,6 +91,15 @@ export async function presentProjects(
       healthReasons: (run?.healthReasons ?? []) as ProjectSummary['healthReasons'],
       plannedLaunch: run?.plannedLaunch ?? null,
       forecastLaunch: run?.forecastLaunch ?? null,
+      nextMilestone: milestone
+        ? {
+            id: milestone.row.id,
+            title: milestone.title,
+            targetDate: milestone.row.targetDate,
+            status: milestone.status,
+            daysLate: milestone.daysLate,
+          }
+        : null,
       createdAt: row.createdAt.toISOString(),
       createdBy: creatorName.get(row.createdBy) ?? 'Unknown',
     };
@@ -85,20 +119,32 @@ export async function presentTeam(ex: Executor, env: Env) {
   }));
 }
 
-export async function presentProject(ex: Executor, env: Env): Promise<ProjectDetail> {
+export async function presentProject(
+  ex: Executor,
+  env: Env,
+  now: Date = new Date(),
+): Promise<ProjectDetail> {
   const { run, route, state } = env.loaded;
-  const [summary] = await presentProjects(ex, env.orgId, [env.project]);
+  const [summary] = await presentProjects(ex, env.orgId, [env.project], now);
   const roles = runActionRoles(route, state);
+  const running = ['active', 'on_hold'].includes(state.status);
   return {
     ...(summary as ProjectSummary),
     holdReason: run.holdReason,
     dropReason: run.dropReason,
     team: await presentTeam(ex, env),
+    milestones: await presentMilestones(
+      ex,
+      { orgId: env.orgId, runId: run.id, route, seesContent: canSeeProjectContent(env) },
+      now,
+    ),
     can: {
       hold: may(env, 'projects.hold', roles.hold),
       resume: may(env, 'projects.resume', roles.resume),
       drop: may(env, 'projects.drop', roles.drop),
       editTeam: may(env, 'projects.team.write', ['rd_head', 'rd_lead']),
+      editMilestones: running && may(env, 'milestones.write', MILESTONE_ROLES),
+      reachMilestones: running && may(env, 'milestones.reach', MILESTONE_ROLES),
     },
   };
 }
@@ -237,13 +283,15 @@ export async function presentRoute(
     stage: run.stage,
     stages: route.stages,
     steps,
-    milestones: route.milestones.map((m) => ({
+    prerequisites: route.milestones.map((m) => ({
       key: m.key,
       name: m.name,
       recordedAt: m.recorded_at,
       recordedBy: m.recorded_by.map(roleRef),
+      holdsUp: stepsWaitingFor(route, m.key),
       reached: milestoneReached(route, state, m.key),
-      canRecord: milestoneOpen(route, state, m.key) && may(env, 'milestones.record', m.recorded_by),
+      canRecord:
+        milestoneOpen(route, state, m.key) && may(env, 'prerequisites.record', m.recorded_by),
     })),
     openCorrectiveActions: state.openCorrectiveActions,
   };

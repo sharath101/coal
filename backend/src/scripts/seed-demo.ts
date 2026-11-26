@@ -130,12 +130,13 @@ const COOKIE_OF_ROLE: Record<string, (line: 'SPN' | 'TRM') => Key> = {
   qc_inspector: () => 'qc',
 };
 
-const go = async (name: string, line: 'SPN' | 'TRM', team: Key[]) =>
+const go = async (name: string, line: 'SPN' | 'TRM', team: Key[], milestones: unknown[] = []) =>
   (
     await call('POST', '/projects', 'vp', {
       name,
       productLineId: lines.get(line),
       teamUserIds: team.map((k) => ids.get(k)),
+      milestones,
     })
   ).body.project.id as string;
 
@@ -200,9 +201,13 @@ async function finish(id: string, key: string, line: 'SPN' | 'TRM') {
 
 const TEAM: Key[] = ['designer', 'aems', 'pme', 'ops', 'dard', 'qc'];
 
-// 1. A Spine project, 50 days in: the Action Plan is signed, and two design steps are late.
+// 1. A Spine project, 50 days in: the Action Plan is signed, and two design steps are late. The
+// VP's milestones: Board approval, reached on time, and the prototype approval to come.
 daysAhead = -50;
-const plate = await go('Anterior cervical plate', 'SPN', TEAM);
+const plate = await go('Anterior cervical plate', 'SPN', TEAM, [
+  { stepKey: '4', targetDate: on(-40) },
+  { stepKey: '18', targetDate: on(120) },
+]);
 for (const key of ['1', '2', '2a', '3']) {
   daysAhead += 1;
   await finish(plate, key, 'SPN');
@@ -247,13 +252,18 @@ await call('POST', `/deviations/${deviation.id}/review`, 'lead', {
   note: 'Agreed.',
 });
 
-// 2. A Trauma project that started today.
+// 2. A Trauma project that started today, with no milestones yet.
 daysAhead = 0;
 await go('Tibial nail, 11 mm', 'TRM', ['designerT', 'pme', 'ops', 'dard']);
 
-// 3. A Spine project at the Board checkpoint, waiting for two signatures.
+// 3. A Spine project at the Board checkpoint, waiting for two signatures. Its Board approval
+// milestone is already late; the launch and a meeting in the VP's own words are still to come.
 daysAhead = -12;
-const cage = await go('Interbody cage, PEEK', 'SPN', TEAM);
+const cage = await go('Interbody cage, PEEK', 'SPN', TEAM, [
+  { stepKey: '4', targetDate: on(-3) },
+  { title: 'Surgeon advisory meeting', targetDate: on(20) },
+  { stepKey: '25', targetDate: on(400) },
+]);
 for (const key of ['1', '2', '2a', '3']) {
   daysAhead += 1;
   await finish(cage, key, 'SPN');

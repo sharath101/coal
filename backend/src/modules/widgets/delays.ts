@@ -1,6 +1,7 @@
 import { workingDaysBetween, type SignOffWait } from '@coal/shared';
 import { presentDeviations } from '../deviations/service';
 import { latestDeviationOfSteps, listDeviationRows } from '../deviations/store';
+import { evaluateRuns } from '../schedule/milestones';
 import { activeTasksOf, signOffWaits } from '../tasks/service';
 import { findUsersByIds } from '../users/service';
 import {
@@ -17,9 +18,9 @@ import { loadPortfolio } from './portfolio';
 import { waitingOnText } from './tasks';
 
 /**
- * W7: late and at-risk steps, with the reason and the cause. The sentence of explanation and the
- * named cause show only to those allowed (docs/roles-and-access.md#content-is-need-to-know); everyone
- * sees the category, the role and the dates, because that is status.
+ * W7: late and at-risk steps and milestones, with the reason and the cause. The sentence of
+ * explanation and the named cause show only to those allowed (docs/roles-and-access.md#content-is-need-to-know);
+ * everyone sees the category, the role and the dates, because that is status.
  */
 export async function delaysAndRisks(w: WidgetContext): Promise<WidgetBody> {
   const { orgId } = w.ctx;
@@ -113,6 +114,54 @@ export async function delaysAndRisks(w: WidgetContext): Promise<WidgetBody> {
       });
     }
   }
+  // The step counts come before the milestones join the list.
+  const overdueCount = delays.filter((d) => d.late > 0).length;
+  const atRiskCount = delays.length - overdueCount;
+
+  // Late and at-risk milestones of the same projects: their target is the date, the step's forecast the forecast.
+  const milestonesByRun = await evaluateRuns(
+    w.deps.db,
+    orgId,
+    shown.map((p) => ({ runId: p.run.id, route: p.route })),
+    w.now,
+  );
+  let lateMilestones = 0;
+  for (const p of shown) {
+    for (const m of milestonesByRun.get(p.run.id) ?? []) {
+      if (m.status !== 'late' && m.status !== 'at_risk') continue;
+      if (m.status === 'late') lateMilestones += 1;
+      const stepRow = m.row.stepKey ? p.steps.get(m.row.stepKey) : undefined;
+      delays.push({
+        late: m.daysLate,
+        r: row({
+          id: m.row.id,
+          title: `Milestone: ${m.title}`,
+          subtitle: `${p.project.code} · ${p.project.name}`,
+          link: projectLink(p.project.id, m.row.stepKey),
+          group: lineGroup(p.line),
+          tone: healthTone(m.status === 'late' ? 'overdue' : 'at_risk'),
+          badges: [
+            { label: 'Milestone', tone: 'neutral' },
+            m.status === 'late'
+              ? { label: `${m.daysLate}d late`, tone: 'danger' }
+              : { label: 'At risk', tone: 'warning' },
+          ],
+          cells: {
+            project: p.project.code,
+            step: m.row.stepKey,
+            owner: stepRow ? ownersOfStep(stepRow.id) : '',
+            planned: m.row.targetDate,
+            forecast: m.forecastDate,
+            daysLate: m.daysLate,
+            reason: null,
+            cause: '',
+          },
+          actions: ['open'],
+          ref: { projectId: p.project.id, ...(m.row.stepKey && { stepKey: m.row.stepKey }) },
+        }),
+      });
+    }
+  }
   delays.sort((a, b) => b.late - a.late);
 
   const runIds = shown.map((p) => p.run.id);
@@ -124,8 +173,6 @@ export async function delaysAndRisks(w: WidgetContext): Promise<WidgetBody> {
   const devs = await presentDeviations(w.deps.db, orgId, w.actor, devRows);
   const groupOfProject = new Map(portfolio.map((p) => [p.project.id, lineGroup(p.line)]));
   const toReview = devs.filter((d) => d.can.review).length;
-  const overdueCount = delays.filter((d) => d.late > 0).length;
-  const atRiskCount = delays.length - overdueCount;
 
   const tab = w.view === 'expanded' && w.tab === 'deviations' ? 'deviations' : 'delays';
   const rows =
@@ -164,6 +211,7 @@ export async function delaysAndRisks(w: WidgetContext): Promise<WidgetBody> {
     counts: [
       count('overdue', overdueCount, overdueCount > 0 ? 'danger' : 'neutral'),
       count('atRisk', atRiskCount, atRiskCount > 0 ? 'warning' : 'neutral'),
+      count('lateMilestones', lateMilestones, lateMilestones > 0 ? 'danger' : 'neutral'),
       count('toReview', toReview, toReview > 0 ? 'warning' : 'neutral'),
     ],
     tabs:

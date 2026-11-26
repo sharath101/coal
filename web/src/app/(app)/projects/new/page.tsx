@@ -7,13 +7,20 @@ import { useTranslations } from 'next-intl';
 import { Suspense, useState } from 'react';
 import { PreviewPanel } from '@/components/preview-panel';
 import { ProblemMessage } from '@/components/problem-message';
+import {
+  MilestoneFields,
+  draftComplete,
+  emptyDraft,
+  toMilestoneInput,
+  type MilestoneDraft,
+} from '@/components/project-milestones';
 import { selectClass } from '@/components/ui/select-class';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { api } from '@/lib/api';
-import { queryKeys, useMe, usePeople, useProductLines } from '@/lib/queries';
+import { queryKeys, useMe, usePeople, useProcess, useProductLines } from '@/lib/queries';
 
 type GoResult = EndpointOutput<typeof createProject>;
 
@@ -31,6 +38,7 @@ export default function NewProjectPage() {
  */
 function NewProject() {
   const t = useTranslations('newProject');
+  const tM = useTranslations('milestones');
   const router = useRouter();
   const params = useSearchParams();
   const queryClient = useQueryClient();
@@ -43,9 +51,17 @@ function NewProject() {
   const [team, setTeam] = useState<string[]>(
     () => params.get('team')?.split(',').filter(Boolean) ?? [],
   );
+  const [milestones, setMilestones] = useState<MilestoneDraft[]>([]);
   const [preview, setPreview] = useState<GoResult | null>(null);
+  const process = useProcess('rnd-route');
 
-  const body = { name, description, productLineId, teamUserIds: team };
+  const body = {
+    name,
+    description,
+    productLineId,
+    teamUserIds: team,
+    milestones: milestones.map(toMilestoneInput),
+  };
   const previewMutation = useMutation({
     mutationFn: () => api(createProject, { query: { preview: 'true' }, body }),
     onSuccess: (res) => setPreview(res),
@@ -69,7 +85,14 @@ function NewProject() {
     setTeam((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
     changed();
   };
-  const ready = name.trim().length >= 3 && productLineId !== '';
+  const setMilestone = (i: number, draft: MilestoneDraft | null) => {
+    setMilestones((all) =>
+      draft ? all.map((m, j) => (j === i ? draft : m)) : all.filter((_, j) => j !== i),
+    );
+    changed();
+  };
+  const routeSteps = (process.data?.steps ?? []).filter((s) => !s.done_at_go);
+  const ready = name.trim().length >= 3 && productLineId !== '' && milestones.every(draftComplete);
 
   return (
     <div className="mx-auto grid w-full max-w-2xl gap-6 p-6">
@@ -155,6 +178,52 @@ function NewProject() {
                 </li>
               ))}
           </ul>
+        </fieldset>
+
+        <fieldset className="grid gap-2">
+          <legend className="text-sm font-medium">{tM('optional')}</legend>
+          <p className="text-sm text-muted-foreground">{tM('goHint')}</p>
+          {milestones.length > 0 && (
+            <ul className="grid gap-2">
+              {milestones.map((m, i) => (
+                <li key={i} className="grid gap-2 rounded-md border p-3">
+                  <MilestoneFields
+                    idPrefix={`go-milestone-${i}`}
+                    draft={m}
+                    onChange={(draft) => setMilestone(i, draft)}
+                    stages={process.data?.stages ?? []}
+                    steps={routeSteps.filter(
+                      (s) =>
+                        s.key === m.stepKey ||
+                        !milestones.some((o) => o.kind === 'step' && o.stepKey === s.key),
+                    )}
+                  />
+                  <Button
+                    type="button"
+                    size="xs"
+                    variant="ghost"
+                    className="justify-self-start"
+                    onClick={() => setMilestone(i, null)}
+                  >
+                    {tM('removeDraft')}
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="justify-self-start"
+            onClick={() => {
+              setMilestones((all) => [...all, emptyDraft()]);
+              changed();
+            }}
+          >
+            {tM('add')}
+          </Button>
+          <ProblemMessage error={process.error} />
         </fieldset>
 
         {preview && (

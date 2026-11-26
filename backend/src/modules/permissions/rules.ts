@@ -419,7 +419,10 @@ export const RULES = {
   'steps.return': { endpoint: signedIn, resource: inRoles },
   'steps.decide': { endpoint: signedIn, resource: inRoles },
   'steps.sendBack': { endpoint: signedIn, resource: inRoles },
-  'milestones.record': { endpoint: signedIn, resource: inRoles },
+  'prerequisites.record': { endpoint: signedIn, resource: inRoles },
+  // ⚠ The VP and the Head set a project's milestones and tick them off (P117).
+  'milestones.write': { endpoint: onlyRoles('vp', 'rd_head'), resource: inRoles },
+  'milestones.reach': { endpoint: onlyRoles('vp', 'rd_head'), resource: inRoles },
   'correctiveActions.create': { endpoint: onlyRoles('rd_lead'), resource: inRoles },
   'tasks.read': { endpoint: signedIn },
   'tasks.readOne': { endpoint: signedIn, resource: taskReadable },

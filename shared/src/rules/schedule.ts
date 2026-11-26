@@ -241,16 +241,65 @@ export function planOfSteps(
 
 export type Health = 'green' | 'amber' | 'red';
 
+/** A project milestone's state (docs/dashboard.md#milestones). */
+export const MILESTONE_STATUSES = ['reached', 'late', 'at_risk', 'on_track', 'no_date'] as const;
+export type MilestoneStatus = (typeof MILESTONE_STATUSES)[number];
+
+export interface MilestoneFacts {
+  targetDate: DateKey | null;
+  /** The day it was reached: its step signed off or done, or ticked off by hand. */
+  reachedOn: DateKey | null;
+  /** A step milestone's forecast: the step's forecast end. Null for one in the VP's own words. */
+  forecastEnd: DateKey | null;
+}
+
 /**
- * Red: a checkpoint is overdue, the forecast launch is more than 30 days past plan, or a step is
- * more than 10 working days overdue. Amber: any step at risk or overdue. Otherwise green.
+ * Reached once reached; late once its target date has passed; at risk while its step's forecast
+ * end is after the target. `daysLate` is working days past the target: until today, or until it was
+ * reached.
+ */
+export function milestoneStatus(
+  m: MilestoneFacts,
+  today: DateKey,
+  cal: WorkCalendar,
+): { status: MilestoneStatus; daysLate: number } {
+  if (m.reachedOn) {
+    const late = m.targetDate && m.reachedOn > m.targetDate;
+    return {
+      status: 'reached',
+      daysLate: late ? workingDaysBetween(cal, m.targetDate as DateKey, m.reachedOn) : 0,
+    };
+  }
+  if (!m.targetDate) return { status: 'no_date', daysLate: 0 };
+  if (today > m.targetDate) {
+    return { status: 'late', daysLate: workingDaysBetween(cal, m.targetDate, today) };
+  }
+  if (m.forecastEnd && m.forecastEnd > m.targetDate) return { status: 'at_risk', daysLate: 0 };
+  return { status: 'on_track', daysLate: 0 };
+}
+
+/** A milestone as health sees it. */
+export interface MilestoneHealth {
+  name: string;
+  status: MilestoneStatus;
+  daysLate: number;
+}
+
+/**
+ * Red: a checkpoint is overdue, the forecast launch is more than 30 days past plan, a step is
+ * more than 10 working days overdue, or a milestone more than 10 working days late. Amber: any step
+ * at risk or overdue, or any milestone late or at risk. Otherwise green.
  */
 export function projectHealth(
   route: RouteDefinition,
   schedule: RunSchedule,
-  options: { plannedLaunch: DateKey | null; settings: ScheduleSettings },
+  options: {
+    plannedLaunch: DateKey | null;
+    settings: ScheduleSettings;
+    milestones?: readonly MilestoneHealth[];
+  },
 ): { health: Health; reasons: HealthReason[] } {
-  const { plannedLaunch, settings } = options;
+  const { plannedLaunch, settings, milestones = [] } = options;
   const red: HealthReason[] = [];
   const amber: HealthReason[] = [];
 
@@ -270,6 +319,16 @@ export function projectHealth(
   if (plannedLaunch && schedule.forecastLaunch) {
     const slip = calendarDaysBetween(plannedLaunch, schedule.forecastLaunch);
     if (slip > settings.redSlipDays) red.push({ code: 'launch_slipped', days: slip });
+  }
+  for (const m of milestones) {
+    if (m.status === 'late') {
+      if (m.daysLate > settings.redOverdueWorkingDays) {
+        red.push({ code: 'milestone_far_late', milestone: m.name, days: m.daysLate });
+      }
+      amber.push({ code: 'milestone_late', milestone: m.name, days: m.daysLate });
+    } else if (m.status === 'at_risk') {
+      amber.push({ code: 'milestone_at_risk', milestone: m.name });
+    }
   }
   if (red.length > 0) return { health: 'red', reasons: red };
   if (amber.length > 0) return { health: 'amber', reasons: amber };

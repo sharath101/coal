@@ -22,7 +22,7 @@ const COMPACT_CELLS: Record<WidgetKey, string[]> = {
   'waiting-signature': ['row', 'waiting'],
   'coming-up': ['starts'],
   'upcoming-checkpoints': ['date'],
-  'my-projects': ['next'],
+  'my-projects': ['next', 'milestone', 'milestoneDue'],
   pipeline: ['launch'],
   'delays-risks': ['forecast'],
   'team-workload': ['open', 'overdue'],

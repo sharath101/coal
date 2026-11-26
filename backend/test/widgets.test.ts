@@ -327,7 +327,12 @@ describe('how we are doing', () => {
     expect(vp.cells.daysLate).toBeGreaterThan(0);
     expect(vp.cells.owner).toContain('Om Example');
     expect(vp.tone).toBe('danger');
-    expect((await widget('delays-risks', 'outsider')).counts.length).toBe(3);
+    expect((await widget('delays-risks', 'outsider')).counts.map((c: any) => c.key)).toEqual([
+      'overdue',
+      'atRisk',
+      'lateMilestones',
+      'toReview',
+    ]);
 
     // The deviations tab: the first one names a person.
     const named = async (as: string) =>

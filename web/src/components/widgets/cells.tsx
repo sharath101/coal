@@ -9,7 +9,16 @@ import { cn } from '@/lib/utils';
 
 export type CellValue = WidgetRow['cells'][string];
 
-const DATE_COLUMNS = new Set(['due', 'starts', 'date', 'next', 'launch', 'planned', 'forecast']);
+const DATE_COLUMNS = new Set([
+  'due',
+  'starts',
+  'date',
+  'next',
+  'launch',
+  'planned',
+  'forecast',
+  'milestoneDue',
+]);
 const PERCENT_COLUMNS = new Set(['onTime', 'rework']);
 const DAY_COLUMNS = new Set(['daysInStage', 'waiting', 'signTurnaround', 'daysLate']);
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;

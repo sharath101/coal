@@ -1,6 +1,6 @@
 # Dashboard
 
-**Read this when** you work on the Dashboard, widgets, measures, health, deadlines, alerts, deviations or notifications.
+**Read this when** you work on the Dashboard, widgets, measures, health, deadlines, alerts, deviations, a project's milestones or notifications.
 **Related:** [roles-and-access.md](./roles-and-access.md) for what each person may see, [api.md](./api.md#dashboard-and-notifications) for the widget endpoints, [workstation-and-ai.md](./workstation-and-ai.md) for "Ask AI".
 
 ---
@@ -64,9 +64,9 @@ The **Projects** page and the **My tasks** page (with its "Waiting for my signat
 | W2 | **Waiting for my signature** | Needs me now | How many, the oldest in days, the next 3 | Each document or sign-off with its row (Prepared, Reviewed, Approved), what changed since the last version, and Sign or Return |
 | W3 | **Coming up** | What's coming | My tasks that will open soon, with expected start dates | Every future task of mine across projects, and what it waits for ("Your part starts after step 5, expected 3 Feb") |
 | W4 | **Upcoming checkpoints** | What's coming | The next checkpoints (4, 12, 18, 23) with dates | For each one: whether its inputs are ready and signed, and who signs |
-| W5 | **My projects** | How are we doing | A card per project: a strip of the 6 stages, health, next due date | The project list; each opens the project page |
+| W5 | **My projects** | How are we doing | A card per project: a strip of the 6 stages, health, next due date, next milestone | The project list; each opens the project page |
 | W6 | **R&D pipeline** | How are we doing | Projects by stage and product line, and their health | Every project: line, stage, current steps, owner, days in stage, health, forecast launch |
-| W7 | **Delays and risks** | How are we doing | Overdue steps, at-risk steps, the 3 worst slips | Each delay: project, step, owner, planned and forecast dates, days late, reason and category. The named cause only for those allowed to see it. A deviations tab |
+| W7 | **Delays and risks** | How are we doing | Overdue steps, at-risk steps, late milestones, the 3 worst slips | Each delay: project, step or milestone, owner, planned and forecast dates, days late, reason and category. The named cause only for those allowed to see it. A deviations tab |
 | W8 | **Team workload** | How are we doing | Open and overdue tasks for each person below me | Person by week; reassign (where allowed) |
 | W9 | **How it's going** | How are we doing | My on-time rate, and my team's | The measures below, for me and for each person below me |
 | W10 | **Messages and activity** | Needs me now | My latest 5 work messages and notifications | The full feed, filters, mark as read |
@@ -77,8 +77,8 @@ The **Projects** page and the **My tasks** page (with its "Waiting for my signat
 - **W2** the document rows waiting for me, and the step sign-offs assigned to me, oldest first.
 - **W3** the steps of mine that are still locked, in projects I'm on (or lead): the step's doers include my role, or "the project team" and I'm on it. "Waits for" names the unfinished steps it depends on, with the expected date.
 - **W4** the next unfinished checkpoint of each running project, with whether its inputs are finished, and who signs. Open to everyone: it is status.
-- **W5** the projects I'm on, or lead. **W6** every project, with its stage, the steps open now, the Lead, days in stage, health and forecast launch; filters: product line, stage, health. Both are status, so open to everyone.
-- **W7** every running project's overdue and at-risk steps, with the owner (the people holding the step's work tasks; once the step is handed in, the signers who have not signed yet, as "Board sign-off: Mira, Chet"), the planned and forecast dates, days late, and the reason and cause of the latest deviation. The cause shows by name only to those allowed; the sentence of explanation appears on the Deviations tab only for people in the project's scope ([roles-and-access.md](./roles-and-access.md#content-is-need-to-know)).
+- **W5** the projects I'm on, or lead, each with the next milestone not reached yet and its target date, marked when it is late or at risk. **W6** every project, with its stage, the steps open now, the Lead, days in stage, health and forecast launch; filters: product line, stage, health. Both are status, so open to everyone.
+- **W7** every running project's overdue and at-risk steps, with the owner (the people holding the step's work tasks; once the step is handed in, the signers who have not signed yet, as "Board sign-off: Mira, Chet"), the planned and forecast dates, days late, and the reason and cause of the latest deviation. The cause shows by name only to those allowed; the sentence of explanation appears on the Deviations tab only for people in the project's scope ([roles-and-access.md](./roles-and-access.md#content-is-need-to-know)). Late and at-risk milestones are listed with them, marked "Milestone": the target date as planned, the step's forecast end as the forecast, and the step's owners for a step milestone. They are counted apart, as late milestones, so the overdue-steps count stays the steps'.
 - **W8** (VP, R&D Head, R&D Lead, and anyone with people reporting to them on the org chart: the DARD Lead and the Asst. Managers) the open tasks of each person below me, by when they fall due. A Lead's people are those below them on the chart and everyone in R&D on their product line's projects. Only the VP, the Head and the Leads can reassign from it.
 - **W9** my measures, then each person below me. The Board sees department totals, not people.
 - **W10** my notifications, newest first.
@@ -104,8 +104,9 @@ Opened from any widget row. It shows:
 
 - **Header:** code, name, product line, stage, health, forecast launch, Lead.
 - **The route:** all 28 steps in their stages, live: locked, ready, in progress, in review, returned, approved, not required. Overdue steps get a red ring, and reopened steps show their iteration ("×2").
-- **Steps:** each step shows its doers and signer by name, tasks, documents and their signature status, dates, decisions, comments, pictures, sources and earlier iterations.
-- **Other tabs:** Documents, Timeline (planned against forecast, with deviations), Team, Activity.
+- **Steps:** each step shows its doers and signer by name, tasks, documents and their signature status, dates, decisions, the prerequisites recorded at it ([workflow.md](./workflow.md#starting-steps)), comments, pictures, sources and earlier iterations.
+- **Milestones:** the project's milestones beside the route, with their target dates and state ([below](#milestones)). The VP and the R&D Head add, change and remove them here.
+- **Other tabs:** Documents, Timeline (planned against forecast, the milestones, and the deviations), Team, Activity.
 
 Content inside the page follows the access rules ([roles-and-access.md](./roles-and-access.md#what-people-can-see)). Someone who may only see status sees the route, dates and owners, but not the documents.
 
@@ -137,11 +138,11 @@ Health uses dates only.
     - it's due within 2 working days and not started;
     - a signature on it has waited more than 3 working days.
 - **Project:**
-  - **red** if a checkpoint is overdue, the forecast launch has slipped more than 30 days, or a step is more than 10 working days overdue;
-  - **amber** if any step is at risk or overdue;
+  - **red** if a checkpoint is overdue, the forecast launch has slipped more than 30 days, a step is more than 10 working days overdue, or a [milestone](#milestones) is more than 10 working days late ⚠;
+  - **amber** if any step is at risk or overdue, or any milestone is late or at risk;
   - **green** otherwise.
 
-All thresholds are settings.
+All thresholds are settings. A milestone uses the step setting (`redOverdueWorkingDays`) ⚠ ([W26](./open-questions.md#workflow)).
 
 ## Deadlines, alerts and deviations
 
@@ -174,6 +175,18 @@ Reminders aren't sent for a project on hold, or for a task nobody holds yet (one
 - **the new expected date.**
 
 The new date becomes the task's due date (its *first* due date stays) and, while that work is open, holds the step's forecast. **A late step can't be submitted, and a late task of the route can't be closed, until a deviation explains the miss** (`DEVIATION_REQUIRED`). Once a step is handed in, the wait is its signers': the step stops asking its doers why it is late, and says instead who has not signed and how late they are ([P110](./decisions.md)). What explains a miss: for a step, a person's new date that hasn't passed yet; for a task, a deviation made for the due date it missed. Work given by hand (own tasks, assignments and requests) isn't on the plan, so it needs none ⚠ ([W25](./open-questions.md#workflow)). When the new date is missed too, the doer says why again. The project page and My tasks offer the form at that moment. The next role up the ladder, or anyone above in the project's scope (never the person who recorded it), confirms or corrects it: a correction is a new record pointing at the old one. The person or role named as the cause can add a comment. Who sees the named cause is in [roles-and-access.md](./roles-and-access.md#content-is-need-to-know).
+
+## Milestones
+
+A project's milestones are the targets the VP sets for it, so everyone can see whether the project is where it should be by a date ([P117](./decisions.md)). They are different for each project, and optional.
+
+- **What a milestone is.** Either a **step of the route**, such as Board approval (4), Prototype approval (18) or Product launch (25), or something in the **VP's own words**, such as "Surgeon advisory meeting". Each may have a **target date**.
+- **When they are set.** At Go the VP may add any number, or none. Afterwards the **VP and the R&D Head** ⚠ add, change (the target date, or the words) and remove them on the project page, while the project runs or is on hold. Each change asks first or ends in a button naming the act ([P107](./decisions.md)), and is recorded in the audit trail and the project's activity. A removed one is kept on record. The assistant reads them but can't change them.
+- **Reached.** A step milestone is reached when its step is signed off (or marked done, for a step with no sign-off), on that day. If work is sent back and the step reopens, it isn't reached until the step is signed off again. One in the VP's own words is ticked off by the VP or the Head, with an optional note, and can be unticked.
+- **State.** *Reached*; *late* once its target date has passed and it isn't reached, counted in working days; *at risk* while its step's forecast end is after the target; *on track*; or *no target date*. The state is worked out from today, so it changes as the days pass.
+- **Where they show.** The project page lists them beside the route. The Timeline tab has a table of them: target, forecast and state. The Projects page and W5 show the next one not reached yet, marked when it is late or at risk. W7 lists the late and at-risk ones with the late steps. A late or at-risk milestone counts in the project's [health](#health).
+
+These are not the prerequisites some steps wait for, such as "material received" ([workflow.md](./workflow.md#starting-steps)): those are part of the route and the same on every project.
 
 ## Notifications and work messages
 

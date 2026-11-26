@@ -19,7 +19,7 @@ A product goes from the VP's idea (step **C**) to launch (step **25**) through *
 
 **The route is data, not code.** It is stored as a versioned definition, `shared/src/process/rnd-route.v2.yaml` (see [architecture.md](./architecture.md#the-process-engine)). Each project stays on the version it started with. A version is never edited once it is loaded: to change the route, add a new version file, and update its tests and this doc together. (Version 2 was extended in place with each step's default length, the step that writes the plan, and the work-message templates, because it had not been deployed anywhere: [P55](./decisions.md).)
 
-**Where this is built.** The whole route runs in COAL: tasks, sign-offs, decisions, milestones, sending work back, hold and drop, due dates, the forecast, health, reminders, deviations and notifications. What is not built yet, and which block adds it:
+**Where this is built.** The whole route runs in COAL: tasks, sign-offs, decisions, prerequisites, a project's own milestones, sending work back, hold and drop, due dates, the forecast, health, reminders, deviations and notifications. What is not built yet, and which block adds it:
 
 | Not yet | Comes with |
 |---|---|
@@ -40,7 +40,7 @@ A product goes from the VP's idea (step **C**) to launch (step **25**) through *
 | **3** | Project proposal | 1 | Head | VP | 1 and 2 approved | Project Planning and the Project Approval Form |
 | **4** | Board approval ◆ | 1 | VP brings it | Board (MD and CEO ⚠) | 3 approved | The approved proposal |
 | **5** | Action plan | 2 | Lead, Head | VP | 4 approved | Action Plan: team, dates for each role, budget, raw material definition |
-| **6** | Raw material | 2 | Lead, Ops, DARD *(vendors)* | Head | 5 approved | Requirement, purchase, raw material test. Records the "material received" milestone |
+| **6** | Raw material | 2 | Lead, Ops, DARD *(vendors)* | Head | 5 approved | Requirement, purchase, raw material test. Records the "material received" prerequisite |
 | **7** | Implant design | 2 | Designers, AEMS | Lead | 5 approved | 3D model, FEA report, drawings with critical dimensions marked for QC |
 | **8** | Instrument design | 2 | Designers, AEMS | Lead | 5 approved | The same as step 7, for the instruments |
 | **9** | Outsourcing | 2 | Lead, Ops, DARD *(outside makers)* | Head | 5 approved | List of items made outside or bought, and the orders |
@@ -55,7 +55,7 @@ A product goes from the VP's idea (step **C**) to launch (step **25**) through *
 | **18** | Prototype approval ◆ | 4 | Lead brings it | Head (final; not the VP) | 17 approved and every corrective action from step 16 closed | Prototype Approval Form |
 | **19** | Trial set planning | 5 | Head, Lead, Ops, PME | VP | 18 approved | Trial set planning document (its form is still to be defined); trial sets made by PME |
 | **20** | Clinical trials | 5 | Lead, Ops, DARD *(surgeons)* | Head | 19 approved | Surgery cases, and each patient's follow-up and scores for one year |
-| **21** | Design revision and master set | 6 | Lead, Ops, PME | Head | "Trial surgeries complete" milestone in step 20 | Design revision on the Non-Conformity Investigation form, controlled copies, process plan, QC documents, costing, master set (made by PME) |
+| **21** | Design revision and master set | 6 | Lead, Ops, PME | Head | "Trial surgeries complete" prerequisite in step 20 | Design revision on the Non-Conformity Investigation form, controlled copies, process plan, QC documents, costing, master set (made by PME) |
 | **22** | Regulatory approval | 6 | Lead, DARD *(company QA team)* | Head | 21 approved (and 2a done ⚠) | Submission to QA for each body, trade mark, registrations, QA approval |
 | **23** | Release approval ◆ | 6 | VP and Head bring it | Board (MD and CEO ⚠) | 22 approved | Transfer Approval Form |
 | **24a** | Pre-transfer (new) | 6 | Lead, Team, DARD *(production, Quality Control dept., company QA team)* | none ⚠ | 23 approved, and positive feedback on about 50 cases ⚠ | The transfer documents, sent to each receiving department |
@@ -94,7 +94,7 @@ flowchart LR
 - **Signed online.** Every sign-off is signed online with Face ID or fingerprint, and signs the step's **sign-off record**, which COAL makes when the step is submitted ([documents-and-signing.md](./documents-and-signing.md#step-sign-off-records)). *Until passkeys arrive (the last block), the signer confirms with a click; the website says so.*
 - **A step needs its documents first.** A step whose documents have a template type ([the table](./documents-and-signing.md#document-types)) can't be submitted until each is made or uploaded, and a document made from a template has its required parts filled in, so the signer never gets an empty step or a blank template (`DOCUMENTS_NEEDED`). The step page lists what is missing. The documents needn't be *approved* yet ⚠ ([S7](./open-questions.md#documents-and-signing)): the preview warns which are not, and the sign-off record lists each output with its status and hash. Which documents a step needs is an assumption ⚠ ([S12](./open-questions.md#documents-and-signing)).
 - **Nothing is done by one click.** On the website, every click that hands work on, signs, marks done or changes what others rely on shows what will happen and waits for a yes ([P107](./decisions.md)):
-  - *Workflow actions with a preview* (start, submit or mark a step done, approve, answer a decision, record a milestone): the API's own preview, with the documents handed in at a submit, the tasks that change, who is asked to sign and any warning, then "Yes, …" or Cancel. A late step asks for its deviation first, then shows the preview.
+  - *Workflow actions with a preview* (start, submit or mark a step done, approve, answer a decision, record a prerequisite): the API's own preview, with the documents handed in at a submit, the tasks that change, who is asked to sign and any warning, then "Yes, …" or Cancel. A late step asks for its deviation first, then shows the preview.
   - *Task actions* (claim from a queue, accept a request, start, mark done) and *switching a research source on or off or stopping a run*: a short dialog saying what will happen.
   - *Already a confirmation:* forms that end in a button naming the act (return with a comment, send back after its preview, hold, resume or drop with a reason, Go, signing, submitting a document version) and the assistant's action cards.
   - *Not asked:* marking a notification read, and saving a draft version (nothing is overwritten and nobody is told).
@@ -108,9 +108,9 @@ flowchart LR
 - **When a step opens.** It opens (becomes *ready*) when everything in its "Starts when" column is true.
 - **Tasks.** The engine then creates tasks for its doers ([roles-and-access.md](./roles-and-access.md#who-gets-a-task)): one for each doer role. Where the doer is "the project team" (steps 12, 24a and 24b), every team member who has no other task at the step gets one ⚠ ([W18](./open-questions.md#workflow)). When a step is submitted, its signer gets a sign-off task; approving, returning or resetting the step closes its tasks.
 - **A step's tasks follow the step.** Starting the step starts its tasks. Submitting it for sign-off makes the doers' tasks wait for the signer (a step with no sign-off is done at once). While they wait, the step and the doers' tasks show who has not signed yet and how late they are: that lateness is the signers', and the doers can remind them once a day ([P110](./decisions.md)). Signing it off closes them, and returning it opens them again. So a step's task is **never started, marked done or reopened by hand**: that would leave the step open with nothing handed in, or a sign-off task closed without a signature (`USE_THE_STEP`). The task list and the Dashboard offer **Open step** where they used to offer Mark done; the step page has Start and Submit for sign-off. Corrective actions, own tasks, assignments and requests are not on the step's flow, and are closed by hand ([P96](./decisions.md)).
-- **Milestones** are facts recorded by a person, with a note or a file as evidence:
+- **Prerequisites** are facts recorded by a person that a step waits for, with a note or a file as evidence ([P116](./decisions.md)):
 
-  | Milestone | Recorded at | Opens |
+  | Prerequisite | Recorded at | Opens |
   |---|---|---|
   | Material received (implant, instrument) | Step 6, by Ops | Steps 10 and 11 |
   | Test licence recorded ⚠ | Before 10 and 11, by DARD for the company QA team | Steps 10 and 11 |
@@ -118,7 +118,7 @@ flowchart LR
   | Positive feedback threshold reached (about 50 cases) ⚠ | Step 20, by the Lead | Step 24a, together with step 23 |
   | Follow-up complete | Step 20, by the Lead or Ops | Step 20 can be signed off ⚠ |
 
-  Until the step modules exist, milestones are recorded by hand, by the roles in the table, with an optional note or file as evidence. A milestone recorded at a step can be recorded once the step has opened. Milestones recorded at step 20 count for that iteration of the step only, so sending work back to 10 means they are needed again. Later, some will be worked out from records (see [roadmap.md](./roadmap.md)).
+  Until the step modules exist, prerequisites are recorded by hand, by the roles in the table, with an optional note or file as evidence, on the card of the step they are recorded at. The test licence belongs to no step: it shows on the cards of steps 10 and 11, and is recorded from step 10's. A prerequisite recorded at a step can be recorded once the step has opened. Those recorded at step 20 count for that iteration of the step only, so sending work back to 10 means they are needed again. Later, some will be worked out from records (see [roadmap.md](./roadmap.md)). The route file calls them `milestones` (`milestone_reached`), because a loaded route version never changes; they are not a project's milestones, which are the VP's own targets ([dashboard.md](./dashboard.md#milestones)).
 - **Item-level rules.** Some rules apply to individual items, not whole steps. For example, a custom outsourced item at step 9 waits for its approved drawing. These are followed by people, and the engine will enforce them once the item records exist ([roadmap.md](./roadmap.md)).
 
 ### Decisions recorded at steps
@@ -156,7 +156,7 @@ The case study at step 16 lists corrective actions. Each becomes a task of kind 
 
 1. **Preview first.** The decider sees which steps would be reset before confirming. Then they give the reason and any evidence, such as a QC or lab report.
 2. **Reopen.** The earlier step reopens as a new **iteration** (iteration 2, 3 and so on). History is never edited: the closed iteration, its decisions and the send-back with its reason stay on record. The reopened step is ready at once, because everything it waits for is upstream and untouched.
-3. **Reset what depends on it.** Every later step that depends on the reopened one, directly or indirectly, is reset to a new iteration that waits for its inputs. This includes the step where the failure happened. A step that hadn't opened yet has nothing to reset. Decisions and milestones belong to an iteration, so those of a reset step are needed again (for example, the Head answers step 12's questions again). Steps that don't depend on it carry on: for example, rework on the implant design (7) doesn't touch the instrument design (8) or the instrument prototype (11).
+3. **Reset what depends on it.** Every later step that depends on the reopened one, directly or indirectly, is reset to a new iteration that waits for its inputs. This includes the step where the failure happened. A step that hadn't opened yet has nothing to reset. Decisions and prerequisites belong to an iteration, so those of a reset step are needed again (for example, the Head answers step 12's questions again). Steps that don't depend on it carry on: for example, rework on the implant design (7) doesn't touch the instrument design (8) or the instrument prototype (11).
 4. **Clean up.** Open tasks on the reset steps are cancelled, and their new iterations create tasks again when they open.
 5. **Carry the documents forward.** The latest version of each document on a reset step becomes a new draft in the new iteration (same content and PDF, marked carried forward), so people revise rather than start again. A version that was with its signers is returned first. A step's sign-off record isn't copied: a new one is made when the step is submitted again.
 6. **Never reset the follow-up.** The step-20 patient follow-up is never reset, because patients already treated must still be followed. It is a task of its own, which a send-back never cancels, and which isn't created twice when step 20 reopens.
@@ -168,7 +168,7 @@ Sending work back is a decision of the person named in the table, with a reason 
 
 - **The VP** can put a project on hold, resume it, or drop it, always with a reason.
 - **The Board** can drop it only while step 4 or 23 is open.
-- **Hold** stops all step work (submitting, signing, deciding, recording milestones, raising corrective actions, sending back) until the VP resumes. Open tasks stay. Reminders and escalations stop for a project on hold; its planned dates don't move, so a long hold shows up as a slip.
+- **Hold** stops all step work (submitting, signing, deciding, recording prerequisites, raising corrective actions, sending back) until the VP resumes. Open tasks stay. Reminders and escalations stop for a project on hold; its planned dates don't move, so a long hold shows up as a slip.
 - **Drop** cancels open steps and tasks and keeps every record. A dropped project can't be resumed.
 - **After launch.** When step 25 is approved the project is *launched*, and step 20's follow-up can still be finished. When every step is finished, the project is *closed*.
 

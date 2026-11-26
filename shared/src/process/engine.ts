@@ -528,7 +528,9 @@ export function apply(route: RouteDefinition, current: RunState, action: Action)
     case 'record_milestone': {
       requireRunStatus(state, WORKING);
       const def = route.milestones.find((m) => m.key === action.milestone);
-      if (!def) throw new EngineError('NOT_FOUND', `There is no milestone "${action.milestone}".`);
+      if (!def) {
+        throw new EngineError('NOT_FOUND', `There is no prerequisite "${action.milestone}".`);
+      }
       const at = def.recorded_at ? stepState(state, def.recorded_at) : null;
       if (def.recorded_at && at && !hasOpened(at.status)) {
         throw new EngineError(
@@ -679,7 +681,7 @@ export function stepActions(route: RouteDefinition, state: RunState, key: StepKe
   };
 }
 
-/** Can a milestone be recorded now? */
+/** Can a prerequisite (the route file's `milestones`) be recorded now? */
 export function milestoneOpen(route: RouteDefinition, state: RunState, key: string): boolean {
   const def = route.milestones.find((m) => m.key === key);
   if (!def || !WORKING.includes(state.status) || milestoneReached(route, state, key)) return false;

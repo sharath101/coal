@@ -72,8 +72,8 @@ Every backend endpoint declares what the AI may do with it: its **AI tier** ([ap
 |---|---|---|
 | `read` | Use it freely, within what the user may see | Projects, route, tasks, documents, widgets, search |
 | `auto` | Use it directly, for the user's own things only. It's logged and can be undone | Save a draft the user owns; create a task for the user themselves; add a note to the user's own draft |
-| `confirm` | Only through an **action card** that the user confirms | Assign a task or send a request; reassign; submit a document or step; record a milestone or deviation; change the team; comment where others are notified; edit someone else's draft; start research in public sources, whose card shows the exact search words that will leave COAL ([P97](./decisions.md)) |
-| `never` | Never. It can prepare the work and give a button that opens the right screen | Sign anything (including Go); decide at a checkpoint; send work back; hold or drop a project; send anything else outside Jayon; delete anything; read research results nobody has kept |
+| `confirm` | Only through an **action card** that the user confirms | Assign a task or send a request; reassign; submit a document or step; record a prerequisite or deviation; change the team; comment where others are notified; edit someone else's draft; start research in public sources, whose card shows the exact search words that will leave COAL ([P97](./decisions.md)) |
+| `never` | Never. It can prepare the work and give a button that opens the right screen | Sign anything (including Go); decide at a checkpoint; send work back; hold or drop a project; set or tick off a project's milestones ([P117](./decisions.md)); send anything else outside Jayon; delete anything; read research results nobody has kept |
 
 **The server enforces this, not the AI's instructions.**
 
@@ -234,7 +234,7 @@ Each tool is a thin wrapper over one endpoint, takes that endpoint's AI tier, an
 |---|---|---|---|
 | `search` | `GET /search` | read | Finding a project, document, task or person without an id |
 | `my_tasks` | `GET /tasks` | read | What is assigned to the person, waiting in their queue, or given by them; a task waiting on its signers says who has not signed and how late they are |
-| `list_projects`, `get_project`, `get_route`, `get_timeline` | projects, route and timeline | read | Where a project is, what comes next, its dates and delays, and who a handed-in step waits on |
+| `list_projects`, `get_project`, `get_route`, `get_timeline` | projects, route and timeline | read | Where a project is, what comes next, its dates and delays, its milestones and whether any is late, the prerequisites its steps wait for, and who a handed-in step waits on |
 | `list_deviations` | `GET /deviations` | read | Why work is late |
 | `list_documents`, `read_document`, `compare_versions` | documents | read | What a document says, and what changed |
 | `active_template` | `GET /templates/active` | read | The template in use for a document type (asked for every time): its name and version, and whether it is a plain Word form |

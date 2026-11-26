@@ -22,6 +22,7 @@ import { useConditionText } from '@/components/condition-text';
 import { RecordDeviationDialog } from '@/components/deviation-dialog';
 import { StepHealthBadge } from '@/components/health-badge';
 import { PreviewPanel } from '@/components/preview-panel';
+import { StepPrerequisites, canRecordAtStep } from '@/components/prerequisites';
 import { ProblemMessage } from '@/components/problem-message';
 import { RemindSigners, SignOffWaitText } from '@/components/remind-signers';
 import { DocumentStatusBadge, StepStatusBadge } from '@/components/status-badge';
@@ -214,7 +215,7 @@ export function StepCard({ projectId, step, route, documents, focused = false, o
           )}
         </div>
       )}
-      <details open={isOpen || focused} className="group">
+      <details open={isOpen || focused || canRecordAtStep(route, step.key)} className="group">
         <summary className="flex cursor-pointer list-none flex-wrap items-center gap-2 p-3">
           <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-md bg-muted font-mono text-xs font-semibold">
             {step.key}
@@ -317,6 +318,13 @@ export function StepCard({ projectId, step, route, documents, focused = false, o
               </ul>
             </div>
           )}
+
+          <StepPrerequisites
+            projectId={projectId}
+            stepKey={step.key}
+            route={route}
+            onChanged={onChanged}
+          />
 
           {step.decisions.length > 0 && (
             <div className="grid gap-3">

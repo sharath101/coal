@@ -37,12 +37,13 @@
 | **Go** | The VP's signed decision that creates a project and opens steps 1, 2 and 2a |
 | **Health** | Green, amber or red, for a step or project, from its dates ([dashboard.md](./dashboard.md#health)) |
 | **Iteration** | One pass through a step. Sending work back opens a new iteration; earlier ones stay on record |
-| **Milestone** | A recorded fact that can open a step, such as "material received" or "trial surgeries complete" |
+| **Milestone** | A target the VP sets for one project, at Go or later: a step of the route (reached when it is signed off) or something in their own words (ticked off by hand), with an optional target date. Late milestones count in the project's health ([dashboard.md](./dashboard.md#milestones)). Not the same as a prerequisite |
 | **Outside document** | A file from outside Jayon (a lab report, a vendor PDF). Treated with extra care by the AI |
 | **Org chart** | Jayon's R&D chart in COAL: positions, who reports to whom, and how many people may hold each ([roles-and-access.md](./roles-and-access.md#the-org-chart)) |
 | **Passkey** | The standard behind Face ID, fingerprint and Windows Hello sign-in. COAL will use passkeys for signing, in the last block (D16) |
 | **Placeholder** | A `{name}` in a template's Word file, replaced when a document is made. Each must match the template's specification *Parked: a plain Word form has none.* |
 | **Position** | A box on the org chart: a title such as "DARD engineer", the role it holds, who it reports to and its seats. A person chooses one when they sign up |
+| **Prerequisite** | A fact a person records that a step waits for, such as "material received" or "trial surgeries complete", recorded on the step's card ([workflow.md](./workflow.md#starting-steps)). The route file calls these `milestones` |
 | **Process run** | One run of a process's route. For R&D, each project has one run |
 | **Project** | One product idea going through R&D, from Go to launch. It has one process run |
 | **Project team** | The people on a project, named in its PID (step 1) |
