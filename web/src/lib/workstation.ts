@@ -40,6 +40,3 @@ export function fromParams(params: URLSearchParams): {
   if (widget) pin.widgetKey = widget as Pin['widgetKey'];
   return { chatId: params.get('chat'), pin, say: params.get('say') ?? '' };
 }
-
-/** What the paperclip accepts for now: a sample document to make a template from. */
-export const SAMPLE_ACCEPT = '.docx,.pdf';

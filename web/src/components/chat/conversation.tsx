@@ -2,6 +2,8 @@
 
 import {
   ApiError,
+  DEFAULT_CHAT_UPLOAD_MB,
+  MAX_CHAT_FILES,
   createChat,
   sendFeedback,
   stopReply,
@@ -12,12 +14,12 @@ import {
   type MessagePart,
 } from '@coal/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { FileText, Loader2, ThumbsDown, ThumbsUp, X } from 'lucide-react';
+import { Loader2, ThumbsDown, ThumbsUp, X } from 'lucide-react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { useEffect, useRef, useState } from 'react';
 import { ActionCard } from '@/components/chat/action-card';
-import { Composer } from '@/components/chat/composer';
+import { Composer, FileIcon } from '@/components/chat/composer';
 import { MessageText } from '@/components/chat/message-text';
 import { DraftCard, IdeaCard } from '@/components/chat/writing-cards';
 import { ProblemMessage } from '@/components/problem-message';
@@ -218,7 +220,7 @@ function UserMessage({
       <p className="whitespace-pre-line">{text}</p>
       {files.map((f) => (
         <p key={f.id} className="flex items-center gap-1.5 text-xs opacity-90">
-          <FileText className="size-3.5" aria-hidden />
+          <FileIcon name={f.name} className="text-primary-foreground" />
           <span className="truncate">{f.name}</span>
         </p>
       ))}
@@ -376,14 +378,21 @@ export function Conversation({
     api(stopReply, { params: { id } }).catch(() => controller?.abort());
   };
 
-  // A sample document is uploaded as an outside file, then rides with the next message.
-  const attach = async (file: File) => {
+  // Documents and pictures are uploaded as outside files, then ride with the next message.
+  const maxFileBytes = me.data?.features.chatUploadMaxBytes ?? DEFAULT_CHAT_UPLOAD_MB * 1024 * 1024;
+  const attach = async (picked: File[]) => {
     setError(null);
     setUploading(true);
     try {
-      const stored = await uploadFile(file, 'outside');
-      setAttached((all) => [...all, { id: stored.id, name: stored.name }]);
-      setInput((current) => current || t('composer.templateText'));
+      // The message takes only so many files; a pick beyond that is left out, not an error.
+      for (const file of picked.slice(0, MAX_CHAT_FILES - attached.length)) {
+        const stored = await uploadFile(file, 'outside', maxFileBytes);
+        setAttached((all) => [...all, { id: stored.id, name: stored.name }]);
+        // A sample for a template says what it is for; any other file leaves the words to the person.
+        if (me.data?.features.templateFilling && /\.(docx|pdf)$/i.test(stored.name)) {
+          setInput((current) => current || t('composer.templateText'));
+        }
+      }
       requestAnimationFrame(() => inputRef.current?.focus());
     } catch (e) {
       setError(e);
@@ -490,9 +499,9 @@ export function Conversation({
             inputRef={inputRef}
             attached={attached}
             uploading={uploading}
-            onAttach={(file) => void attach(file)}
+            onAttach={(picked) => void attach(picked)}
             onDetach={(id) => setAttached((all) => all.filter((f) => f.id !== id))}
-            canAttach={!!me.data?.features.templateFilling}
+            maxFileBytes={maxFileBytes}
           />
           <p className="text-xs text-muted-foreground">{t('composer.hint')}</p>
         </div>

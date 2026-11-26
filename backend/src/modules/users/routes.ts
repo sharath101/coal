@@ -25,7 +25,10 @@ export const usersRoutes = [
     const admin = actor.switcherId ? await findUser(deps.db, ctx.orgId, actor.switcherId) : null;
     return {
       ...(await presentMe(deps.db, ctx.orgId, row)),
-      features: { templateFilling: deps.config.templateFilling },
+      features: {
+        templateFilling: deps.config.templateFilling,
+        chatUploadMaxBytes: deps.config.ai.uploadMaxBytes,
+      },
       switcher: admin ? { id: admin.id, name: admin.name } : null,
     };
   }),

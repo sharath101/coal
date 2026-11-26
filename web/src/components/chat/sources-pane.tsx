@@ -16,6 +16,7 @@ const TYPES = [
   'person',
   'widget',
   'sample',
+  'attachment',
   'source',
 ] as const;
 const isKnownType = (type: string): type is (typeof TYPES)[number] =>

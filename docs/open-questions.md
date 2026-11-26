@@ -133,7 +133,7 @@ These matter when the [regulatory notes](./regulatory-notes.md) are taken up.
 | I5 | Where are existing R&D documents kept? Which projects are under way, at which steps, and do they move into COAL? | R&D Head |
 | I6 | COAL's web domain. Decided at the end (D13). Until then, passkeys work on `localhost`, and passkeys made on a demo host are registered again once the domain is set. The mobile app needs it too | Founders |
 | I7 | Who in Jayon's IT will look after COAL day to day? | Jayon |
-| I9 | Which file types must COAL accept, and how large can they be (for example CAD files, scans, videos of tests)? Assumption in use: PDF, Word, Excel, PowerPoint, CSV, text, PNG, JPEG, WebP, HEIC and STEP, up to 100 MB (`shared/src/rules/files.ts`) | Jayon IT, R&D Head |
+| I9 | Which file types must COAL accept, and how large can they be (for example CAD files, scans, videos of tests)? Assumption in use: PDF, Word, Excel, PowerPoint, CSV, text, PNG, JPEG, WebP, HEIC and STEP, up to 100 MB (`shared/src/rules/files.ts`). **In the AI chat** ([P115](./decisions.md)): documents (PDF, Word, text, CSV) and pictures (PNG, JPEG, WebP), up to three a message and `AI_UPLOAD_MAX_MB` each (10 MB unless set); Excel, PowerPoint, HEIC and CAD are not read yet | Jayon IT, R&D Head |
 
 ## Business
 

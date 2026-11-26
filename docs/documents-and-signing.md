@@ -282,7 +282,7 @@ Signatures will use **passkeys**, the standard behind Face ID, fingerprint and W
 
 - **Storage.** Files are kept in private object storage. They are reached only through short-lived links issued after a permission check.
 - **Who can open a file.** The person who uploaded it, and anyone who may see a record that holds it: a document version's PDF or upload, an attachment or source, a template's sample PDF (and its Word file, for the VP and the Head). Each of those follows its own record's rule ([roles-and-access.md](./roles-and-access.md#content-is-need-to-know)), so a budget annex's attachment is as private as the annex.
-- **Uploads.** There's a list of allowed file types and a size limit ⚠ ([I9](./open-questions.md#it-and-data)). Outside documents are marked "outside" ([workstation-and-ai.md](./workstation-and-ai.md#safety-basics)).
+- **Uploads.** There's a list of allowed file types and a size limit ⚠ ([I9](./open-questions.md#it-and-data)). Outside documents are marked "outside" ([workstation-and-ai.md](./workstation-and-ai.md#safety-basics)). A file for the AI chat (`outside`) must also be one the assistant reads, and no larger than `AI_UPLOAD_MAX_MB` ([P115](./decisions.md)).
 - **Virus scanning** uses ClamAV (`CLAMAV_HOST`), and is **required in production**:
   - an upload is scanned when it is completed. An infected file can't be opened, attached or used as a template, and COAL's audit trail records the scan;
   - if the scanner can't be reached, the file stays "not scanned", and a job tries again every minute;

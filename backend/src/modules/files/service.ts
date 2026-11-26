@@ -1,4 +1,4 @@
-import { checkUpload, type StoredFile } from '@coal/shared';
+import { checkChatFile, checkUpload, type StoredFile } from '@coal/shared';
 import { and, desc, eq, inArray } from 'drizzle-orm';
 import { change } from '../../core/db/change';
 import type { Executor } from '../../core/db/client';
@@ -38,6 +38,12 @@ const UPLOAD_REFUSALS = {
   size: 'The file is too large.',
   empty: 'The file is empty.',
 } as const;
+
+/** `10 MB` or `500 KB`, for a message: whole numbers stay whole. */
+export const formatMegabytes = (bytes: number): string =>
+  bytes >= 1024 * 1024
+    ? `${Number((bytes / (1024 * 1024)).toFixed(1))} MB`
+    : `${Math.round(bytes / 1024)} KB`;
 
 /** Where the client uploads to. Only COAL writes the final key (`storage_key`). */
 const stagingKey = (row: FileRow) => `staging/${row.storageKey}`;
@@ -200,6 +206,21 @@ export async function createUpload(
 ) {
   const check = checkUpload(input);
   if (!check.ok) throw new AppError(400, 'UPLOAD_NOT_ALLOWED', UPLOAD_REFUSALS[check.reason]);
+  // An outside file is one attached to the AI chat: only what the assistant can read, within its limit.
+  if (input.origin === 'outside') {
+    const chat = checkChatFile(input, deps.config.ai.uploadMaxBytes);
+    if (!chat.ok) {
+      throw new AppError(
+        400,
+        'UPLOAD_NOT_ALLOWED',
+        chat.reason === 'size'
+          ? `A file in the chat can be at most ${formatMegabytes(deps.config.ai.uploadMaxBytes)}.`
+          : chat.reason === 'type'
+            ? 'The assistant can read PDF, Word, text and CSV files, and PNG, JPEG and WebP pictures.'
+            : UPLOAD_REFUSALS[chat.reason],
+      );
+    }
+  }
 
   const id = newId();
   const row = await change(deps.db, ctx, async (tx, log) => {

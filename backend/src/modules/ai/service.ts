@@ -1,4 +1,5 @@
 import {
+  chatFileKind,
   dateOfInstant,
   type Chat,
   type ChatContext,
@@ -140,19 +141,33 @@ export async function saveFeedback(
     });
 }
 
+/**
+ * How a file on a message is told to the model: a picture is shown with the message, a document is
+ * read with `read_attachment` using the id.
+ */
+export const attachedLine = (name: string, fileId: string): string =>
+  `[Attached ${chatFileKind(name) === 'image' ? 'picture' : 'file'}: ${name}, file id ${fileId}]`;
+
 /** The text of a message, without the source tags, for showing the model what was said. */
 export const plainText = (parts: MessagePart[]): string =>
   parts
     .flatMap((p) =>
-      p.type === 'text'
-        ? [p.text]
-        : p.type === 'file'
-          ? [`[Attached file: ${p.name}, file id ${p.fileId}]`]
-          : [],
+      p.type === 'text' ? [p.text] : p.type === 'file' ? [attachedLine(p.name, p.fileId)] : [],
     )
     .join('\n\n')
     .replace(/\s*\[S\d+\]/g, '')
     .trim();
+
+/** The files attached to the messages of a chat: what the assistant may read in it. */
+export async function attachedFileIds(ex: Executor, chatId: string): Promise<Set<string>> {
+  const rows = await ex
+    .select({ parts: aiMessages.parts })
+    .from(aiMessages)
+    .where(and(eq(aiMessages.chatId, chatId), eq(aiMessages.sender, 'user')));
+  return new Set(
+    rows.flatMap((r) => r.parts.flatMap((p) => (p.type === 'file' ? [p.fileId] : []))),
+  );
+}
 
 export async function touchChat(tx: Tx, id: string, title?: string): Promise<void> {
   await tx

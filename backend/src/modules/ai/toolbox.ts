@@ -119,7 +119,7 @@ export function buildToolbox(env: ToolboxEnv) {
           env.deps,
           ctx,
           env.actor,
-          def.call(parsed.data as never),
+          def.call(parsed.data as never, { chatId: env.chatId }),
         );
         const shaped = def.shape(output as never, parsed.data as never);
         const refs = shaped.sources.map((s) => ({ ref: cite(s), is: `${s.type}: ${s.label}` }));

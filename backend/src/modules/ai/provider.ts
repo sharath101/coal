@@ -13,6 +13,13 @@ export interface AiTool {
   run(input: unknown): Promise<string>;
 }
 
+/** A picture the person attached to the chat. The model looks at it with the person's message. */
+export interface ModelImage {
+  name: string;
+  mediaType: string;
+  data: Buffer;
+}
+
 export interface ModelTurn {
   model: string;
   system: string;
@@ -20,6 +27,11 @@ export interface ModelTurn {
   history: { role: 'user' | 'assistant'; text: string }[];
   /** The person's new message. */
   prompt: string;
+  /**
+   * Pictures attached to the chat, oldest first: the ones with this message, and recent ones from
+   * earlier. Each is named in the message text that came with it (`[Attached file: …]`).
+   */
+  images?: ModelImage[];
   tools: AiTool[];
   /** The most model calls (one more than the tools it may use) before it must answer. */
   maxSteps: number;

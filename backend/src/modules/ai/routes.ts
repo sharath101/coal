@@ -2,6 +2,7 @@ import {
   createChat,
   getChat,
   listChats as listChatsEndpoint,
+  readAttachment as readAttachmentEndpoint,
   sendFeedback,
   sendMessage,
   stopReply as stopReplyEndpoint,
@@ -13,11 +14,11 @@ import type { AppDeps } from '../../core/deps';
 import type { Actor, RequestContext } from '../../core/http/context';
 import { implement, implementationOf } from '../../core/http/endpoint';
 import { AppError, notFound, validationFailed } from '../../core/http/errors';
-import { assertUsableEvidence, type FileRow } from '../files/service';
 import { assertCanAccess } from '../permissions';
 import { proposalsOfChat } from '../proposals/service';
 import { findProject } from '../rnd/projects';
 import { findTask } from '../tasks/service';
+import { checkChatFiles, readChatDocument } from './attachments';
 import {
   feedbackFor,
   findMessage,
@@ -58,24 +59,6 @@ async function checkContext(
     if (impl) await callEndpoint(impl, deps, ctx, actor, { params: { id: context.documentId } });
   }
   return { runId };
-}
-
-/** What may be attached for now: a Word file or a PDF, finished uploading, the person's own. */
-async function attachments(
-  deps: AppDeps,
-  ctx: RequestContext,
-  actor: Actor,
-  ids: string[],
-): Promise<FileRow[]> {
-  const rows: FileRow[] = [];
-  for (const [i, id] of [...new Set(ids)].entries()) {
-    const row = await assertUsableEvidence(deps.db, ctx.orgId, actor, id, `fileIds.${i}`);
-    if (!/\.(docx|pdf)$/i.test(row.name)) {
-      throw validationFailed('Only Word files and PDFs can be attached for now.', `fileIds.${i}`);
-    }
-    rows.push(row);
-  }
-  return rows;
 }
 
 const sse = (raw: NodeJS.WritableStream & { writableEnded: boolean }, event: ChatStreamEvent) => {
@@ -129,8 +112,8 @@ export const aiRoutes = [
       const chat = await requireChat(deps.db, ctx.orgId, params.id);
       assertCanAccess('ai.chats.write', actor, chat);
       const controller = new AbortController();
-      const files = await attachments(deps, ctx, actor, body.fileIds);
-      const args = { deps, provider, ctx, actor, chat, text: body.text, files, controller };
+      const { files, images } = await checkChatFiles(deps, ctx, actor, body.fileIds);
+      const args = { deps, provider, ctx, actor, chat, text: body.text, files, images, controller };
 
       if (!http.request.headers.accept?.includes('text/event-stream')) {
         return answerMessage({ ...args, emit: () => undefined });
@@ -174,6 +157,12 @@ export const aiRoutes = [
     },
     { rateLimit: () => ({ max: 30, timeWindow: '1 minute' }) },
   ),
+
+  implement(readAttachmentEndpoint, async ({ deps, ctx, actor, params }) => {
+    const chat = await requireChat(deps.db, ctx.orgId, params.id);
+    assertCanAccess('ai.attachments.read', actor, chat);
+    return readChatDocument(deps, ctx, actor, chat, params.fileId);
+  }),
 
   implement(stopReplyEndpoint, async ({ deps, ctx, actor, params }) => {
     const chat = await requireChat(deps.db, ctx.orgId, params.id);

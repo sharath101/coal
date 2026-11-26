@@ -116,7 +116,19 @@ export class AnthropicProvider implements AiProvider {
       instructions: turn.system,
       messages: [
         ...turn.history.map((m) => ({ role: m.role, content: m.text })),
-        { role: 'user' as const, content: turn.prompt },
+        {
+          role: 'user' as const,
+          content: turn.images?.length
+            ? [
+                { type: 'text' as const, text: turn.prompt },
+                // Each picture is named before it, so the model can match it to the message that came with it.
+                ...turn.images.flatMap((image) => [
+                  { type: 'text' as const, text: `Picture: ${image.name}` },
+                  { type: 'image' as const, image: image.data, mediaType: image.mediaType },
+                ]),
+              ]
+            : turn.prompt,
+        },
       ],
       tools: Object.fromEntries(
         turn.tools.map((t) => [

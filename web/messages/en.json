@@ -133,7 +133,7 @@
       "send": "Send",
       "stop": "Stop",
       "attach": "Attach a file",
-      "attachHelp": "Attach a Word file or a PDF, such as a sample document to make a template from",
+      "attachHelp": "Attach documents (PDF, Word, text, CSV) or pictures (PNG, JPEG, WebP): up to {count} files of {limit} each. You can also paste a screenshot.",
       "attached": "Attached files",
       "detach": "Remove {name}",
       "uploading": "Uploading…",
@@ -203,6 +203,7 @@
         "person": "Person",
         "widget": "Dashboard widget",
         "sample": "Attached file",
+        "attachment": "Attached file",
         "source": "Kept source"
       },
       "preview": "Preview"

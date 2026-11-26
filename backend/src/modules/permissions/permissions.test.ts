@@ -102,6 +102,7 @@ const ENDPOINT_TABLE: Record<PermissionKey, Who[]> = {
   'ai.chats.read': SIGNED_IN,
   'ai.chats.write': SIGNED_IN,
   'ai.feedback': SIGNED_IN,
+  'ai.attachments.read': SIGNED_IN,
   'research.sources.read': SIGNED_IN,
   // ⚠ The VP, the Head and the Leads keep the source library; the people of steps C, 1 and 2 research (A11).
   'research.sources.write': ['vp', 'rd_head', 'rd_lead'],
@@ -499,7 +500,7 @@ describe('giving work: assignment or request (the org chart)', () => {
 });
 
 describe('chat rules', () => {
-  it.each(['ai.chats.read', 'ai.chats.write', 'ai.feedback'] as const)(
+  it.each(['ai.chats.read', 'ai.chats.write', 'ai.feedback', 'ai.attachments.read'] as const)(
     '%s: only the person who started the chat, whatever their role',
     (permission) => {
       for (const who of ROLE_KEYS) {

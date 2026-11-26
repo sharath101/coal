@@ -81,7 +81,20 @@ export class CopilotProvider implements AiProvider {
     const abort = () => void session.abort().catch(() => undefined);
     turn.signal.addEventListener('abort', abort, { once: true });
     try {
-      await session.sendAndWait(transcriptPrompt(turn), turn.timeoutMs);
+      await session.sendAndWait(
+        {
+          prompt: transcriptPrompt(turn),
+          ...(turn.images?.length && {
+            attachments: turn.images.map((image) => ({
+              type: 'blob' as const,
+              data: image.data.toString('base64'),
+              mimeType: image.mediaType,
+              displayName: image.name,
+            })),
+          }),
+        },
+        turn.timeoutMs,
+      );
     } catch (error) {
       if (turn.signal.aborted) return { model, usage };
       throw new AiProviderError(error instanceof Error ? error.message : 'The model call failed.');

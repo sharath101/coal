@@ -15,11 +15,13 @@ import type { FileRow } from '../files/service';
 import { listLatestVersions } from '../process/service';
 import { findProject } from '../rnd/projects';
 import { getProductLine } from '../rnd/service';
-import { AiProviderError, type AiProvider, type TurnOutcome } from './provider';
+import { AiProviderError, type AiProvider, type ModelImage, type TurnOutcome } from './provider';
 import { costOf } from './pricing';
 import { buildInstructions, PROMPT_VERSION } from './prompts';
+import { earlierImages, MAX_IMAGES_SHOWN } from './attachments';
 import {
   assertWithinBudget,
+  attachedLine,
   insertMessage,
   logRequest,
   markOutsideText,
@@ -103,6 +105,8 @@ export interface TurnArgs {
   text: string;
   /** Files the person attached to this message, already checked. */
   files: FileRow[];
+  /** The pictures among them, for the model to look at with the message. */
+  images?: ModelImage[];
   emit: (event: ChatStreamEvent) => void;
   /** Aborts the reply, when the person stops it or goes away. */
   controller: AbortController;
@@ -150,7 +154,8 @@ async function run(args: TurnArgs, ai: AppDeps['config']['ai']) {
   const started = Date.now();
   const requestId = newId();
 
-  const history = (await recentMessages(deps.db, chat.id, ai.historyMessages))
+  const recent = await recentMessages(deps.db, chat.id, ai.historyMessages);
+  const history = recent
     .map((m) => ({ role: m.sender, text: plainText(m.parts) }))
     .filter((m) => m.text);
   // A file from outside makes the whole chat "outside" for good (docs/workstation-and-ai.md#safety-basics).
@@ -165,10 +170,11 @@ async function run(args: TurnArgs, ai: AppDeps['config']['ai']) {
       ...args.files.map((f) => ({ type: 'file' as const, fileId: f.id, name: f.name })),
     ],
   });
-  const prompt = [
-    args.text,
-    ...args.files.map((f) => `[Attached file: ${f.name}, file id ${f.id}]`),
-  ].join('\n\n');
+  const prompt = [args.text, ...args.files.map((f) => attachedLine(f.name, f.id))].join('\n\n');
+  // The pictures of the chat, newest last: this message's, and recent ones the model saw before.
+  const images = [...(await earlierImages(deps, ctx, actor, recent)), ...(args.images ?? [])].slice(
+    -MAX_IMAGES_SHOWN,
+  );
   const userMessage = presentMessage(userRow);
   emit({ type: 'start', userMessage });
 
@@ -225,6 +231,7 @@ async function run(args: TurnArgs, ai: AppDeps['config']['ai']) {
       system,
       history,
       prompt,
+      images,
       tools: toolbox.tools,
       maxSteps: ai.maxToolCalls + 1,
       signal: controller.signal,

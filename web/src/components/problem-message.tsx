@@ -3,7 +3,12 @@
 import { ApiError, MAX_UPLOAD_BYTES, type ErrorCode } from '@coal/shared';
 import { useTranslations } from 'next-intl';
 import { formatSize } from '@/lib/format';
-import { ALLOWED_EXTENSIONS, UploadCheckError, UploadTransferError } from '@/lib/upload';
+import {
+  ALLOWED_EXTENSIONS,
+  CHAT_TYPES,
+  UploadCheckError,
+  UploadTransferError,
+} from '@/lib/upload';
 
 type ProblemKey = Parameters<ReturnType<typeof useTranslations<'problems'>>>[0];
 
@@ -28,8 +33,8 @@ export function ProblemMessage({
   if (override) text = override;
   else if (error instanceof UploadCheckError) {
     text = t(`upload_${error.reason}`, {
-      types: ALLOWED_EXTENSIONS,
-      limit: formatSize(MAX_UPLOAD_BYTES),
+      types: error.chat ? CHAT_TYPES : ALLOWED_EXTENSIONS,
+      limit: formatSize(error.chat?.maxBytes ?? MAX_UPLOAD_BYTES),
     });
   } else if (error instanceof UploadTransferError) text = t('upload_transfer');
   else if (code === 'NOT_ALLOWED' && error instanceof ApiError) {

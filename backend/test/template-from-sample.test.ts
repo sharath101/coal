@@ -546,12 +546,12 @@ describe('the assistant with a sample attached', () => {
     expect((await ok(call('GET', `/ai/chats/${chat}`, 'head'))).hasOutsideText).toBe(false);
   });
 
-  it('refuses a file that is not the person’s own, or not a Word file or PDF', async () => {
+  it('refuses a file that is not the person’s own, or not a kind the assistant can read', async () => {
     const chat = await newChat('head');
     const theirs = await w.upload('vp', 'vp-form.docx', sampleForm());
     expect((await send(chat, 'head', 'Use this', [theirs])).status).toBe(403);
-    const txt = await w.upload('head', 'notes.txt', Buffer.from('hi'));
-    expect((await send(chat, 'head', 'Use this', [txt])).status).toBe(400);
+    const sheet = await w.upload('head', 'results.xlsx', Buffer.from('hi'));
+    expect((await send(chat, 'head', 'Use this', [sheet])).status).toBe(400);
     expect(
       (await send(chat, 'head', 'Use this', ['01a1f3ee-0000-7000-8000-000000000000'])).status,
     ).toBe(400);

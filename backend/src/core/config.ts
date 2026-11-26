@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { DEFAULT_CHAT_UPLOAD_MB } from '@coal/shared';
 import { z } from 'zod';
 
 const repoEnvFile = fileURLToPath(new URL('../../../.env', import.meta.url));
@@ -99,6 +100,11 @@ const Env = z.object({
   AI_TURN_TIMEOUT_MS: z.coerce.number().int().positive().default(120_000),
   /** How many earlier messages of a chat the AI is shown. */
   AI_HISTORY_MESSAGES: z.coerce.number().int().min(0).default(20),
+  /**
+   * The largest file, in megabytes, that may be attached to a message in the AI chat: a document the
+   * assistant reads or a picture it looks at (docs/workstation-and-ai.md#what-the-ai-does).
+   */
+  AI_UPLOAD_MAX_MB: z.coerce.number().positive().max(100).default(DEFAULT_CHAT_UPLOAD_MB),
   AI_MODEL_CHAT: z.string().default(''),
   AI_MODEL_TITLE: z.string().default(''),
   AI_MODEL_DRAFT_WRITE: z.string().default(''),
@@ -175,6 +181,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
       maxToolCalls: e.AI_MAX_TOOL_CALLS,
       turnTimeoutMs: e.AI_TURN_TIMEOUT_MS,
       historyMessages: e.AI_HISTORY_MESSAGES,
+      uploadMaxBytes: Math.round(e.AI_UPLOAD_MAX_MB * 1024 * 1024),
       models: Object.fromEntries(
         AI_PURPOSES.map((p) => [p, overrides[p] || defaults[p]]),
       ) as Record<AiPurpose, string>,

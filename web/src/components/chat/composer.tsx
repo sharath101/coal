@@ -1,12 +1,20 @@
 'use client';
 
-import { FileText, Loader2, Paperclip, SendHorizontal, Square, X } from 'lucide-react';
+import { MAX_CHAT_FILES, chatFileKind } from '@coal/shared';
+import { FileText, ImageIcon, Loader2, Paperclip, SendHorizontal, Square, X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useRef, useState, type KeyboardEvent, type RefObject } from 'react';
 import { Button } from '@/components/ui/button';
+import { formatSize } from '@/lib/format';
 import { useSearch } from '@/lib/queries';
-import { SAMPLE_ACCEPT } from '@/lib/workstation';
+import { CHAT_ACCEPT } from '@/lib/upload';
 import { cn } from '@/lib/utils';
+
+/** A picture or a document, so a file chip says which. */
+export function FileIcon({ name, className }: { name: string; className?: string }) {
+  const Icon = chatFileKind(name) === 'image' ? ImageIcon : FileText;
+  return <Icon className={cn('size-3.5', className ?? 'text-muted-foreground')} aria-hidden />;
+}
 
 /**
  * `/` commands: each starts a message the person finishes, or, for /brief, sends it at once
@@ -35,13 +43,13 @@ interface Props {
   onStop: () => void;
   replying: boolean;
   inputRef: RefObject<HTMLTextAreaElement | null>;
-  /** Files attached to the message about to be sent, such as a sample document for a template. */
+  /** Files attached to the message about to be sent: documents and pictures. */
   attached: { id: string; name: string }[];
   uploading: boolean;
-  onAttach: (file: File) => void;
+  onAttach: (files: File[]) => void;
   onDetach: (id: string) => void;
-  /** The paperclip's only use is a sample to make a template from, which is parked (docs/documents-and-signing.md). */
-  canAttach: boolean;
+  /** The largest file the chat takes, in bytes, for the paperclip's hint. */
+  maxFileBytes: number;
 }
 
 /** The message box: Enter sends, `/` lists commands, `@` finds people, projects and documents. */
@@ -56,7 +64,7 @@ export function Composer({
   uploading,
   onAttach,
   onDetach,
-  canAttach,
+  maxFileBytes,
 }: Props) {
   const t = useTranslations('workstation');
   const [caret, setCaret] = useState(0);
@@ -198,7 +206,7 @@ export function Composer({
               key={f.id}
               className="flex items-center gap-1.5 rounded-md border bg-muted/50 py-1 pr-1 pl-2 text-xs"
             >
-              <FileText className="size-3.5 text-muted-foreground" aria-hidden />
+              <FileIcon name={f.name} />
               <span className="max-w-48 truncate">{f.name}</span>
               <Button
                 type="button"
@@ -220,33 +228,33 @@ export function Composer({
         </ul>
       )}
       <div className="flex items-end gap-2">
-        {canAttach && (
-          <>
-            <input
-              ref={fileInput}
-              type="file"
-              hidden
-              accept={SAMPLE_ACCEPT}
-              aria-label={t('composer.attach')}
-              onChange={(e) => {
-                const chosen = e.target.files?.[0];
-                e.target.value = '';
-                if (chosen) onAttach(chosen);
-              }}
-            />
-            <Button
-              type="button"
-              size="icon"
-              variant="outline"
-              disabled={replying || uploading || attached.length >= 3}
-              title={t('composer.attachHelp')}
-              onClick={() => fileInput.current?.click()}
-            >
-              <Paperclip aria-hidden />
-              <span className="sr-only">{t('composer.attach')}</span>
-            </Button>
-          </>
-        )}
+        <input
+          ref={fileInput}
+          type="file"
+          hidden
+          multiple
+          accept={CHAT_ACCEPT}
+          aria-label={t('composer.attach')}
+          onChange={(e) => {
+            const chosen = [...(e.target.files ?? [])];
+            e.target.value = '';
+            if (chosen.length > 0) onAttach(chosen);
+          }}
+        />
+        <Button
+          type="button"
+          size="icon"
+          variant="outline"
+          disabled={replying || uploading || attached.length >= MAX_CHAT_FILES}
+          title={t('composer.attachHelp', {
+            limit: formatSize(maxFileBytes),
+            count: MAX_CHAT_FILES,
+          })}
+          onClick={() => fileInput.current?.click()}
+        >
+          <Paperclip aria-hidden />
+          <span className="sr-only">{t('composer.attach')}</span>
+        </Button>
         <textarea
           ref={inputRef}
           value={value}
@@ -261,6 +269,14 @@ export function Composer({
             setActive(0);
           }}
           onSelect={(e) => setCaret(e.currentTarget.selectionStart)}
+          onPaste={(e) => {
+            // A pasted screenshot or file is attached like a chosen one; pasted words stay words.
+            const pasted = [...e.clipboardData.files];
+            if (pasted.length > 0 && !replying && !uploading) {
+              e.preventDefault();
+              onAttach(pasted);
+            }
+          }}
           onKeyDown={keys}
         />
         {replying ? (

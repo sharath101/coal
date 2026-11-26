@@ -137,16 +137,22 @@ describe('sign-in and sign-out', () => {
 });
 
 describe('my profile', () => {
-  it('says what is switched on: filling templates in COAL is parked unless the setting is on', async () => {
+  it('says what is switched on, and set: filling templates in COAL is parked unless the setting is on, and the chat has a file size limit', async () => {
     const { cookie } = await signUp(t.app, { name: 'Features Reader', roleKey: 'rd_head' });
     const read = async (app: typeof t.app, c: string) =>
       (await app.inject({ method: 'GET', url: '/api/v1/me', headers: { cookie: c } })).json();
-    expect((await read(t.app, cookie)).features).toEqual({ templateFilling: false });
+    expect((await read(t.app, cookie)).features).toEqual({
+      templateFilling: false,
+      chatUploadMaxBytes: 10 * 1024 * 1024,
+    });
 
-    const on = await createTestApp({ TEMPLATE_FILLING: 'true' });
+    const on = await createTestApp({ TEMPLATE_FILLING: 'true', AI_UPLOAD_MAX_MB: '2.5' });
     try {
       const other = await signUp(on.app, { name: 'Features Reader', roleKey: 'rd_head' });
-      expect((await read(on.app, other.cookie)).features).toEqual({ templateFilling: true });
+      expect((await read(on.app, other.cookie)).features).toEqual({
+        templateFilling: true,
+        chatUploadMaxBytes: 2.5 * 1024 * 1024,
+      });
     } finally {
       await on.close();
     }

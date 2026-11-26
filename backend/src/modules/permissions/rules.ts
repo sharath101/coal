@@ -470,6 +470,7 @@ export const RULES = {
   'ai.chats.read': { endpoint: signedIn, resource: ownChat },
   'ai.chats.write': { endpoint: signedIn, resource: ownChat },
   'ai.feedback': { endpoint: signedIn, resource: ownChat },
+  'ai.attachments.read': { endpoint: signedIn, resource: ownChat },
   'research.sources.read': { endpoint: signedIn },
   // ⚠ The VP, the R&D Head and the R&D Leads keep the source library (A11).
   'research.sources.write': { endpoint: onlyRoles('vp', 'rd_head', 'rd_lead') },

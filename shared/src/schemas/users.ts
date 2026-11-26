@@ -33,10 +33,12 @@ export type Manager = z.infer<typeof Manager>;
 export const Me = User.extend({ updatedAt: Timestamp, reportsTo: Manager.nullable() });
 export type Me = z.infer<typeof Me>;
 
-/** What is switched on in this deployment, so the website hides what is parked (docs/architecture.md). */
+/** What is switched on or set in this deployment, so the website hides what is parked and knows its limits (docs/architecture.md). */
 export const Features = z.object({
   /** Filling templates in COAL: fields from records, the document form, the assistant drafting a template. */
   templateFilling: z.boolean(),
+  /** The largest file that may be attached to a message in the AI chat, in bytes (`AI_UPLOAD_MAX_MB`). */
+  chatUploadMaxBytes: z.number().int().positive(),
 });
 export type Features = z.infer<typeof Features>;
 
