@@ -188,7 +188,7 @@ export async function changeResearchSource(
 // Runs
 
 /** What must never leave COAL in a search: every project's code and name, and every person's name. */
-async function privatePhrases(ex: Executor, orgId: string): Promise<string[]> {
+export async function privatePhrases(ex: Executor, orgId: string): Promise<string[]> {
   const [projects, people] = await Promise.all([
     allProjects(ex, orgId),
     listActiveUsers(ex, orgId),

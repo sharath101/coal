@@ -8,6 +8,7 @@ import {
   type ProposalAction,
 } from '@coal/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { Globe } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useId, useState } from 'react';
 import { PreviewPanel } from '@/components/preview-panel';
@@ -23,6 +24,7 @@ import {
   TemplateDetailView,
   isTemplateCard,
 } from '@/components/chat/template-detail';
+import { FillDetailView, WebLink } from '@/components/chat/web-lookup';
 import { ResearchCardOutcome, ResearchDetailView } from '@/components/research/research-card';
 import { api } from '@/lib/api';
 import { formatDate, todayIst } from '@/lib/format';
@@ -56,6 +58,7 @@ export function ActionCard({
   chatId,
   onAskChange,
   onShowSample,
+  webPages = [],
 }: {
   proposal: Proposal;
   chatId: string;
@@ -63,11 +66,14 @@ export function ActionCard({
   onAskChange: (title: string) => void;
   /** A template card's sample PDF is shown in the right-hand pane. */
   onShowSample?: (fileId: string) => void;
+  /** The web pages the chat's answers cited: what a card prepared after a look on the web may rest on. */
+  webPages?: { url: string; title: string }[];
 }) {
   const t = useTranslations('workstation.card');
   const queryClient = useQueryClient();
   const refreshWork = useRefreshWork();
   const [editing, setEditing] = useState(false);
+  const fills = proposal.actions.some((a) => a.endpoint === 'documents.fillForm');
   const reload = () => queryClient.invalidateQueries({ queryKey: queryKeys.chat(chatId) });
   const confirm = useMutation({
     mutationFn: () =>
@@ -106,6 +112,29 @@ export function ActionCard({
         <Pill tone={TONE[proposal.status]}>{t(`status.${proposal.status}`)}</Pill>
       </header>
 
+      {proposal.fromWeb && (
+        <div
+          role="note"
+          className="grid gap-1.5 rounded-md bg-warning px-3 py-2 text-warning-foreground"
+        >
+          <p className="flex items-start gap-1.5">
+            <Globe className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+            {t(fills ? 'fromWebFill' : 'fromWeb')}
+          </p>
+          {webPages.length > 0 && (
+            <ul className="grid gap-0.5 pl-5 text-xs">
+              {webPages.map((page) => (
+                <li key={page.url}>
+                  <WebLink href={page.url} className="underline underline-offset-2">
+                    {page.title}
+                  </WebLink>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
       <ol className="grid gap-3">
         {proposal.preview.actions.map((action, i) => (
           <li key={i} className="grid gap-1">
@@ -127,6 +156,7 @@ export function ActionCard({
               />
             )}
             {action.detail?.kind === 'research' && <ResearchDetailView detail={action.detail} />}
+            {action.detail?.kind === 'fill' && <FillDetailView detail={action.detail} />}
             {action.notified.length > 0 && (
               <p className="text-xs text-muted-foreground">
                 {t('told', { names: action.notified.map((p) => p.name).join(', ') })}

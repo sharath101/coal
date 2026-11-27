@@ -193,6 +193,116 @@ describe('the Anthropic provider', () => {
     ).resolves.toMatchObject({ usage: { calls: 0 } });
   });
 
+  it('runs the web assistant with only its web search and reader, keeps only the pages they returned, and goes on after a pause', async () => {
+    const page = 'https://standards.example.org/plates';
+    const calls: Part[][] = [
+      [
+        {
+          type: 'tool-call',
+          toolCallId: 's1',
+          toolName: 'web_search',
+          input: '{"query":"cervical plate fatigue test standard"}',
+          providerExecuted: true,
+        },
+        {
+          type: 'tool-result',
+          toolCallId: 's1',
+          toolName: 'web_search',
+          result: [
+            {
+              type: 'web_search_result',
+              url: page,
+              title: 'A made-up standards page',
+              pageAge: 'March 2024',
+              encryptedContent: 'x',
+            },
+          ],
+        },
+        {
+          type: 'finish',
+          finishReason: { unified: 'stop', raw: 'pause_turn' },
+          usage: usage(300, 20),
+        },
+      ],
+      [
+        {
+          type: 'tool-call',
+          toolCallId: 'f1',
+          toolName: 'web_fetch',
+          input: JSON.stringify({ url: page }),
+          providerExecuted: true,
+        },
+        {
+          type: 'tool-result',
+          toolCallId: 'f1',
+          toolName: 'web_fetch',
+          result: {
+            type: 'web_fetch_result',
+            url: page,
+            retrievedAt: null,
+            content: {
+              type: 'document',
+              title: 'Plates, made up',
+              source: { type: 'text', mediaType: 'text/plain', data: 'Made-up text.' },
+            },
+          },
+        },
+        ...text('t', [
+          `ANSWER\nA fatigue test is needed [${page}].\n`,
+          'FINDINGS\n- An invented one [https://invented.example.com/x]',
+        ]),
+        finish('stop', 900, 80),
+      ],
+    ];
+    const model = new MockLanguageModelV4({ doStream: async () => streamOf(calls.shift()!) });
+    const progress: unknown[] = [];
+    const outcome = await new AnthropicProvider({ model: () => model }).lookUpWeb({
+      model: 'claude-test',
+      system: 'Search the web.',
+      prompt: 'THE QUESTION\nWhat must a cervical plate pass?',
+      sites: ['standards.example.org'],
+      maxSearches: 5,
+      maxPages: 5,
+      signal: new AbortController().signal,
+      timeoutMs: 10_000,
+      onProgress: (step) => progress.push(step),
+    });
+
+    expect(outcome.searches).toEqual(['cervical plate fatigue test standard']);
+    // Only what the tools returned: the address the model made up is not a page.
+    expect(outcome.pages).toEqual([
+      { url: page, title: 'Plates, made up', date: 'March 2024', read: true },
+    ]);
+    expect(outcome.text).toContain('A fatigue test is needed');
+    expect(outcome.usage).toEqual({ calls: 2, inputTokens: 1200, outputTokens: 100 });
+    expect(progress).toEqual([
+      { kind: 'search', query: 'cervical plate fatigue test standard' },
+      { kind: 'read', url: page },
+    ]);
+    // The provider's own web tools and nothing else, kept to the websites asked for.
+    expect(model.doStreamCalls[0]!.tools).toMatchObject([
+      {
+        type: 'provider',
+        id: 'anthropic.web_search_20260318',
+        args: { allowedDomains: ['standards.example.org'], maxUses: 5 },
+      },
+      {
+        type: 'provider',
+        id: 'anthropic.web_fetch_20260318',
+        args: { allowedDomains: ['standards.example.org'], maxUses: 5 },
+      },
+    ]);
+    expect(model.doStreamCalls[0]!.tools).toHaveLength(2);
+    // The paused turn went on from where it stopped, with the searches it had left.
+    expect(JSON.stringify(model.doStreamCalls[1]!.prompt)).toContain(
+      'cervical plate fatigue test standard',
+    );
+    expect(model.doStreamCalls[1]!.tools).toMatchObject([
+      { args: { maxUses: 4 } },
+      { args: { maxUses: 5 } },
+    ]);
+  });
+
   it('names the key and the workspace it bills to on every call', async () => {
     const seen: { url: string; headers: Headers }[] = [];
     const provider = new AnthropicProvider({
@@ -264,6 +374,7 @@ describe('settings', () => {
       draft_write: 'claude-sonnet-5-5',
       template: 'claude-sonnet-5-5',
       research: 'claude-sonnet-5-5',
+      web: 'claude-sonnet-5-5',
     });
     // Turning a sample into a template, and research, stay on the strong model when the everyday one is made cheaper.
     expect(config({ AI_PROVIDER: 'copilot', AI_MODEL_CHAT: 'claude-haiku-5.5' }).ai.models).toEqual(
@@ -273,8 +384,15 @@ describe('settings', () => {
         draft_write: 'claude-sonnet-5.5',
         template: 'claude-sonnet-5.5',
         research: 'claude-sonnet-5.5',
+        web: 'claude-sonnet-5.5',
       },
     );
+    // The web assistant follows the research model, unless it has its own.
+    expect(config({ AI_MODEL_RESEARCH: 'claude-opus-5-5' }).ai.models.web).toBe('claude-opus-5-5');
+    expect(
+      config({ AI_MODEL_RESEARCH: 'claude-opus-5-5', AI_MODEL_WEB: 'claude-haiku-5-5' }).ai.models
+        .web,
+    ).toBe('claude-haiku-5-5');
   });
 
   it('refuse the Copilot stand-in in production', () => {

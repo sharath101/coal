@@ -51,7 +51,7 @@ export async function callEndpoint(
     query: parseInput(endpoint.query, call.query ?? {}, at && `${at}.query`),
     body: parseInput(endpoint.body, call.body, at && `${at}.body`),
   };
-  guard(endpoint, ctx);
+  guard(endpoint, ctx, input.body);
   const output = await impl.handler({
     ctx,
     actor,

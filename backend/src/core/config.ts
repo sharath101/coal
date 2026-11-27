@@ -7,7 +7,7 @@ const repoEnvFile = fileURLToPath(new URL('../../../.env', import.meta.url));
 if (process.env.NODE_ENV !== 'test' && existsSync(repoEnvFile)) process.loadEnvFile(repoEnvFile);
 
 /** What the AI is asked for; each can use its own model (docs/workstation-and-ai.md#ai-providers). */
-export const AI_PURPOSES = ['chat', 'title', 'draft_write', 'template', 'research'] as const;
+export const AI_PURPOSES = ['chat', 'title', 'draft_write', 'template', 'research', 'web'] as const;
 export type AiPurpose = (typeof AI_PURPOSES)[number];
 export const AI_PROVIDERS = ['anthropic', 'copilot', 'none'] as const;
 export type AiProviderName = (typeof AI_PROVIDERS)[number];
@@ -20,6 +20,7 @@ const DEFAULT_MODELS: Record<'anthropic' | 'copilot', Record<AiPurpose, string>>
     draft_write: 'claude-sonnet-5-5',
     template: 'claude-sonnet-5-5',
     research: 'claude-sonnet-5-5',
+    web: 'claude-sonnet-5-5',
   },
   copilot: {
     chat: 'claude-sonnet-5.5',
@@ -27,6 +28,7 @@ const DEFAULT_MODELS: Record<'anthropic' | 'copilot', Record<AiPurpose, string>>
     draft_write: 'claude-sonnet-5.5',
     template: 'claude-sonnet-5.5',
     research: 'claude-sonnet-5.5',
+    web: 'claude-sonnet-5.5',
   },
 };
 
@@ -110,6 +112,20 @@ const Env = z.object({
   AI_MODEL_DRAFT_WRITE: z.string().default(''),
   AI_MODEL_TEMPLATE: z.string().default(''),
   AI_MODEL_RESEARCH: z.string().default(''),
+  /** The web assistant's model. Left out: the research model. */
+  AI_MODEL_WEB: z.string().default(''),
+  /**
+   * Looking things up on the web (docs/workstation-and-ai.md#looking-things-up-on-the-web): a
+   * separate web assistant, which sees only the brief COAL checked, searches and reads public pages.
+   * Off, nobody can; on, each chat has a switch, on unless the person turns it off.
+   */
+  AI_WEB: flag.default(true),
+  /** Lookups one reply may make: a first, and a sharper second if the first doesn't answer. */
+  AI_WEB_LOOKUPS_PER_REPLY: z.coerce.number().int().min(1).max(3).default(2),
+  /** Searches, and pages read in full, in one lookup. */
+  AI_WEB_MAX_SEARCHES: z.coerce.number().int().min(1).max(10).default(5),
+  AI_WEB_MAX_PAGES: z.coerce.number().int().min(0).max(10).default(5),
+  AI_WEB_TIMEOUT_MS: z.coerce.number().int().positive().default(60_000),
   /**
    * Research (docs/workstation-and-ai.md#researching-what-already-exists). The keys are free and
    * optional: they raise the sources' limits. NCBI and Crossref ask for a contact address.
@@ -142,6 +158,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
     draft_write: e.AI_MODEL_DRAFT_WRITE,
     template: e.AI_MODEL_TEMPLATE,
     research: e.AI_MODEL_RESEARCH,
+    web: e.AI_MODEL_WEB || e.AI_MODEL_RESEARCH,
   };
   const defaults = provider === 'none' ? DEFAULT_MODELS.anthropic : DEFAULT_MODELS[provider];
   return {
@@ -185,6 +202,13 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
       models: Object.fromEntries(
         AI_PURPOSES.map((p) => [p, overrides[p] || defaults[p]]),
       ) as Record<AiPurpose, string>,
+      web: {
+        enabled: e.AI_WEB,
+        lookupsPerReply: e.AI_WEB_LOOKUPS_PER_REPLY,
+        maxSearches: e.AI_WEB_MAX_SEARCHES,
+        maxPages: e.AI_WEB_MAX_PAGES,
+        timeoutMs: e.AI_WEB_TIMEOUT_MS,
+      },
     },
     research: {
       ncbiApiKey: e.NCBI_API_KEY,

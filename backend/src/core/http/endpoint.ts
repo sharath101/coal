@@ -79,26 +79,43 @@ export function proposableImplementations(): Implementation[] {
   return [...registered.values()].filter((i) => i.describe);
 }
 
-/** The `auto` endpoints that stay open in a chat with outside text: they only prepare cards. */
-const OUTSIDE_TEXT_ALLOWED = ['proposals.create', 'proposals.update'];
+/**
+ * The `auto` endpoints that stay open in a chat with outside text (a file, or what the web returned),
+ * and when: preparing cards, asking the web assistant again, and starting a blank copy of an
+ * approved form, which carries no outside words.
+ */
+const OUTSIDE_TEXT_ALLOWED: Record<string, (body: unknown) => boolean> = {
+  'proposals.create': () => true,
+  'proposals.update': () => true,
+  'ai.web.lookUp': () => true,
+  'documents.create': (body) => {
+    const b = (body ?? {}) as { fromForm?: unknown; title?: unknown; fileId?: unknown };
+    return b.fromForm === true && b.title === undefined && b.fileId === undefined;
+  },
+};
 
 /**
  * The AI tiers, enforced by the server (docs/workstation-and-ai.md#what-the-ai-may-do).
  * `auto` endpoints confine the AI to the user's own things through their resource rules.
  */
-export function assertAiTier(endpoint: EndpointSpec, ctx: RequestContext): void {
+export function assertAiTier(endpoint: EndpointSpec, ctx: RequestContext, body?: unknown): void {
   if (!ctx.viaAi) return;
   switch (endpoint.aiTier) {
     case 'read':
       return;
     case 'auto':
-      // A file from outside is in the chat: it may hold hidden instructions, so nothing is saved
-      // on its say-so. Action cards are the way through, because a person confirms each one.
-      if (ctx.aiChat?.outsideText && !OUTSIDE_TEXT_ALLOWED.includes(endpoint.id)) {
+      // Outside text is in the chat: it may hold hidden instructions, so nothing is saved on its
+      // say-so. Action cards are the way through, because a person confirms each one.
+      if (
+        (ctx.aiChat?.outsideText || ctx.aiChat?.usedWeb) &&
+        !OUTSIDE_TEXT_ALLOWED[endpoint.id]?.(body)
+      ) {
         throw new AppError(
           403,
           'AI_NOT_ALLOWED',
-          'This chat holds a file from outside the company’s records, so the assistant can only prepare action cards for you to confirm.',
+          ctx.aiChat.outsideText
+            ? 'This chat holds a file from outside the company’s records, so the assistant can only prepare action cards for you to confirm.'
+            : 'This chat has used the web, so the assistant can only prepare action cards for you to confirm.',
         );
       }
       return;
@@ -115,11 +132,11 @@ export function assertAiTier(endpoint: EndpointSpec, ctx: RequestContext): void 
 }
 
 /** The checks every endpoint runs before its handler, in this order. */
-export function guard(endpoint: EndpointSpec, ctx: RequestContext): void {
+export function guard(endpoint: EndpointSpec, ctx: RequestContext, body?: unknown): void {
   if (endpoint.auth === 'session' && !ctx.actor) {
     throw new AppError(401, 'NOT_SIGNED_IN', 'Sign in first.');
   }
-  assertAiTier(endpoint, ctx);
+  assertAiTier(endpoint, ctx, body);
   assertCanUse(endpoint.permission as Parameters<typeof assertCanUse>[0], ctx.actor);
 }
 

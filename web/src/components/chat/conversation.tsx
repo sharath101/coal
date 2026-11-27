@@ -15,13 +15,14 @@ import {
   type MessagePart,
 } from '@coal/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Loader2, ThumbsDown, ThumbsUp, X } from 'lucide-react';
+import { Globe, Loader2, ThumbsDown, ThumbsUp, X } from 'lucide-react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { useEffect, useRef, useState } from 'react';
 import { ActionCard } from '@/components/chat/action-card';
 import { Composer, FileIcon } from '@/components/chat/composer';
 import { MessageText } from '@/components/chat/message-text';
+import { WebLookupView } from '@/components/chat/web-lookup';
 import { DraftCard, IdeaCard } from '@/components/chat/writing-cards';
 import { ProblemMessage } from '@/components/problem-message';
 import { Button } from '@/components/ui/button';
@@ -140,9 +141,20 @@ function Feedback({ message, chatId }: { message: ChatMessage; chatId: string })
 const citationsOf = (message: ChatMessage): Citation[] =>
   message.parts.flatMap((p) => (p.type === 'text' ? p.citations : []));
 
+/** The web pages the chat's answers cited, once each: what a card prepared after a look on the web may rest on. */
+const webPagesOf = (messages: ChatMessage[]) => [
+  ...new Map(
+    messages
+      .flatMap(citationsOf)
+      .filter((c) => c.type === 'web')
+      .map((c) => [c.link, { url: c.link, title: c.label }]),
+  ).values(),
+];
+
 function AssistantMessage({
   message,
   chat,
+  webPages,
   selected,
   onSelect,
   onAskChange,
@@ -150,6 +162,7 @@ function AssistantMessage({
 }: {
   message: ChatMessage;
   chat: ChatDetail;
+  webPages: { url: string; title: string }[];
   selected: boolean;
   onSelect: () => void;
   onAskChange: (title: string) => void;
@@ -167,6 +180,7 @@ function AssistantMessage({
           ) : null;
         }
         if (part.type === 'file') return null;
+        if (part.type === 'web') return <WebLookupView key={i} lookup={part} />;
         if (part.type === 'draft') {
           return (
             <DraftCard
@@ -185,6 +199,7 @@ function AssistantMessage({
             chatId={chat.id}
             onAskChange={onAskChange}
             onShowSample={(fileId) => onPreview(`file:${fileId}`)}
+            webPages={webPages}
           />
         ) : null;
       })}
@@ -271,6 +286,10 @@ export function Conversation({
   const [error, setError] = useState<unknown>(null);
   const [attached, setAttached] = useState<{ id: string; name: string }[]>([]);
   const [uploading, setUploading] = useState(false);
+  // The Web switch: what the person chose in this chat, else what the chat keeps (on in a new chat).
+  const [webChoice, setWebChoice] = useState<{ chatId: string | null; on: boolean } | null>(null);
+  const webOn =
+    webChoice && webChoice.chatId === chatId ? webChoice.on : (chat.data?.webOn ?? true);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const endRef = useRef<HTMLDivElement | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -318,6 +337,7 @@ export function Conversation({
         text,
         controller.signal,
         files.map((f) => f.id),
+        me.data?.features.aiWeb ? webOn : undefined,
       )) {
         switch (event.type) {
           case 'start':
@@ -328,12 +348,15 @@ export function Conversation({
             setLive((l) => l && { ...l, reply: l.reply + event.delta });
             break;
           case 'activity':
+            // A long lookup says what it is doing on its own line: searching, then reading.
             setLive(
               (l) =>
                 l && {
                   ...l,
                   activity: l.activity.some((a) => a.id === event.id)
-                    ? l.activity.map((a) => (a.id === event.id ? { ...a, state: event.state } : a))
+                    ? l.activity.map((a) =>
+                        a.id === event.id ? { ...a, state: event.state, label: event.label } : a,
+                      )
                     : [...l.activity, { id: event.id, label: event.label, state: event.state }],
                 },
             );
@@ -341,6 +364,7 @@ export function Conversation({
           case 'card':
           case 'draft':
           case 'idea':
+          case 'web':
             void queryClient.invalidateQueries({ queryKey: queryKeys.chat(id) });
             break;
           case 'done':
@@ -410,10 +434,17 @@ export function Conversation({
   const messages = (chat.data?.messages ?? []).filter((m) => m.id !== live?.userId);
   const empty = messages.length === 0 && !live;
   const context = chat.data?.context ?? pin;
+  const webPages = webPagesOf(messages);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <PinChips pin={context} {...(!chatId && { onClear: onClearPin })} />
+      {chat.data?.usedWeb && (
+        <p className="flex items-center gap-1.5 border-b px-4 py-1.5 text-xs text-muted-foreground">
+          <Globe className="size-3.5" aria-hidden />
+          {t('usedWeb')}
+        </p>
+      )}
       <div className="min-h-0 flex-1 overflow-y-auto p-4" aria-live="polite">
         {empty ? (
           <div className="mx-auto grid max-w-md gap-4 py-8 text-center">
@@ -443,6 +474,7 @@ export function Conversation({
                     key={m.id}
                     message={m}
                     chat={chat.data}
+                    webPages={webPages}
                     selected={m.id === selectedMessageId}
                     onSelect={() => {
                       onSelectMessage(m.id);
@@ -503,6 +535,9 @@ export function Conversation({
             onAttach={(picked) => void attach(picked)}
             onDetach={(id) => setAttached((all) => all.filter((f) => f.id !== id))}
             maxFileBytes={maxFileBytes}
+            {...(me.data?.features.aiWeb && {
+              web: { on: webOn, onChange: (on: boolean) => setWebChoice({ chatId, on }) },
+            })}
           />
           <p className="text-xs text-muted-foreground">{t('composer.hint')}</p>
         </div>

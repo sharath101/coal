@@ -6,11 +6,12 @@ import {
   type ChatMessage,
   type MessagePart,
 } from '@coal/shared';
-import { and, desc, eq, gte, inArray, sql, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, sql, type SQL } from 'drizzle-orm';
 import type { Executor, Tx } from '../../core/db/client';
 import { msOf } from '../../core/db/columns';
+import type { AppDeps } from '../../core/deps';
 import { AppError, notFound, validationFailed } from '../../core/http/errors';
-import { aiChats, aiFeedback, aiMessages, aiRequests, aiToolCalls } from './tables';
+import { aiChats, aiFeedback, aiMessages, aiRequests, aiToolCalls, aiWebLookups } from './tables';
 
 export type ChatRow = typeof aiChats.$inferSelect;
 export type MessageRow = typeof aiMessages.$inferSelect;
@@ -21,9 +22,37 @@ export const presentChat = (row: ChatRow): Chat => ({
   channel: row.channel,
   context: row.context,
   hasOutsideText: row.hasOutsideText,
+  webOn: row.webOn,
+  usedWeb: row.usedWeb,
   createdAt: row.createdAt.toISOString(),
   updatedAt: row.updatedAt.toISOString(),
 });
+
+/**
+ * The assistant can look things up on the web here: switched on, and a provider with a web search
+ * (docs/workstation-and-ai.md#looking-things-up-on-the-web).
+ */
+export const webAvailable = (deps: Pick<AppDeps, 'config' | 'ai'>): boolean =>
+  deps.config.ai.web.enabled && !!deps.ai?.lookUpWeb;
+
+/** The person's Web switch for a chat. */
+export async function setWebOn(ex: Executor, id: string, on: boolean): Promise<void> {
+  await ex.update(aiChats).set({ webOn: on }).where(eq(aiChats.id, id));
+}
+
+/** The words of a web report, which a card may carry into a document once the person has checked them. */
+export const reportText = (report: (typeof aiWebLookups.$inferSelect)['report']): string =>
+  [report.answer, ...report.findings, ...report.notFound, ...report.cautions].join('\n');
+
+/** What the web returned in a chat so far, as text. */
+export async function webFoundInChat(ex: Executor, chatId: string): Promise<string> {
+  const rows = await ex
+    .select({ report: aiWebLookups.report })
+    .from(aiWebLookups)
+    .where(eq(aiWebLookups.chatId, chatId))
+    .orderBy(asc(aiWebLookups.createdAt));
+  return rows.map((r) => reportText(r.report)).join('\n');
+}
 
 export const presentMessage = (
   row: MessageRow,

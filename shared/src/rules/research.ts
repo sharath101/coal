@@ -22,10 +22,10 @@ export const RESEARCH_LIMITS = {
 const OPERATORS = new Set(['and', 'or', 'not']);
 
 /** Project codes such as SPN-26-001, whatever the product line. */
-const PROJECT_CODE = /\b[A-Z]{2,4}-\d{2}-\d{3}\b/i;
+export const PROJECT_CODE = /\b[A-Z]{2,4}-\d{2}-\d{3}\b/i;
 
 /** Names that point at the company itself. */
-const COMPANY_NAMES = ['jayon', 'coal'];
+export const COMPANY_NAMES = ['jayon', 'coal'];
 
 const normalise = (text: string) =>
   text
@@ -39,7 +39,8 @@ export const researchWords = (text: string): string[] =>
     .split(' ')
     .filter((w) => w.length > 0);
 
-const containsPhrase = (text: string, phrase: string) =>
+/** Whether the text holds the phrase as whole words, ignoring case and punctuation. */
+export const containsPhrase = (text: string, phrase: string) =>
   ` ${normalise(text)} `.includes(` ${normalise(phrase)} `);
 
 export interface TermContext {

@@ -71,7 +71,7 @@ On a step, **Add document** offers a kind's form:
 
 A document made this way is an ordinary Word document with the same versions, hashes and signatures as any other:
 
-- **Every version is kept.** Filling in (by hand or with the assistant) or uploading makes a new version; nothing is overwritten.
+- **Every version is kept.** Filling in (by hand or with the assistant) or uploading makes a new version; nothing is overwritten. A version filled from a card in a chat where the assistant looked on the web says in its note that it includes facts from the public web, to check before submitting ([P120](./decisions.md)).
 - **Its PDF is made while the version is saved** (Gotenberg turns the Word file into a PDF), so signers read a PDF and signatures are tied to it. If the PDF service is down, the save fails and nothing is saved. A PDF that is uploaded is its own PDF.
 - **A copy that is still the blank form isn't something to hand in.** The step says "still the blank form" until the document differs from it ([Before a step is submitted](#before-a-step-is-submitted)).
 - **It records which version of the form it started from** (in its audit entry), and a later approved form doesn't change it.

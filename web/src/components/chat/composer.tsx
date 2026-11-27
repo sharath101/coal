@@ -1,7 +1,16 @@
 'use client';
 
 import { MAX_CHAT_FILES, chatFileKind } from '@coal/shared';
-import { FileText, ImageIcon, Loader2, Paperclip, SendHorizontal, Square, X } from 'lucide-react';
+import {
+  FileText,
+  Globe,
+  ImageIcon,
+  Loader2,
+  Paperclip,
+  SendHorizontal,
+  Square,
+  X,
+} from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useRef, useState, type KeyboardEvent, type RefObject } from 'react';
 import { Button } from '@/components/ui/button';
@@ -50,6 +59,8 @@ interface Props {
   onDetach: (id: string) => void;
   /** The largest file the chat takes, in bytes, for the paperclip's hint. */
   maxFileBytes: number;
+  /** The Web switch: whether the assistant may look things up on the web in this chat. Left out where the web can't be reached. */
+  web?: { on: boolean; onChange: (on: boolean) => void };
 }
 
 /** The message box: Enter sends, `/` lists commands, `@` finds people, projects and documents. */
@@ -65,6 +76,7 @@ export function Composer({
   onAttach,
   onDetach,
   maxFileBytes,
+  web,
 }: Props) {
   const t = useTranslations('workstation');
   const [caret, setCaret] = useState(0);
@@ -303,6 +315,23 @@ export function Composer({
           </Button>
         )}
       </div>
+      {web && (
+        <div className="mt-1.5 flex items-center gap-2">
+          <Button
+            type="button"
+            size="xs"
+            variant={web.on ? 'secondary' : 'ghost'}
+            aria-pressed={web.on}
+            disabled={replying}
+            title={t(web.on ? 'composer.webOnHelp' : 'composer.webOffHelp')}
+            onClick={() => web.onChange(!web.on)}
+            className={cn(!web.on && 'text-muted-foreground')}
+          >
+            <Globe aria-hidden />
+            {t(web.on ? 'composer.webOn' : 'composer.webOff')}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

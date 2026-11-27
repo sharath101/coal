@@ -53,6 +53,7 @@ async function runOnce(env: EvalEnv, c: EvalCase): Promise<RunResult> {
   const { t, w, facts, recorder } = env;
   const started = Date.now();
   recorder.reset();
+  recorder.webReport = c.webReport ?? 'standard';
 
   const chat = await w.ok(w.call('POST', '/ai/chats', c.as, { context: c.context?.(facts) ?? {} }));
   let fileIds: string[] = [];
@@ -69,6 +70,7 @@ async function runOnce(env: EvalEnv, c: EvalCase): Promise<RunResult> {
     const res = await w.call('POST', `/ai/chats/${chat.id}/messages`, c.as, {
       text,
       ...(i === 0 && fileIds.length > 0 && { fileIds }),
+      ...(c.web === false && { web: false }),
     });
     if (res.status !== 201) {
       error = `${res.status} ${res.body?.code ?? ''} ${recorder.failures}`.trim();
@@ -87,6 +89,7 @@ async function runOnce(env: EvalEnv, c: EvalCase): Promise<RunResult> {
     mark,
     replies,
     seen: recorder.seen,
+    briefs: recorder.briefs,
     error,
   });
   const checks: Check[] = c.checks(facts);

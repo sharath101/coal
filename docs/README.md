@@ -31,8 +31,9 @@ This is the main doc. It gives the whole picture on one page and points to the d
 - turns an idea into a project;
 - helps fill in Jayon's templates (Word forms kept in COAL's template library, always the approved one) by reading the form and writing into a copy of it;
 - assigns work;
-- explains documents before you sign;
-- researches what already exists (products, studies, trials, safety problems) in the public sources Jayon chose, with search words you confirm.
+- explains documents before you sign, and general ideas and terms from what it knows;
+- researches what already exists (products, studies, trials, safety problems) in the public sources Jayon chose, with search words you confirm;
+- looks things up on the open web when COAL's records don't hold the answer, through a separate web assistant that sees only a general question, while the chat's Web switch is on.
 
 It acts as you, sees only what you can see, and anything that affects other people needs your confirmation on an action card. It never signs or decides. It runs on Claude (Anthropic). → [workstation-and-ai.md](./workstation-and-ai.md)
 
@@ -50,7 +51,7 @@ It acts as you, sees only what you can see, and anything that affects other peop
 
 These hold everywhere. If a change breaks one, raise it first.
 
-1. **People decide; the AI prepares.** The AI never signs, decides, or sends anything outside Jayon on its own: research sends only the general search words a person confirms on a card ([P97](./decisions.md)). Changes that affect others need a person's confirmation, on the website as well as on a card: no click changes something by itself ([P107](./decisions.md)).
+1. **People decide; the AI prepares.** The AI never signs, decides, or sends anything outside Jayon on its own but general words: research sends only the general search words a person confirms on a card ([P97](./decisions.md)), and a look on the web only a general question that the backend checks, while the chat's Web switch is on ([P119](./decisions.md)). Changes that affect others need a person's confirmation, on the website as well as on a card: no click changes something by itself ([P107](./decisions.md)).
 2. **Facts come from records.** Numbers, dates, names and statuses come from the database, with their source, never from the AI.
 3. **The backend enforces the rules.** Permissions, AI tiers and signatures are checked in the backend, never only in a client or in the AI's instructions.
 4. **Processes are data.** Jayon's processes, starting with the R&D route, live in versioned definitions, not in code. Projects stay on the version they started with.
@@ -109,6 +110,7 @@ The full log, with reasons, is in [decisions.md](./decisions.md).
 | How a request is processed, step by step, and where it can stop | [workstation-and-ai.md § How a reply is made](./workstation-and-ai.md#how-a-reply-is-made) |
 | AI safety: presenting it, a new AI feature, a change to instructions, tools, tiers or the model, or running the exam | [ai-safety.md](./ai-safety.md) |
 | Research, the source library or a connector to a public source | [workstation-and-ai.md § Researching what already exists](./workstation-and-ai.md#researching-what-already-exists) |
+| The assistant's looks on the web: the brief, its checks, the web assistant | [workstation-and-ai.md § Looking things up on the web](./workstation-and-ai.md#looking-things-up-on-the-web), then [ai-safety.md](./ai-safety.md#7-nothing-leaves-coal-but-general-questions) |
 | A template or the template library | [documents-and-signing.md § The template library](./documents-and-signing.md#the-template-library) |
 | Documents, versions or signing | [documents-and-signing.md](./documents-and-signing.md) |
 | The repo setup, the stack, hosting or security | [architecture.md](./architecture.md) |

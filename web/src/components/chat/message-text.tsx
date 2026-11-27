@@ -1,22 +1,39 @@
 'use client';
 
 import type { Citation } from '@coal/shared';
+import { Globe } from 'lucide-react';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
+import { WebLink } from '@/components/chat/web-lookup';
 import { cn } from '@/lib/utils';
 
 const TAG = /(\[S\d+\])/;
 const BOLD = /(\*\*[^*\n]+\*\*)/;
 
-/** A citation: a small numbered mark that shows the record and its passage on hover and opens it on click. */
+/**
+ * A citation: a small numbered mark that shows the record and its passage on hover and opens it on
+ * click. A page from the web opens in a new tab, and says it is from the web.
+ */
 function CitationMark({ citation, onSelect }: { citation: Citation; onSelect?: () => void }) {
+  const t = useTranslations('workstation.sources');
+  const web = citation.type === 'web';
   const mark = cn(
     'inline-flex size-4 items-center justify-center rounded-full bg-muted text-[10px] font-medium text-muted-foreground',
     citation.link && 'hover:bg-primary hover:text-primary-foreground',
+    web && 'ring-1 ring-sky-500/50',
   );
   const number = citation.ref.slice(1);
   return (
     <span className="group relative mx-0.5 inline-block align-text-top">
-      {citation.link ? (
+      {web ? (
+        <WebLink
+          href={citation.link}
+          className={mark}
+          label={t('openWeb', { label: citation.label })}
+        >
+          {number}
+        </WebLink>
+      ) : citation.link ? (
         <Link href={citation.link} className={mark} onClick={onSelect} aria-label={citation.label}>
           {number}
         </Link>
@@ -29,6 +46,12 @@ function CitationMark({ citation, onSelect }: { citation: Citation; onSelect?: (
         role="tooltip"
         className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1 hidden w-64 -translate-x-1/2 rounded-md border bg-popover p-2 text-xs text-popover-foreground shadow-md group-focus-within:block group-hover:block"
       >
+        {web && (
+          <span className="mb-1 flex items-center gap-1 text-muted-foreground">
+            <Globe className="size-3" aria-hidden />
+            {t('fromWeb')}
+          </span>
+        )}
         <span className="block font-medium">{citation.label}</span>
         {citation.passage && (
           <span className="mt-1 block text-muted-foreground">{citation.passage}</span>

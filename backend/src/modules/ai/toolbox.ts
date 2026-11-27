@@ -1,4 +1,4 @@
-import type { ChatStreamEvent, Citation, DraftRef, IdeaRef } from '@coal/shared';
+import type { ChatStreamEvent, Citation, DraftRef, IdeaRef, WebRef } from '@coal/shared';
 import type { AppDeps } from '../../core/deps';
 import { callEndpoint } from '../../core/http/call';
 import type { Actor, RequestContext } from '../../core/http/context';
@@ -22,8 +22,16 @@ export interface ToolboxEnv {
   maxToolCalls: number;
   /** A file from outside is in the chat, so nothing is saved without a card. */
   outsideText?: boolean;
+  /** The assistant may look things up on the web in this reply: the Web switch is on, and the web can be reached. */
+  web?: boolean;
+  /** The chat used the web in an earlier reply, so nothing is saved without a card. */
+  usedWeb?: boolean;
   /** Everything the person has said in this chat, which a draft may rest on. */
   said: string;
+  /** What the assistant answered earlier in this chat: it may repeat the company's records. */
+  answered?: string;
+  /** What the web returned earlier in this chat. */
+  webFound?: string;
   /** Today's date, a source for the dates a draft states. */
   today: string;
   signal: AbortSignal;
@@ -39,16 +47,31 @@ export interface ToolboxEnv {
 export function buildToolbox(env: ToolboxEnv) {
   /** What the tools returned in this reply: a draft's numbers must come from here or from the person. */
   const read: string[] = [env.today];
-  const ctx: RequestContext = {
+  /** What the web returned in this chat: only a card the person checks may carry it into a document. */
+  const webFound: string[] = env.webFound ? [env.webFound] : [];
+  /** Once the web has answered, the rest of the reply only prepares cards, as in a chat with a file. */
+  const state = { usedWeb: !!env.usedWeb };
+  const counts = { webLookups: 0 };
+  /** The context one tool call runs in: the person's request, marked "via AI", with what the reply knows. */
+  const contextFor = (callId: string, tool: string): RequestContext => ({
     ...env.ctx,
     viaAi: true,
     aiChat: {
       chatId: env.chatId,
       requestId: env.requestId,
       ...(env.outsideText && { outsideText: true }),
-      grounding: { said: env.said, read: () => read.join('\n') },
+      ...(state.usedWeb && { usedWeb: true }),
+      grounding: {
+        said: env.said,
+        read: () => read.join('\n'),
+        answered: env.answered ?? '',
+        web: () => webFound.join('\n'),
+      },
+      counts,
+      signal: env.signal,
+      progress: (label) => env.emit({ type: 'activity', id: callId, tool, label, state: 'start' }),
     },
-  };
+  });
   /** The records read in this reply, by the tag the answer cites them with. */
   const citations = new Map<string, Citation>();
   const known = new Map<string, string>();
@@ -57,6 +80,7 @@ export function buildToolbox(env: ToolboxEnv) {
   const cards: string[] = [];
   const drafts = new Map<string, DraftRef>();
   const ideas: IdeaRef[] = [];
+  const webRefs: WebRef[] = [];
   let used = 0;
 
   function cite(source: ToolSource): string {
@@ -117,7 +141,7 @@ export function buildToolbox(env: ToolboxEnv) {
         const { output } = await callEndpoint(
           impl,
           env.deps,
-          ctx,
+          contextFor(callId, def.name),
           env.actor,
           def.call(parsed.data as never, { chatId: env.chatId }),
         );
@@ -141,8 +165,22 @@ export function buildToolbox(env: ToolboxEnv) {
           ideas.push(shaped.idea);
           env.emit({ type: 'idea', ...shaped.idea });
         }
+        if (shaped.web) {
+          // The brief has left COAL: what comes back is outside material.
+          state.usedWeb = true;
+          webRefs.push(shaped.web);
+          env.emit({ type: 'web', ...shaped.web });
+        }
+        if (shaped.found) webFound.push(shaped.found);
         text = JSON.stringify({ result: shaped.data, sources: refs });
-        read.push(text);
+        if (shaped.tags) {
+          // The tool's own tags ([W1]) become the source tags the answer cites ([S4]).
+          text = text.replace(new RegExp(`\\[${shaped.tags}(\\d+)\\]`, 'g'), (_tag, n: string) => {
+            const ref = refs[Number(n) - 1];
+            return ref ? `[${ref.ref}]` : '';
+          });
+        }
+        if (!def.outside) read.push(text);
         const limit = def.maxChars ?? MAX_RESULT_CHARS;
         if (text.length > limit) {
           text = `${text.slice(0, limit)}\n…[cut: too long. Ask for something narrower.]`;
@@ -170,12 +208,26 @@ export function buildToolbox(env: ToolboxEnv) {
     return text;
   }
 
-  const tools: AiTool[] = aiToolDefs({ filling: env.deps.config.templateFilling }).map((def) => ({
+  const tools: AiTool[] = aiToolDefs({
+    filling: env.deps.config.templateFilling,
+    web: !!env.web,
+  }).map((def) => ({
     name: def.name,
     description: def.description,
     inputSchema: inputSchemaOf(def),
     run: (raw) => run(def, raw),
   }));
 
-  return { tools, citations, calls, activity, cards, drafts, ideas };
+  return {
+    tools,
+    citations,
+    calls,
+    activity,
+    cards,
+    drafts,
+    ideas,
+    webRefs,
+    /** Whether the reply ended in a chat that has used the web. */
+    usedWeb: () => state.usedWeb,
+  };
 }

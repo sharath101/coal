@@ -113,6 +113,7 @@
     "newChat": "New chat",
     "untitled": "New chat",
     "conversationEmpty": "Ask a question, find a document or ask someone to do something. The assistant only acts when you ask, and it sees only what you can see.",
+    "usedWeb": "This chat has used the web, so the assistant only prepares cards for you to check.",
     "examples": {
       "one": "What's waiting on me?",
       "two": "Which projects are late, and why?",
@@ -137,7 +138,11 @@
       "attached": "Attached files",
       "detach": "Remove {name}",
       "uploading": "Uploading…",
-      "templateText": "Make this a template."
+      "templateText": "Make this a template.",
+      "webOn": "Web on",
+      "webOff": "Web off",
+      "webOnHelp": "The assistant may look things up on the public web in this chat. Only its questions leave COAL, after COAL checks them, and you see each one. Click to switch it off.",
+      "webOffHelp": "The assistant won't look anything up on the web in this chat. Click to switch it on."
     },
     "commands": {
       "title": "Commands",
@@ -187,12 +192,31 @@
     "activity": {
       "looked": "Looked at {count, plural, one {# thing} other {# things}}"
     },
+    "web": {
+      "looked": "Looked on the web: {question}",
+      "status": {
+        "done": "Done",
+        "failed": "Could not finish",
+        "stopped": "Stopped"
+      },
+      "sent": "What left COAL",
+      "sentNote": "Only this question went to the web assistant, which knows nothing else about COAL.",
+      "sites": "Only on: {sites}",
+      "searches": "What it searched for",
+      "noSearches": "No searches were made.",
+      "pages": "Pages it used",
+      "noPages": "No pages.",
+      "readInFull": "read in full"
+    },
     "sources": {
       "title": "Sources",
       "empty": "The records the assistant used to answer appear here.",
       "none": "This answer didn't use any records.",
       "looked": "What it looked at",
       "open": "Open {label}",
+      "openWeb": "Open {label} on the web, in a new tab",
+      "fromWeb": "From the web",
+      "fromWebNote": "Public pages, found by the web assistant. Check what matters on the page itself.",
       "types": {
         "project": "Project",
         "task": "Task",
@@ -224,6 +248,18 @@
       "edit": "Edit",
       "cancel": "Cancel",
       "confirmedNote": "Done. Everyone it affects has been told.",
+      "fromWebFill": "Facts from the public web will go into this document. Check each against its page before you confirm.",
+      "fromWeb": "Prepared in a chat that used the public web. Check what it says before you confirm.",
+      "fill": {
+        "version": "Written for version {version}. Confirming saves a new draft version.",
+        "part": "Part {part}",
+        "partAt": "In {where}",
+        "inText": "In the form's text",
+        "mode": {
+          "append": "Added at the end of this part.",
+          "after": "Added as new paragraphs after this part."
+        }
+      },
       "changeText": "Change the card “{title}”: ",
       "editTitle": "Edit the card",
       "editIntro": "Changing who, what or when checks the card again. Nothing happens until you confirm.",

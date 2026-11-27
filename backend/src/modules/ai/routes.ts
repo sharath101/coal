@@ -2,6 +2,7 @@ import {
   createChat,
   getChat,
   listChats as listChatsEndpoint,
+  lookUpWeb as lookUpWebEndpoint,
   readAttachment as readAttachmentEndpoint,
   sendFeedback,
   sendMessage,
@@ -29,8 +30,10 @@ import {
   recentMessages,
   requireChat,
   saveFeedback,
+  setWebOn,
 } from './service';
 import { AI_UNAVAILABLE, answerMessage, assertCanReply, stopReply } from './turn';
+import { lookUpWeb } from './web';
 
 /** What the chat is pinned to must exist, and be something the person may open. */
 async function checkContext(
@@ -109,10 +112,15 @@ export const aiRoutes = [
     async ({ deps, ctx, actor, params, body, http }) => {
       const provider = deps.ai;
       if (!provider) throw AI_UNAVAILABLE();
-      const chat = await requireChat(deps.db, ctx.orgId, params.id);
+      let chat = await requireChat(deps.db, ctx.orgId, params.id);
       assertCanAccess('ai.chats.write', actor, chat);
       const controller = new AbortController();
       const { files, images } = await checkChatFiles(deps, ctx, actor, body.fileIds);
+      // The person's Web switch goes with the message, and the chat keeps it.
+      if (body.web !== undefined && body.web !== chat.webOn) {
+        await setWebOn(deps.db, chat.id, body.web);
+        chat = { ...chat, webOn: body.web };
+      }
       const args = { deps, provider, ctx, actor, chat, text: body.text, files, images, controller };
 
       if (!http.request.headers.accept?.includes('text/event-stream')) {
@@ -163,6 +171,10 @@ export const aiRoutes = [
     assertCanAccess('ai.attachments.read', actor, chat);
     return readChatDocument(deps, ctx, actor, chat, params.fileId);
   }),
+
+  implement(lookUpWebEndpoint, ({ deps, ctx, actor, params, body }) =>
+    lookUpWeb(deps, ctx, actor, params.id, body),
+  ),
 
   implement(stopReplyEndpoint, async ({ deps, ctx, actor, params }) => {
     const chat = await requireChat(deps.db, ctx.orgId, params.id);

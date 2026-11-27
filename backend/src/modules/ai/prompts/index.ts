@@ -5,6 +5,7 @@ import { PLATFORM_RULES } from './platform';
 import { RESEARCH_RULES } from './research';
 import { roleSummary } from './role';
 import { OUTSIDE_TEXT_RULES, SAMPLE_RULES } from './template';
+import { WEB_CHAT_RULES, WEB_OFF_RULES, webRules } from './web';
 import { DRAFTING_RULES, FORM_RULES, WRITING_RULES } from './writing';
 
 /**
@@ -19,6 +20,9 @@ export const PROMPT_VERSION = `v1-${createHash('sha256')
       FORM_RULES +
       WRITING_RULES +
       RESEARCH_RULES +
+      webRules(0) +
+      WEB_OFF_RULES +
+      WEB_CHAT_RULES +
       OUTSIDE_TEXT_RULES +
       SAMPLE_RULES,
   )
@@ -41,6 +45,15 @@ export interface InstructionInputs {
    * makes templates from samples (docs/documents-and-signing.md#parked-filling-templates-in-coal).
    */
   templateFilling?: boolean;
+  /**
+   * Looking things up on the web (docs/workstation-and-ai.md#looking-things-up-on-the-web): on,
+   * switched off by the person in this chat, or not available here.
+   */
+  web?: 'on' | 'off' | 'unavailable';
+  /** Lookups one reply may make. */
+  webLookups?: number;
+  /** The chat used the web in an earlier reply: everything goes on cards. */
+  usedWeb?: boolean;
 }
 
 /** The layers of the AI's instructions, in order (docs/workstation-and-ai.md#how-the-ai-is-told-what-to-do). */
@@ -70,6 +83,8 @@ export function buildInstructions(i: InstructionInputs): string {
     FORM_RULES,
     WRITING_RULES,
     RESEARCH_RULES,
+    i.web === 'on' ? webRules(i.webLookups ?? 2) : i.web === 'off' ? WEB_OFF_RULES : '',
+    i.usedWeb ? WEB_CHAT_RULES : '',
     i.hasFile ? OUTSIDE_TEXT_RULES : '',
     i.hasFile && i.templateFilling ? SAMPLE_RULES : '',
   ]

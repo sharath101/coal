@@ -9,6 +9,7 @@ import {
   specTitle,
   stepActions,
   ungroundedNumbers,
+  WEB_VERSION_NOTE,
   type CompareResponse,
   type DocumentContent,
   type DocumentDetail,
@@ -666,6 +667,28 @@ async function wordFileOf(
   return { version, file, bytes: await readFileBytes(deps, file) };
 }
 
+/**
+ * The parts of one version of a Word document, by id: where each is and its words. A card that
+ * fills the form shows them, so the person sees what each part held before.
+ */
+export async function partsOfVersion(
+  deps: AppDeps,
+  orgId: string,
+  documentId: string,
+  versionNo: number,
+): Promise<Map<string, { where: string; text: string }>> {
+  const versions = (await versionsOf(deps.db, [documentId])).get(documentId) ?? [];
+  const version = versions.find((v) => v.versionNo === versionNo);
+  const [file] = version?.fileId ? await findFiles(deps.db, orgId, [version.fileId]) : [];
+  if (!file || !isWordFile(file)) return new Map();
+  try {
+    const { parts } = formOutline(await readFileBytes(deps, file));
+    return new Map(parts.map((p) => [p.id, { where: p.where, text: p.text }]));
+  } catch {
+    return new Map();
+  }
+}
+
 export async function readForm(deps: AppDeps, ctx: RequestContext, actor: Actor, id: string) {
   const o = await openDocument(deps.db, ctx, actor, id);
   const access = await fullAccess(deps.db, o);
@@ -732,8 +755,14 @@ export async function fillForm(
     }
     const { file, bytes } = await wordFileOf(tx, deps, ctx.orgId, versions);
 
-    if (ctx.viaAi && ctx.aiChat?.grounding) {
-      const sources = `${ctx.aiChat.grounding.said}\n${ctx.aiChat.grounding.read()}`;
+    // What the assistant writes must rest on a source: directly, on what it read in this reply or
+    // was told; on a card it prepares, also on what the web returned in its chat, because the card
+    // shows the person every word before anything is saved.
+    const byAssistant = ctx.viaAi || !!ctx.proposal?.preparedByAi;
+    const grounding = ctx.aiChat?.grounding;
+    if (byAssistant && grounding) {
+      const web = ctx.viaAi ? '' : (grounding.web?.() ?? '');
+      const sources = `${grounding.said}\n${grounding.read()}\n${web}`;
       const problems = input.fills.flatMap((fill) => {
         const numbers = ungroundedNumbers(fill.text, sources);
         return numbers.length > 0
@@ -789,9 +818,15 @@ export async function fillForm(
       fileId: stored.id,
       pdf,
       searchText: wordSearchText(o.doc.title, filled.docx),
-      note: input.note || (ctx.viaAi ? 'Filled in with the assistant' : 'Filled in'),
+      note: [
+        input.note || (byAssistant ? 'Filled in with the assistant' : 'Filled in'),
+        // Confirmed from a card prepared in a chat that used the web: the history says so.
+        ctx.proposal?.fromWeb ? WEB_VERSION_NOTE : '',
+      ]
+        .filter(Boolean)
+        .join('. '),
       createdBy: actor.userId,
-      viaAi: ctx.viaAi,
+      viaAi: byAssistant,
       aiRequestId: ctx.viaAi ? (ctx.aiChat?.requestId ?? null) : null,
       aiSections: [],
     });

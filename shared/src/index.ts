@@ -28,6 +28,7 @@ export * from './rules/templates';
 export * from './rules/documents';
 export * from './rules/drafting';
 export * from './rules/research';
+export * from './rules/web';
 export * from './rules/calendar';
 export * from './rules/schedule';
 export * from './rules/measures';

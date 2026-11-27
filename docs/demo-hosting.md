@@ -44,6 +44,7 @@ Set in Railway (`railway variable list --service …`), never in the repository.
 | | `COOKIE_SECURE` | `true` |
 | | `AI_PROVIDER`, `ANTHROPIC_API_KEY`, `ANTHROPIC_WORKSPACE_ID` | `anthropic`, and the key and workspace from Madhav. Never the Copilot stand-in ([D19](./decisions.md)) |
 | | `NCBI_API_KEY`, `OPENFDA_API_KEY`, `RESEARCH_CONTACT_EMAIL` | Optional. Free keys and a contact address that raise the public sources' limits for research ([workstation-and-ai.md](./workstation-and-ai.md#researching-what-already-exists)). Research works without them, and the default sources load when the backend migrates. Websites in the source library are searched only on `anthropic` |
+| | `AI_WEB`, `AI_WEB_LOOKUPS_PER_REPLY`, `AI_WEB_MAX_SEARCHES`, `AI_WEB_MAX_PAGES`, `AI_WEB_TIMEOUT_MS`, `AI_MODEL_WEB` | Optional. Looking things up on the web is on by default (`true`, 2 lookups per reply, 5 searches and 5 pages each, 60 seconds) and works only on `anthropic` ([workstation-and-ai.md](./workstation-and-ai.md#looking-things-up-on-the-web)). `false` switches it off for everyone. ⚠ Anthropic's web search and web fetch may need switching on in the organisation's Anthropic Console |
 | `web` | `RAILWAY_DOCKERFILE_PATH` | `web/Dockerfile` |
 | | `COAL_API_URL` | `http://backend.railway.internal:4000`. Read when the website is **built**, so a change needs a rebuild |
 | | `PORT` | `3000`, the port of the public address |

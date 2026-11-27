@@ -55,7 +55,41 @@ export interface AiProvider {
    * it, a website in the source library is a link the person opens.
    */
   searchWeb?(search: WebSearch): Promise<WebSearchOutcome>;
+  /**
+   * Runs the web assistant on one brief: a turn with the provider's own web search and web reader,
+   * and no other tools (docs/workstation-and-ai.md#looking-things-up-on-the-web). Only some
+   * providers can: without it, the assistant can't look things up on the web.
+   */
+  lookUpWeb?(lookup: WebLookupRun): Promise<WebLookupOutcome>;
   close?(): Promise<void>;
+}
+
+export interface WebLookupRun {
+  model: string;
+  system: string;
+  /** The brief, written out: everything the web assistant knows. */
+  prompt: string;
+  /** Keep the search and the reading to these websites; empty for the whole web. */
+  sites: string[];
+  maxSearches: number;
+  maxPages: number;
+  signal: AbortSignal;
+  timeoutMs: number;
+  /** Told as each search is sent and each page is opened, so the person sees it working. */
+  onProgress?(step: { kind: 'search'; query: string } | { kind: 'read'; url: string }): void;
+}
+
+export interface WebLookupOutcome {
+  /** The web assistant's report, as it wrote it. */
+  text: string;
+  /** The searches sent, as they were sent. */
+  searches: string[];
+  /**
+   * The pages the search returned or the reader opened: the only addresses a report may cite.
+   * `date` is how old the page is, as the search gave it.
+   */
+  pages: { url: string; title: string; date: string | null; read: boolean }[];
+  usage: TurnOutcome['usage'];
 }
 
 export interface WebSearch {

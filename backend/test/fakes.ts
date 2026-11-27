@@ -1,6 +1,12 @@
 import PizZip from 'pizzip';
 import { AppError } from '../src/core/http/errors';
-import type { AiProvider, ModelTurn, TurnOutcome } from '../src/modules/ai/provider';
+import type {
+  AiProvider,
+  ModelTurn,
+  TurnOutcome,
+  WebLookupOutcome,
+  WebLookupRun,
+} from '../src/modules/ai/provider';
 import type { PdfRenderer } from '../src/modules/documents/pdf';
 import type { ScanResult, VirusScanner } from '../src/modules/files/scanner';
 
@@ -41,22 +47,36 @@ export class FakeScanner implements VirusScanner {
 /** One thing the scripted model does in a turn. */
 export type ScriptStep =
   | { say: string | ((results: string[]) => string) }
+  /** A tool call; its input may be worked out from what the earlier tools of the turn answered. */
   | { tool: string; input?: unknown }
   | { fail: string }
   /** Waits until the person stops the reply, or the test lets it go. */
   | { hold: Promise<void> };
 
+/** What the scripted web assistant reports for one lookup: its words, its searches and the pages its tools returned. */
+export interface ScriptedWeb {
+  text: string;
+  searches?: string[];
+  pages?: WebLookupOutcome['pages'];
+  fail?: string;
+  /** Waits until the person stops the reply, or the test lets it go. */
+  hold?: Promise<void>;
+}
+
 /**
  * Stands in for the model (docs/workstation-and-ai.md#testing-the-ai): each turn plays a script of
  * words and tool calls, running the real tools like a model would, so tests need no key. Turns
- * are played in the order they are queued.
+ * are played in the order they are queued. It stands in for the web assistant too.
  */
 export class ScriptedAi implements AiProvider {
   readonly name = 'scripted' as const;
   readonly turns: ModelTurn[] = [];
   /** What each tool answered, in order, for the tests to read. */
   readonly results: string[] = [];
+  /** What the web assistant was given, lookup by lookup. */
+  readonly lookups: WebLookupRun[] = [];
   private readonly scripts: ScriptStep[][] = [];
+  private readonly webScripts: ScriptedWeb[] = [];
   usage = { inputTokens: 1000, outputTokens: 200 };
 
   queue(...steps: ScriptStep[]): this {
@@ -69,8 +89,33 @@ export class ScriptedAi implements AiProvider {
     return this.queue(...steps).queue({ say: 'A made-up chat title' });
   }
 
+  /** What the web assistant reports, for the next lookups. */
+  web(...reports: ScriptedWeb[]): this {
+    this.webScripts.push(...reports);
+    return this;
+  }
+
   get pending(): number {
-    return this.scripts.length;
+    return this.scripts.length + this.webScripts.length;
+  }
+
+  async lookUpWeb(lookup: WebLookupRun): Promise<WebLookupOutcome> {
+    this.lookups.push(lookup);
+    const script = this.webScripts.shift() ?? { text: 'ANSWER\nNothing was scripted.' };
+    if (script.fail) throw new Error(script.fail);
+    for (const query of script.searches ?? []) lookup.onProgress?.({ kind: 'search', query });
+    if (script.hold) {
+      await Promise.race([
+        script.hold,
+        new Promise<void>((resolve) => lookup.signal.addEventListener('abort', () => resolve())),
+      ]);
+    }
+    return {
+      text: script.text,
+      searches: script.searches ?? [],
+      pages: script.pages ?? [],
+      usage: { calls: 1, inputTokens: 500, outputTokens: 100 },
+    };
   }
 
   async run(turn: ModelTurn): Promise<TurnOutcome> {
@@ -92,7 +137,11 @@ export class ScriptedAi implements AiProvider {
         const tool = turn.tools.find((t) => t.name === step.tool);
         if (!tool) throw new Error(`The model asked for a tool that was not offered: ${step.tool}`);
         calls += 1;
-        const text = await tool.run(step.input ?? {});
+        const input =
+          typeof step.input === 'function'
+            ? (step.input as (results: string[]) => unknown)(results)
+            : step.input;
+        const text = await tool.run(input ?? {});
         results.push(text);
         this.results.push(text);
       }

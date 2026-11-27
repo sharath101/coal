@@ -170,6 +170,7 @@ Everyone with an account can see the **status** of every project. For now, that 
 | Read a template | Everyone reads the active ones; the VP and the Head also read drafts and retired versions |
 | Add, change or switch off a place in the source library | VP, R&D Head, R&D Leads ⚠ ([A11](./open-questions.md#people-and-access)). Everyone reads the library |
 | Research in public sources | VP, R&D Head, R&D Leads, R&D Ops: the people of steps 0, 1 and 2 ⚠ ([A11](./open-questions.md#people-and-access)). The assistant prepares the card; the person confirms the search words |
+| Let the assistant look things up on the web (`ai.web`) | Everyone, in their own chats, while the chat's Web switch is on ⚠ ([P119](./decisions.md), [AI20](./open-questions.md#ai)). Only the assistant asks, from inside its reply; COAL checks every question before it leaves |
 | Keep research results as sources of a project (or of one step) | The person who ran the research, into a project they are on, or the VP, the Head or the Lead of its line; for a step, one they may add sources to (above) |
 
 ## Assigning work and making requests

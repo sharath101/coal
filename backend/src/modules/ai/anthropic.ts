@@ -1,10 +1,20 @@
 import { createAnthropic } from '@ai-sdk/anthropic';
-import { generateText, isStepCount, jsonSchema, streamText, tool, type LanguageModel } from 'ai';
+import {
+  generateText,
+  isStepCount,
+  jsonSchema,
+  streamText,
+  tool,
+  type LanguageModel,
+  type ModelMessage,
+} from 'ai';
 import {
   AiProviderError,
   type AiProvider,
   type ModelTurn,
   type TurnOutcome,
+  type WebLookupOutcome,
+  type WebLookupRun,
   type WebSearch,
   type WebSearchOutcome,
 } from './provider';
@@ -24,6 +34,16 @@ export function pageLines(text: string): Map<string, string> {
   }
   return lines;
 }
+
+/** A page's text read by the web assistant is cut at this many tokens, to bound what a lookup costs. */
+const PAGE_TOKENS = 8000;
+/** How often a turn Anthropic paused (a long run of searches) is continued. */
+const MAX_CONTINUATIONS = 2;
+
+type FoundPage = WebLookupOutcome['pages'][number];
+
+const isAddress = (value: unknown): value is string =>
+  typeof value === 'string' && /^https?:\/\//.test(value);
 
 /**
  * Anthropic (Claude) through the Vercel AI SDK (D17). The key isn't tied to one workspace, so
@@ -107,6 +127,108 @@ export class AnthropicProvider implements AiProvider {
     } catch (error) {
       throw new AiProviderError(error instanceof Error ? error.message : 'The web search failed.');
     }
+  }
+
+  /**
+   * The web assistant: Claude with its own web search and web reader, and no other tool. The reader
+   * opens only addresses already in the conversation, which a brief can't hold (Anthropic's rule),
+   * and only the pages the tools returned are kept, so a report can't cite an address the model
+   * made up. A turn Anthropic pauses is continued, within the limits and the time.
+   */
+  async lookUpWeb(lookup: WebLookupRun): Promise<WebLookupOutcome> {
+    const sites = lookup.sites.length > 0 ? lookup.sites : null;
+    const deadline = Date.now() + lookup.timeoutMs;
+    const searches: string[] = [];
+    const pages = new Map<string, FoundPage>();
+    const usage = { calls: 0, inputTokens: 0, outputTokens: 0 };
+    const messages: ModelMessage[] = [{ role: 'user', content: lookup.prompt }];
+    let text = '';
+    let reads = 0;
+
+    const keep = (toolName: string, output: unknown) => {
+      if (toolName === 'web_search' && Array.isArray(output)) {
+        for (const r of output as { url?: unknown; title?: unknown; pageAge?: unknown }[]) {
+          if (!isAddress(r.url) || pages.has(r.url)) continue;
+          pages.set(r.url, {
+            url: r.url,
+            title: typeof r.title === 'string' && r.title ? r.title : r.url,
+            date: typeof r.pageAge === 'string' && r.pageAge ? r.pageAge : null,
+            read: false,
+          });
+        }
+      } else if (toolName === 'web_fetch') {
+        const r = (output ?? {}) as {
+          type?: unknown;
+          url?: unknown;
+          content?: { title?: unknown };
+        };
+        if (r.type !== 'web_fetch_result' || !isAddress(r.url)) return;
+        const known = pages.get(r.url);
+        const title = typeof r.content?.title === 'string' ? r.content.title : '';
+        pages.set(r.url, {
+          url: r.url,
+          title: title || known?.title || r.url,
+          date: known?.date ?? null,
+          read: true,
+        });
+      }
+    };
+
+    try {
+      for (let round = 0; round <= MAX_CONTINUATIONS; round++) {
+        const result = streamText({
+          model: this.make(lookup.model),
+          instructions: lookup.system,
+          messages,
+          tools: {
+            web_search: this.tools.webSearch_20260318({
+              maxUses: Math.max(1, lookup.maxSearches - searches.length),
+              ...(sites && { allowedDomains: sites }),
+              userLocation: { type: 'approximate', country: 'IN', timezone: 'Asia/Kolkata' },
+            }),
+            ...(lookup.maxPages > 0 && {
+              web_fetch: this.tools.webFetch_20260318({
+                maxUses: Math.max(1, lookup.maxPages - reads),
+                ...(sites && { allowedDomains: sites }),
+                maxContentTokens: PAGE_TOKENS,
+              }),
+            }),
+          },
+          stopWhen: isStepCount(2),
+          abortSignal: lookup.signal,
+          timeout: Math.max(1000, deadline - Date.now()),
+        });
+        for await (const part of result.fullStream) {
+          if (part.type === 'text-delta') text += part.text;
+          else if (part.type === 'tool-call' && part.providerExecuted) {
+            const input = (part.input ?? {}) as { query?: unknown; url?: unknown };
+            if (part.toolName === 'web_search' && typeof input.query === 'string') {
+              searches.push(input.query);
+              lookup.onProgress?.({ kind: 'search', query: input.query });
+            } else if (part.toolName === 'web_fetch' && typeof input.url === 'string') {
+              reads += 1;
+              lookup.onProgress?.({ kind: 'read', url: input.url });
+            }
+          } else if (part.type === 'tool-result' && part.providerExecuted) {
+            keep(part.toolName, part.output);
+          } else if (part.type === 'finish-step') {
+            usage.calls += 1;
+            usage.inputTokens += part.usage.inputTokens ?? 0;
+            usage.outputTokens += part.usage.outputTokens ?? 0;
+          } else if (part.type === 'error') throw part.error;
+        }
+        // A long run of searches can make Anthropic pause the turn: it goes on from where it stopped.
+        if ((await result.rawFinishReason) !== 'pause_turn' || Date.now() >= deadline) break;
+        messages.push(...(await result.response).messages);
+      }
+    } catch (error) {
+      if (!lookup.signal.aborted) {
+        throw new AiProviderError(
+          error instanceof Error ? error.message : 'The web lookup failed.',
+        );
+      }
+    }
+    return { text, searches, pages: [...pages.values()], usage };
   }
 
   async run(turn: ModelTurn): Promise<TurnOutcome> {

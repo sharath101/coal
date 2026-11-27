@@ -1,4 +1,4 @@
-import type { ChatContext, MessagePart } from '@coal/shared';
+import type { ChatContext, MessagePart, WebBrief, WebPage } from '@coal/shared';
 import {
   boolean,
   index,
@@ -31,6 +31,10 @@ export const aiChats = pgTable(
     title: text('title').notNull().default(''),
     /** Set once a file from outside is attached, and never unset: from then on the AI only prepares cards. */
     hasOutsideText: boolean('has_outside_text').notNull().default(false),
+    /** The person's Web switch: the assistant may look things up on the web in this chat. */
+    webOn: boolean('web_on').notNull().default(true),
+    /** Set once the assistant has looked something up on the web, and never unset: from then on it only prepares cards. */
+    usedWeb: boolean('used_web').notNull().default(false),
     ...timestamps(),
   },
   (t) => [
@@ -124,4 +128,40 @@ export const aiFeedback = pgTable(
     ...timestamps(),
   },
   (t) => [unique('ai_feedback_message_user').on(t.messageId, t.userId)],
+);
+
+/**
+ * Each look on the web (docs/workstation-and-ai.md#looking-things-up-on-the-web): the brief that
+ * left COAL, what the web assistant searched, the pages it used and its report as COAL shaped it.
+ * Private to the person, like the chat. Insert-only.
+ */
+export const aiWebLookups = pgTable(
+  'ai_web_lookups',
+  {
+    id: idColumn(),
+    orgId: orgIdColumn(),
+    chatId: uuid('chat_id')
+      .notNull()
+      .references(() => aiChats.id),
+    userId: uuid('user_id').notNull(),
+    /** The reply that asked; a reply may make only so many lookups. */
+    requestId: uuid('request_id').notNull(),
+    /** The web assistant's own request, with what it cost. */
+    webRequestId: uuid('web_request_id').notNull(),
+    round: integer('round').notNull(),
+    followUpOf: uuid('follow_up_of'),
+    brief: jsonb('brief').$type<Omit<WebBrief, 'followUp'>>().notNull(),
+    searches: jsonb('searches').$type<string[]>().notNull(),
+    pages: jsonb('pages').$type<WebPage[]>().notNull(),
+    report: jsonb('report')
+      .$type<{ answer: string; findings: string[]; notFound: string[]; cautions: string[] }>()
+      .notNull(),
+    status: text('status', { enum: ['done', 'failed', 'stopped'] }).notNull(),
+    error: text('error'),
+    createdAt: timestamptz('created_at').notNull().defaultNow(),
+  },
+  (t) => [
+    index('ai_web_lookups_chat').on(t.chatId, t.createdAt),
+    index('ai_web_lookups_request').on(t.requestId),
+  ],
 );

@@ -16,6 +16,8 @@ export const proposals = pgTable(
     /** The AI chat that prepared it (the chats come with the AI module). */
     chatId: uuid('chat_id'),
     preparedByAi: boolean('prepared_by_ai').notNull().default(false),
+    /** Prepared in a chat that used the web: the card tells the person to check its facts. */
+    fromWeb: boolean('from_web').notNull().default(false),
     version: integer('version').notNull().default(1),
     title: text('title').notNull(),
     actions: jsonb('actions').$type<ProposalAction[]>().notNull(),

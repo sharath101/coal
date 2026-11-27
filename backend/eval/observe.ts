@@ -1,20 +1,33 @@
-import { eq, gt, max } from 'drizzle-orm';
+import { and, eq, gt, max, ne } from 'drizzle-orm';
 import type { AppDeps } from '../src/core/deps';
-import type { AiProvider, ModelTurn, TurnOutcome, WebSearch } from '../src/modules/ai/provider';
+import type {
+  AiProvider,
+  ModelTurn,
+  TurnOutcome,
+  WebLookupOutcome,
+  WebLookupRun,
+  WebSearch,
+} from '../src/modules/ai/provider';
 import { aiRequests, aiToolCalls } from '../src/modules/ai/tables';
 import { auditEvents } from '../src/modules/audit/tables';
 import { proposals } from '../src/modules/proposals/tables';
 import type { Observation } from './checks';
+import { fakeWeb, type WebReport } from './world';
 
 /**
  * Wraps the model and writes down everything it is shown: its instructions and every tool result.
  * That is the strongest evidence for a leak check, because the server decides what the model can
- * see, whatever the model then chooses to say.
+ * see, whatever the model then chooses to say. It also plays the web assistant with made-up pages,
+ * so the exam reaches no real website, and keeps every brief: what would have left COAL.
  */
 export class RecordingProvider implements AiProvider {
   /** What the model was shown since the last `reset`. */
   private shown: string[] = [];
   private failed: string[] = [];
+  /** The briefs the web assistant was sent since the last `reset`. */
+  briefs: string[] = [];
+  /** What the made-up web reports to the next lookups. */
+  webReport: WebReport = 'standard';
   model = '';
 
   constructor(private readonly inner: AiProvider) {}
@@ -26,6 +39,8 @@ export class RecordingProvider implements AiProvider {
   reset() {
     this.shown = [];
     this.failed = [];
+    this.briefs = [];
+    this.webReport = 'standard';
   }
 
   get seen(): string {
@@ -75,6 +90,14 @@ export class RecordingProvider implements AiProvider {
       : Promise.reject(new Error('no web'));
   }
 
+  async lookUpWeb(lookup: WebLookupRun): Promise<WebLookupOutcome> {
+    this.briefs.push(lookup.prompt);
+    const found = fakeWeb(this.webReport);
+    for (const query of found.searches) lookup.onProgress?.({ kind: 'search', query });
+    if (process.env.EVAL_TRACE) console.log(`  web brief: ${lookup.prompt.replace(/\s+/g, ' ')}`);
+    return found;
+  }
+
   close() {
     return this.inner.close?.() ?? Promise.resolve();
   }
@@ -94,6 +117,7 @@ export async function observe(
     mark: number;
     replies: { text: string; citations: number }[];
     seen: string;
+    briefs: string[];
     error: string | null;
   },
 ): Promise<Observation> {
@@ -108,7 +132,8 @@ export async function observe(
       })
       .from(aiToolCalls)
       .innerJoin(aiRequests, eq(aiRequests.id, aiToolCalls.requestId))
-      .where(eq(aiRequests.chatId, input.chatId))
+      // The assistant's own tools: the web assistant's searches are what `briefs` stands for.
+      .where(and(eq(aiRequests.chatId, input.chatId), ne(aiToolCalls.tier, 'outside')))
       .orderBy(aiToolCalls.createdAt),
     db
       .select({
@@ -133,6 +158,7 @@ export async function observe(
       denial: c.denial,
     })),
     seen: input.seen,
+    briefs: input.briefs,
     writes: writes.map((w) => ({
       action: w.action,
       recordType: w.recordType,

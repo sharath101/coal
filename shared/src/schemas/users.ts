@@ -39,6 +39,8 @@ export const Features = z.object({
   templateFilling: z.boolean(),
   /** The largest file that may be attached to a message in the AI chat, in bytes (`AI_UPLOAD_MAX_MB`). */
   chatUploadMaxBytes: z.number().int().positive(),
+  /** The assistant can look things up on the web here (`AI_WEB`, and a provider with a web search). */
+  aiWeb: z.boolean(),
 });
 export type Features = z.infer<typeof Features>;
 

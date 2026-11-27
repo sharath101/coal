@@ -67,6 +67,25 @@ export const ActionDetail = z.discriminatedUnion('kind', [
     /** Where results will most likely be kept: a project and step. */
     keepIn: z.string().nullable(),
   }),
+  z.object({
+    kind: z.literal('fill'),
+    documentId: Id,
+    projectId: Id,
+    number: z.string(),
+    title: z.string(),
+    /** The version the words were written for; confirming saves the next one, as a draft. */
+    versionNo: z.number().int(),
+    /** Each part of the form that changes: where it is, the words it has now, and exactly what goes in. */
+    fills: z.array(
+      z.object({
+        part: z.string(),
+        where: z.string(),
+        was: z.string(),
+        mode: z.enum(['replace', 'append', 'after']),
+        text: z.string(),
+      }),
+    ),
+  }),
 ]);
 export type ActionDetail = z.infer<typeof ActionDetail>;
 
@@ -91,6 +110,11 @@ export const Proposal = z.object({
   /** Prepared by the AI in this chat; empty for a bulk action from a screen. */
   chatId: Id.nullable(),
   preparedByAi: z.boolean(),
+  /**
+   * Prepared in a chat where the assistant looked things up on the web: it may carry facts from
+   * the public web, so the card tells the person to check them before confirming.
+   */
+  fromWeb: z.boolean(),
   actions: z.array(ProposalAction),
   preview: z.object({ actions: z.array(ActionPreview) }),
   expiresAt: Timestamp,

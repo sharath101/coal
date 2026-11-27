@@ -144,6 +144,7 @@ describe('my profile', () => {
     expect((await read(t.app, cookie)).features).toEqual({
       templateFilling: false,
       chatUploadMaxBytes: 10 * 1024 * 1024,
+      aiWeb: false,
     });
 
     const on = await createTestApp({ TEMPLATE_FILLING: 'true', AI_UPLOAD_MAX_MB: '2.5' });
@@ -152,6 +153,7 @@ describe('my profile', () => {
       expect((await read(on.app, other.cookie)).features).toEqual({
         templateFilling: true,
         chatUploadMaxBytes: 2.5 * 1024 * 1024,
+        aiWeb: false,
       });
     } finally {
       await on.close();

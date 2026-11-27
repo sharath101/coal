@@ -38,7 +38,7 @@
 | **Health** | Green, amber or red, for a step or project, from its dates ([dashboard.md](./dashboard.md#health)) |
 | **Iteration** | One pass through a step. Sending work back opens a new iteration; earlier ones stay on record |
 | **Milestone** | A target the VP sets for one project, at Go or later: a step of the route (reached when it is signed off) or something in their own words (ticked off by hand), with an optional target date. Late milestones count in the project's health ([dashboard.md](./dashboard.md#milestones)). Not the same as a prerequisite |
-| **Outside document** | A file from outside Jayon (a lab report, a vendor PDF). Treated with extra care by the AI |
+| **Outside document** | A file from outside Jayon (a lab report, a vendor PDF). Treated with extra care by the AI; so is what a web lookup brings back |
 | **Org chart** | Jayon's R&D chart in COAL: positions, who reports to whom, and how many people may hold each ([roles-and-access.md](./roles-and-access.md#the-org-chart)) |
 | **Passkey** | The standard behind Face ID, fingerprint and Windows Hello sign-in. COAL will use passkeys for signing, in the last block (D16) |
 | **Placeholder** | A `{name}` in a template's Word file, replaced when a document is made. Each must match the template's specification *Parked: a plain Word form has none.* |
@@ -66,6 +66,9 @@
 | **Task** | One person's piece of work. Kinds: work, review, sign, decision, corrective action, request, own |
 | **Template library** | Where COAL keeps Jayon's Word form for each document type, with its versions (draft, approved, retired). One version per type is approved ("active" in the code), and it replaces the one before it |
 | **Via AI** | The mark on every request the AI makes on a user's behalf. The backend uses it to apply the AI tiers |
+| **Web assistant** | A separate model turn that searches and reads public pages for COAL's assistant. It sees only one **web brief**, never COAL's records, and reports back with the page for each statement |
+| **Web brief** | What COAL's assistant asks the web assistant: one question in general words and the facts that would answer it. The only thing that leaves COAL in a web lookup, checked by code first |
+| **Web lookup** | One look on the web: a web brief, the web assistant's searches and pages, and its report as COAL shaped it. Allowed while the chat's **Web switch** is on; after one, the chat only prepares action cards |
 | **Widget** | A Dashboard card that expands into a full view. Defined in `shared/`; every widget returns counts and rows in one shape |
 | **Work message** | A notification written from the route's template for the event, for example "Your part on SPN-26-004: step 1…". Never carries comments or reasons |
 | **Working day** | Monday to Friday, except the holidays and worked Saturdays in the working calendar |

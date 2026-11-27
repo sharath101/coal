@@ -30,6 +30,8 @@ import {
   recentMessages,
   setTitle,
   touchChat,
+  webAvailable,
+  webFoundInChat,
   type ChatRow,
   type MessageRow,
 } from './service';
@@ -178,13 +180,17 @@ async function run(args: TurnArgs, ai: AppDeps['config']['ai']) {
   const userMessage = presentMessage(userRow);
   emit({ type: 'start', userMessage });
 
-  const [role, line, versions, context, waiting] = await Promise.all([
+  const [role, line, versions, context, waiting, webFound] = await Promise.all([
     getRole(deps.db, ctx.orgId, actor.roleKey),
     actor.productLineId ? getProductLine(deps.db, ctx.orgId, actor.productLineId) : null,
     listLatestVersions(deps.db, ctx.orgId),
     contextLines(deps, ctx.orgId, chat.context),
     proposalsOfChat(deps.db, ctx.orgId, actor.userId, chat.id, deps.now()),
+    chat.usedWeb ? webFoundInChat(deps.db, chat.id) : '',
   ]);
+  // The web can be reached here, and the person's switch for this chat is on.
+  const canReachWeb = webAvailable(deps);
+  const web = canReachWeb && chat.webOn;
   const today = dateOfInstant(deps.now());
   const system = buildInstructions({
     today,
@@ -204,6 +210,9 @@ async function run(args: TurnArgs, ai: AppDeps['config']['ai']) {
       ),
     hasFile,
     templateFilling: deps.config.templateFilling,
+    web: web ? 'on' : canReachWeb ? 'off' : 'unavailable',
+    webLookups: ai.web.lookupsPerReply,
+    usedWeb: chat.usedWeb,
   });
 
   const toolbox = buildToolbox({
@@ -215,7 +224,14 @@ async function run(args: TurnArgs, ai: AppDeps['config']['ai']) {
     maxToolCalls: ai.maxToolCalls,
     signal: controller.signal,
     outsideText: hasFile,
+    web,
+    usedWeb: chat.usedWeb,
     said: [...history.filter((m) => m.role === 'user').map((m) => m.text), args.text].join('\n'),
+    answered: history
+      .filter((m) => m.role === 'assistant')
+      .map((m) => m.text)
+      .join('\n'),
+    webFound,
     today,
     emit,
   });
@@ -235,7 +251,8 @@ async function run(args: TurnArgs, ai: AppDeps['config']['ai']) {
       tools: toolbox.tools,
       maxSteps: ai.maxToolCalls + 1,
       signal: controller.signal,
-      timeoutMs: ai.turnTimeoutMs,
+      // A reply that may look on the web gets the time its lookups may take, on top of its own.
+      timeoutMs: ai.turnTimeoutMs + (web ? ai.web.lookupsPerReply * ai.web.timeoutMs : 0),
       onText: (delta) => {
         // Words that follow a lookup start a new paragraph, not the end of the last sentence.
         const lookups = toolbox.calls.length;
@@ -264,6 +281,7 @@ async function run(args: TurnArgs, ai: AppDeps['config']['ai']) {
       toolbox.ideas.length === 0)
   )
     parts.push({ type: 'text', text, citations });
+  for (const lookup of toolbox.webRefs) parts.push({ type: 'web', ...lookup });
   for (const proposalId of new Set(toolbox.cards)) parts.push({ type: 'card', proposalId });
   for (const draft of toolbox.drafts.values()) parts.push({ type: 'draft', ...draft });
   for (const idea of toolbox.ideas) parts.push({ type: 'idea', ...idea });
@@ -295,7 +313,8 @@ async function run(args: TurnArgs, ai: AppDeps['config']['ai']) {
     written.length > 0 ||
     toolbox.cards.length > 0 ||
     toolbox.drafts.size > 0 ||
-    toolbox.ideas.length > 0;
+    toolbox.ideas.length > 0 ||
+    toolbox.webRefs.length > 0;
   let reply: MessageRow | null = null;
   const firstTitle = chat.title ? undefined : args.text.replace(/\s+/g, ' ').slice(0, 60);
   await deps.db.transaction(async (tx) => {

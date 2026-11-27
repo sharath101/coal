@@ -8,6 +8,7 @@ import {
 import { change } from '../../core/db/change';
 import { implement } from '../../core/http/endpoint';
 import { AppError, notFound } from '../../core/http/errors';
+import { webAvailable } from '../ai/service';
 import {
   findUser,
   listUsers,
@@ -28,6 +29,7 @@ export const usersRoutes = [
       features: {
         templateFilling: deps.config.templateFilling,
         chatUploadMaxBytes: deps.config.ai.uploadMaxBytes,
+        aiWeb: webAvailable(deps),
       },
       switcher: admin ? { id: admin.id, name: admin.name } : null,
     };

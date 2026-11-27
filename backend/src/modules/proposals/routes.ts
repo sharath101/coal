@@ -31,7 +31,7 @@ const runContext = (
   deps: AppDeps,
   ctx: RequestContext,
   actor: Actor,
-  proposal: { id: string; chatId: string | null; preparedByAi: boolean },
+  proposal: NonNullable<RequestContext['proposal']>,
 ): RunContext => ({ deps, ctx, actor, proposal });
 
 /** `3` or `"3"`: the version the person saw. Confirming needs it; editing checks it when sent. */
@@ -79,7 +79,11 @@ const proposalCtx = (row: ProposalRow) => ({
   id: row.id,
   chatId: row.chatId,
   preparedByAi: row.preparedByAi,
+  fromWeb: row.fromWeb,
 });
+
+/** The card is prepared in a chat that has used the web: it may carry facts from the public web. */
+const fromWebNow = (ctx: RequestContext) => !!(ctx.viaAi && ctx.aiChat?.usedWeb);
 
 class PreviewChanged extends Error {
   constructor(readonly previews: ActionPreview[]) {
@@ -91,7 +95,8 @@ export const proposalsRoutes = [
   implement(createProposal, async ({ deps, ctx, actor, body }) => {
     // Set by the backend while the AI answers in a chat; a client can't name a chat.
     const chatId = ctx.aiChat?.chatId ?? null;
-    const draft = { id: 'new', chatId, preparedByAi: ctx.viaAi };
+    const fromWeb = fromWebNow(ctx);
+    const draft = { id: 'new', chatId, preparedByAi: ctx.viaAi, fromWeb };
     const preview = await previewActions(runContext(deps, ctx, actor, draft), body.actions);
     return change(deps.db, ctx, async (tx, log) => {
       const row = await insertProposal(tx, {
@@ -99,6 +104,7 @@ export const proposalsRoutes = [
         forUserId: actor.userId,
         chatId,
         preparedByAi: ctx.viaAi,
+        fromWeb,
         title: body.title,
         actions: body.actions,
         preview,
@@ -108,7 +114,12 @@ export const proposalsRoutes = [
         action: 'proposal.created',
         recordType: 'proposal',
         recordId: row.id,
-        after: { title: row.title, endpoints: row.actions.map((a) => a.endpoint), chatId },
+        after: {
+          title: row.title,
+          endpoints: row.actions.map((a) => a.endpoint),
+          chatId,
+          ...(fromWeb && { fromWeb }),
+        },
       });
       log.event({ type: 'proposal.created', payload: { proposalId: row.id } });
       return presentProposal(row, deps.now());
@@ -131,8 +142,10 @@ export const proposalsRoutes = [
     const current = await findProposal(deps.db, ctx.orgId, params.id);
     if (!current) throw notFound('proposal');
     assertCanAccess('proposals.write', actor, current);
+    // A card the assistant changes after looking on the web may now carry what it found.
+    const fromWeb = current.fromWeb || fromWebNow(ctx);
     const preview = await previewActions(
-      runContext(deps, ctx, actor, proposalCtx(current)),
+      runContext(deps, ctx, actor, { ...proposalCtx(current), fromWeb }),
       body.actions,
     );
     return change(deps.db, ctx, async (tx, log) => {
@@ -145,6 +158,7 @@ export const proposalsRoutes = [
           actions: body.actions,
           preview: { actions: preview },
           version: row.version + 1,
+          fromWeb,
         },
         deps.now(),
       );
@@ -194,6 +208,7 @@ export const proposalsRoutes = [
               version: row.version,
               chatId: row.chatId,
               preparedByAi: row.preparedByAi,
+              ...(row.fromWeb && { fromWeb: true }),
               endpoints: row.actions.map((a) => a.endpoint),
             },
           },

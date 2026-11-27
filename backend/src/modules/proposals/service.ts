@@ -20,6 +20,7 @@ export function presentProposal(row: ProposalRow, now: Date): Proposal {
     title: row.title,
     chatId: row.chatId,
     preparedByAi: row.preparedByAi,
+    fromWeb: row.fromWeb,
     actions: row.actions,
     preview: row.preview,
     expiresAt: row.expiresAt.toISOString(),
@@ -36,6 +37,7 @@ export async function insertProposal(
     forUserId: string;
     chatId: string | null;
     preparedByAi: boolean;
+    fromWeb: boolean;
     title: string;
     actions: ProposalAction[];
     preview: ActionPreview[];
@@ -69,7 +71,7 @@ export async function updateProposalRow(
   set: Partial<
     Pick<
       ProposalRow,
-      'title' | 'actions' | 'preview' | 'version' | 'status' | 'confirmedAt' | 'result'
+      'title' | 'actions' | 'preview' | 'version' | 'status' | 'confirmedAt' | 'result' | 'fromWeb'
     >
   >,
   now: Date,
